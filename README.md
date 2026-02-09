@@ -1,8 +1,11 @@
-# Agent Sandbox Profile Kit
+# Agent Safehouse
+
+[![Tests (macOS)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Sandbox your LLM coding agents on macOS so they can only touch the files they need.
 
-Uses macOS `sandbox-exec` with a set of composable policy profiles to confine agents like Claude, Cursor, Aider, and others. The sandbox starts from **deny-all** and selectively opens access to toolchains, agent configs, integrations, and the directories you specify.
+Uses macOS `sandbox-exec` with composable policy profiles to confine agents like Claude Code, Codex, Gemini CLI, Cursor, Aider, and others. Starts from **deny-all** and selectively opens access to toolchains, agent configs, integrations, and the directories you specify.
 
 ## Why
 
