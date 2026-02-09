@@ -1,0 +1,20 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Java
+;; Java runtime, Maven, Gradle, SBT, and Coursier paths.
+;; Source: 30-toolchains/java.sb
+;; ---------------------------------------------------------------------------
+
+;; Includes common Maven/Gradle/SBT/Coursier and Java runtime manager locations.
+
+(allow file-read* file-write*
+    (home-subpath "/.m2")
+    (home-subpath "/.gradle")
+    (home-subpath "/.ivy2")
+    (home-subpath "/.sbt")
+    (home-subpath "/.jenv")
+    (home-subpath "/.sdkman")
+    (home-subpath "/.cache/coursier")
+    (home-subpath "/.coursier")
+    (home-subpath "/Library/Application Support/Coursier")
+    (home-subpath "/Library/Caches/Coursier")
+)

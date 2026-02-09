@@ -1,0 +1,17 @@
+;; ---------------------------------------------------------------------------
+;; Integration: SCM CLIs
+;; GitHub CLI (gh) and GitLab CLI (glab) config, cache, and state access.
+;; Source: 50-integrations/scm-clis.sb
+;; ---------------------------------------------------------------------------
+
+;; Threat-model note: preventing exfiltration/C2 is NOT a goal; this keeps SCM workflows available to agents.
+
+(allow file-read* file-write*
+    (home-subpath "/.config/gh")             ;; gh auth tokens/config for repo and PR automation.
+    (home-subpath "/.cache/gh")              ;; gh cache for API and command acceleration.
+    (home-subpath "/.local/share/gh")        ;; gh persistent state and extensions.
+    (home-subpath "/.local/state/gh")        ;; gh runtime state files.
+    (home-subpath "/.config/glab-cli")       ;; glab auth tokens/config for GitLab automation.
+    (home-subpath "/.cache/glab-cli")        ;; glab cache for API and command acceleration.
+    (home-subpath "/.local/share/glab-cli")  ;; glab persistent state.
+)

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+GENERATOR="${SCRIPT_DIR}/generate-policy.sh"
+policy_path=""
+cleanup_policy=1
+policy_arg_count=0
+dry_run=0
+
+cleanup() {
+  if [[ "$cleanup_policy" -eq 1 && -n "$policy_path" && -f "$policy_path" ]]; then
+    rm -f "$policy_path"
+  fi
+}
+
+trap cleanup EXIT
+
+usage() {
+  cat <<USAGE
+Usage:
+  $(basename "$0") [policy options] -- <command> [args...]
+
+Examples:
+  $(basename "$0") --dry-run --add-dirs=/path1 -- claude
+  $(basename "$0") --add-dirs=/path1:/path2 --add-dirs-ro=/path3 -- claude --dangerously-skip-permissions
+  $(basename "$0") --enable=docker --add-dirs="$PWD" -- docker ps
+  $(basename "$0") -- ~/.local/bin/claude --dangerously-skip-permissions
+USAGE
+}
+
+preflight_runtime() {
+  local os_name
+  os_name="$(uname -s 2>/dev/null || printf 'unknown')"
+  if [[ "$os_name" != "Darwin" ]]; then
+    echo "safehouse requires macOS (Darwin) to execute commands under sandbox-exec." >&2
+    echo "Detected platform: ${os_name}" >&2
+    echo "Tip: run generate-policy.sh directly if you only need the generated policy path." >&2
+    exit 1
+  fi
+
+  if ! command -v sandbox-exec >/dev/null 2>&1; then
+    echo "safehouse could not find sandbox-exec in PATH." >&2
+    echo "Expected binary on macOS: /usr/bin/sandbox-exec" >&2
+    echo "Use --dry-run to inspect policy output without execution." >&2
+    exit 1
+  fi
+}
+
+if [[ ! -x "$GENERATOR" ]]; then
+  echo "Policy generator is missing or not executable: ${GENERATOR}" >&2
+  exit 1
+fi
+
+policy_args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      policy_args+=("$1")
+      policy_arg_count=$((policy_arg_count + 1))
+      shift
+    ;;
+  esac
+done
+
+if [[ "$dry_run" -eq 0 && $# -eq 0 ]]; then
+  echo "No command provided. Use: $(basename "$0") [policy options] -- <command> [args...]" >&2
+  exit 1
+fi
+
+if [[ "$dry_run" -eq 0 ]]; then
+  preflight_runtime
+fi
+
+if [[ "$policy_arg_count" -gt 0 ]]; then
+  policy_path="$("$GENERATOR" "${policy_args[@]}")"
+else
+  policy_path="$("$GENERATOR")"
+fi
+if [[ ! -f "$policy_path" ]]; then
+  echo "Generator returned non-existent policy file: ${policy_path}" >&2
+  exit 1
+fi
+
+if [[ "$policy_arg_count" -gt 0 ]]; then
+  for ((i = 0; i < policy_arg_count; i++)); do
+    case "${policy_args[$i]}" in
+      --output|--output=*)
+        cleanup_policy=0
+        break
+        ;;
+    esac
+  done
+fi
+
+if [[ "$dry_run" -eq 1 ]]; then
+  cleanup_policy=0
+  printf '%s\n' "$policy_path"
+  exit 0
+fi
+
+set +e
+sandbox-exec -f "$policy_path" -- "$@"
+status=$?
+set -e
+
+exit "$status"

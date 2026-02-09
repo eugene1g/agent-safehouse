@@ -1,0 +1,60 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Browser Native Messaging
+;; Chromium native messaging host registration and extension detection.
+;; Source: 50-integrations/browser-native-messaging.sb
+;; ---------------------------------------------------------------------------
+
+;; Three things are needed per browser:
+;;   1. Directory listing on the browser root (check if browser is installed)
+;;   2. Read+write on NativeMessagingHosts (register/update the native messaging manifest)
+;;   3. Read on Default/Extensions (check if a specific extension is installed)
+;; Extensions dir only contains publicly-available extension source/manifests — no browsing data.
+;; No access to cookies, passwords, history, bookmarks, or profile data.
+
+(allow file-read*
+    (home-literal "/Library/Application Support/Google/Chrome")
+    (home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
+    (home-literal "/Library/Application Support/Arc/User Data")
+    (home-literal "/Library/Application Support/Microsoft Edge")
+    (home-literal "/Library/Application Support/Chromium")
+    (home-literal "/Library/Application Support/Vivaldi")
+    (home-literal "/Library/Application Support/com.operasoftware.Opera")
+    (data-home-literal "/Library/Application Support/Google/Chrome")
+    (data-home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
+    (data-home-literal "/Library/Application Support/Arc/User Data")
+    (data-home-literal "/Library/Application Support/Microsoft Edge")
+    (data-home-literal "/Library/Application Support/Chromium")
+    (data-home-literal "/Library/Application Support/Vivaldi")
+    (data-home-literal "/Library/Application Support/com.operasoftware.Opera")
+    (home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
+    (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
+    (home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
+    (home-subpath "/Library/Application Support/Microsoft Edge/Default/Extensions")
+    (home-subpath "/Library/Application Support/Chromium/Default/Extensions")
+    (home-subpath "/Library/Application Support/Vivaldi/Default/Extensions")
+    (home-subpath "/Library/Application Support/com.operasoftware.Opera/Default/Extensions")
+    (data-home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
+    (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
+    (data-home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
+    (data-home-subpath "/Library/Application Support/Microsoft Edge/Default/Extensions")
+    (data-home-subpath "/Library/Application Support/Chromium/Default/Extensions")
+    (data-home-subpath "/Library/Application Support/Vivaldi/Default/Extensions")
+    (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/Default/Extensions")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Microsoft Edge/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/Microsoft Edge/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
+)

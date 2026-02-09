@@ -1,0 +1,28 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Runtime Managers
+;; Cross-language version managers (mise, asdf, proto, pkgx).
+;; Source: 30-toolchains/runtime-managers.sb
+;; ---------------------------------------------------------------------------
+
+;; Keep these separate from node.sb so Node toolchain policy stays focused.
+
+(allow file-read* file-write*
+    ;; mise
+    (home-subpath "/.config/mise")
+    (home-subpath "/.local/share/mise")
+    (home-subpath "/.local/state/mise")
+    (home-subpath "/Library/Caches/mise")
+
+    ;; volta
+    (home-subpath "/.volta")
+
+    ;; asdf
+    (home-subpath "/.asdf")
+    (home-subpath "/.config/asdf")
+    (home-subpath "/.local/share/asdf")
+    (home-subpath "/.local/state/asdf")
+    (home-subpath "/.cache/asdf")
+    (home-subpath "/Library/Caches/asdf")
+    (home-literal "/.asdfrc")
+    (home-literal "/.tool-versions")
+)

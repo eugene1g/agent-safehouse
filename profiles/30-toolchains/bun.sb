@@ -1,0 +1,23 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Bun
+;; Bun runtime, installer, and cache paths.
+;; Source: 30-toolchains/bun.sb
+;; ---------------------------------------------------------------------------
+
+;; Canonical Bun paths from docs:
+;; - BUN_INSTALL defaults to ~/.bun
+;; - install.cache.dir defaults to ~/.bun/install/cache
+;; - install.globalDir defaults to ~/.bun/install/global
+;; - install.globalBinDir defaults to ~/.bun/bin
+;; - global bunfig path is ~/.bunfig.toml (or $XDG_CONFIG_HOME/.bunfig.toml)
+;; Also include common cache/state variants seen on macOS.
+
+(allow file-read* file-write*
+    (home-subpath "/.bun")
+    (home-subpath "/.cache/bun")
+    (home-subpath "/.local/state/bun")
+    (home-subpath "/.local/share/bun")
+    (home-subpath "/Library/Caches/bun")
+    (home-literal "/.bunfig.toml")
+    (home-literal "/.config/.bunfig.toml")
+)

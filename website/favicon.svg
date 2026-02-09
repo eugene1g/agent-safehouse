@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="shield" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#1f6feb"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield shape - full solid blue -->
+  <path d="M32 4 L56 16 L56 34 C56 50 45 58 32 62 C19 58 8 50 8 34 L8 16 Z"
+        fill="url(#shield)"/>
+  <!-- House icon inside shield - bright green -->
+  <path d="M32 20 L19 30 L19 44 L27 44 L27 37 L37 37 L37 44 L45 44 L45 30 Z"
+        fill="#3fb950"/>
+  <!-- Keyhole -->
+  <circle cx="32" cy="33" r="3" fill="#0d1117"/>
+  <rect x="30.5" y="34.5" width="3" height="4.5" rx="0.8" fill="#0d1117"/>
+</svg>

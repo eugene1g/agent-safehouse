@@ -1,0 +1,19 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Ruby
+;; Ruby runtime, gem, and bundler cache paths.
+;; Source: 30-toolchains/ruby.sb
+;; ---------------------------------------------------------------------------
+
+;; Covers common Ruby managers and gem/bundler caches.
+
+(allow file-read* file-write*
+    (home-subpath "/.rbenv")
+    (home-subpath "/.rvm")
+    (home-subpath "/.rubies")
+    (home-subpath "/.bundle")
+    (home-subpath "/.gem")
+    (home-subpath "/.cache/bundler")
+    (home-subpath "/.cache/rubygems")
+    (home-subpath "/Library/Caches/bundle")
+    (home-literal "/.gemrc")
+)

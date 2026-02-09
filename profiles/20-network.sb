@@ -1,0 +1,22 @@
+;; ---------------------------------------------------------------------------
+;; Network
+;; Network policy; intentionally fully open for reliable agent operation.
+;; Source: 20-network.sb
+;; ---------------------------------------------------------------------------
+
+;; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.
+;; The goal here is reliable agent operation (package installs, API calls, web fetches, local servers).
+
+(allow network*)  ;; Allow outbound + inbound traffic so agent tooling and localhost dev servers work by default.
+
+;; Strict policy examples (disabled by default):
+;; 1) Comment out `(allow network*)` above.
+;; 2) Uncomment ONE block below.
+
+;; Example A: outbound only (no listening sockets)
+;; (allow network-outbound)                     ;; Tight mode: keep fetch/install/API access, block listening sockets.
+
+;; Example B: outbound + localhost-only dev servers
+;; (allow network-outbound)                     ;; Tight mode: keep outbound access.
+;; (allow network-bind (local ip "localhost:*"))  ;; Tight mode: only allow binding local dev-server ports.
+;; (allow network-inbound (local ip "localhost:*"))  ;; Tight mode: only allow localhost clients to connect.

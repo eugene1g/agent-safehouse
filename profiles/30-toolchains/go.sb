@@ -1,0 +1,21 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Go
+;; Go toolchain, module cache, and build cache paths.
+;; Source: 30-toolchains/go.sb
+;; ---------------------------------------------------------------------------
+
+;; Adjust for your GOPATH/GOMODCACHE conventions as needed.
+;; Defaults on many setups:
+;; - GOPATH: ~/go
+;; - GOCACHE: ~/.cache/go-build or ~/Library/Caches/go-build
+
+(allow file-read* file-write*
+    (home-subpath "/go")
+    (home-subpath "/.cache/go-build")
+    (home-subpath "/Library/Caches/go-build")
+    (home-subpath "/.config/go")
+    (home-subpath "/.cache/golangci-lint")
+    (home-subpath "/Library/Caches/golangci-lint")
+    (home-subpath "/.config/golangci-lint")
+    (home-subpath "/.local/share/go")
+)

@@ -1,0 +1,25 @@
+(version 1)
+
+;; ---------------------------------------------------------------------------
+;; Base Profile
+;; Core definitions, HOME_DIR replacement token, and helper macros shared by all modules.
+;; Source: 00-base.sb
+;; ---------------------------------------------------------------------------
+
+;; HOME_DIR starts as an explicit replacement placeholder.
+;; bin/generate-policy.sh replaces this token with the resolved HOME path.
+;;
+;; Manual policy-only example (no generator):
+;;   Replace the next line with:
+;;     (define HOME_DIR "/Users/alice")
+;;   and keep DATA_HOME_DIR unchanged.
+(define HOME_DIR "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__")
+(define DATA_HOME_DIR (string-append "/System/Volumes/Data" HOME_DIR))
+
+(define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
+(define (home-literal rel) (literal (string-append HOME_DIR rel)))
+(define (home-prefix rel) (prefix (string-append HOME_DIR rel)))
+(define (data-home-subpath rel) (subpath (string-append DATA_HOME_DIR rel)))
+(define (data-home-literal rel) (literal (string-append DATA_HOME_DIR rel)))
+
+(deny default)

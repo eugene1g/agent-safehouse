@@ -1,0 +1,17 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Rust
+;; Rust toolchain via rustup/cargo, including config, cache, and optional sccache.
+;; Source: 30-toolchains/rust.sb
+;; ---------------------------------------------------------------------------
+
+;; Includes common cargo config/cache locations and optional sccache.
+
+(allow file-read* file-write*
+    (home-subpath "/.cargo")
+    (home-subpath "/.config/cargo")
+    (home-subpath "/.rustup")
+    (home-subpath "/.cache/cargo")
+    (home-subpath "/Library/Caches/cargo")
+    (home-subpath "/.cache/sccache")
+    (home-subpath "/Library/Caches/sccache")
+)

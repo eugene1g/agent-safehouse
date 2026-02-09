@@ -1,0 +1,38 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Python
+;; Python runtime, pip, uv, and virtualenv paths.
+;; Source: 30-toolchains/python.sb
+;; ---------------------------------------------------------------------------
+
+;; Covers common Python package/cache/config paths, plus uv binaries/state.
+;; Do not grant blanket writes to ~/.local/bin; per-agent modules grant entrypoint-specific binary writes.
+
+(allow file-read* file-write*
+    (home-literal "/.local/bin/uv")            ;; uv binary observed in ~/.local/bin on this machine.
+    (home-literal "/.local/bin/uvx")           ;; uvx companion binary observed in ~/.local/bin.
+    (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state.
+    (home-subpath "/.local/state/uv")          ;; uv state/cache metadata on XDG-style setups.
+    (home-subpath "/.local/pipx")              ;; pipx-managed virtualenvs and shared python runtime.
+    (home-subpath "/.cache/uv")                ;; uv download/build cache for fast repeated runs.
+    (home-subpath "/Library/Caches/uv")        ;; macOS cache variant used by some uv installs.
+    (home-subpath "/.config/uv")               ;; uv config reads/writes during tool resolution.
+    (home-subpath "/.cache/pip")               ;; pip cache writes used by Python package installs.
+    (home-subpath "/.config/pip")              ;; pip config reads for index/auth/behavior settings.
+    (home-subpath "/Library/Caches/pip")       ;; macOS pip cache location used by some Python setups.
+    (home-subpath "/.cache/pypoetry")          ;; Poetry dependency cache for Python project tasks.
+    (home-subpath "/.config/pypoetry")         ;; Poetry config used during install/publish operations.
+    (home-subpath "/.local/share/pypoetry")    ;; Poetry local state and virtualenv metadata.
+    (home-subpath "/Library/Caches/pypoetry")  ;; macOS Poetry cache variant.
+    (home-subpath "/.cache/pdm")               ;; PDM dependency/cache data.
+    (home-subpath "/.config/pdm")              ;; PDM config files.
+    (home-subpath "/.local/share/pdm")         ;; PDM local metadata/state.
+    (home-subpath "/.cache/pre-commit")        ;; pre-commit hook environment cache.
+    (home-subpath "/.cache/mypy")              ;; mypy incremental/type cache.
+    (home-subpath "/.cache/ruff")              ;; Ruff lint/format cache.
+    (home-subpath "/.virtualenvs")             ;; virtualenvwrapper default location.
+    (home-subpath "/.ipython")                 ;; IPython history/profile data.
+    (home-subpath "/.jupyter")                 ;; Jupyter runtime/config paths in home.
+    (home-subpath "/.pyenv")                   ;; pyenv interpreter shims/versions used by many repos.
+    (home-literal "/.pypirc")                  ;; Python package index credentials/config file path.
+    (home-literal "/.python_history")          ;; REPL history file touched by Python subprocess sessions.
+)

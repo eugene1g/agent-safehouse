@@ -1,0 +1,47 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Keychain
+;; macOS Keychain and Security framework for agent authentication and TLS.
+;; Source: 50-integrations/keychain.sb
+;; ---------------------------------------------------------------------------
+
+;; Most agents (Claude Code, Amp, etc.) store login/auth tokens in the macOS Keychain.
+;; Without this, agents cannot authenticate and will fail to start.
+;; Read+write access is needed for credential storage, retrieval, and TLS certificate validation.
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.
+    (data-home-subpath "/Library/Keychains")                   ;; Same keychain access on macOS Data volume path aliases.
+)
+
+(allow file-read-metadata
+    (home-literal "/Library")                                  ;; Restrict home traversal to the Library root only.
+    (home-literal "/Library/Keychains")                        ;; User keychain directory metadata for login/session lookups.
+    (data-home-literal "/Library")                             ;; Same traversal on macOS Data volume path aliases.
+    (data-home-literal "/Library/Keychains")                   ;; Same keychain metadata on macOS Data volume path aliases.
+    (literal "/Library")                                       ;; System Library traversal for system keychain access.
+    (literal "/Library/Keychains")                             ;; System keychain directory metadata.
+)
+
+(allow file-read* file-write*
+    (home-literal "/Library/Preferences/com.apple.security.plist")   ;; User security preferences touched by some auth flows.
+    (data-home-literal "/Library/Preferences/com.apple.security.plist") ;; Same preferences path on macOS Data volume aliases.
+    (literal "/Library/Preferences/com.apple.security.plist")  ;; Security preferences read/written by security CLI.
+)
+
+(allow file-read*
+    (literal "/Library/Keychains/System.keychain")             ;; System keychain read for security CLI operations.
+)
+
+(allow mach-lookup
+    (global-name "com.apple.SecurityServer")                   ;; Keychain operations depend on SecurityServer IPC.
+    (global-name "com.apple.security.agent")                   ;; Login prompts/token unlock dialogs route through this service.
+    (global-name "com.apple.securityd.xpc")                    ;; securityd backend needed for certificate/key queries.
+    (global-name "com.apple.security.authhost")                ;; Auth host service for interactive credential flows.
+    (global-name "com.apple.secd")                             ;; Secure enclave/credential mediation used by macOS security APIs.
+    (global-name "com.apple.trustd.agent")                     ;; Certificate trust evaluation for HTTPS/API clients.
+    (global-name "com.apple.trustd")                           ;; trustd backend used by TLS validation during network calls.
+)
+
+(allow ipc-posix-shm-read-data ipc-posix-shm-write-create ipc-posix-shm-write-data
+    (ipc-posix-name "com.apple.AppleDatabaseChanged")          ;; Keychain database change notifications via shared memory.
+)

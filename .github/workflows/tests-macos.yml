@@ -1,0 +1,33 @@
+name: Tests (macOS)
+
+on:
+  push:
+    paths:
+      - "bin/**"
+      - "profiles/**"
+      - "scripts/**"
+      - "tests/**"
+      - "generated/agent-safehouse-policy.sb"
+      - ".github/workflows/tests-macos.yml"
+      - ".github/workflows/regenerate-static-policy.yml"
+  pull_request:
+    paths:
+      - "bin/**"
+      - "profiles/**"
+      - "scripts/**"
+      - "tests/**"
+      - "generated/agent-safehouse-policy.sb"
+      - ".github/workflows/tests-macos.yml"
+      - ".github/workflows/regenerate-static-policy.yml"
+  workflow_dispatch:
+
+jobs:
+  test-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Run test suite
+        run: ./tests/run.sh

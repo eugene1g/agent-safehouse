@@ -1,0 +1,20 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Codex
+;; Codex CLI binary, state, and config paths.
+;; Source: 40-agents/codex.sb
+;; ---------------------------------------------------------------------------
+
+;; - npm/bun global installs place binaries under package-manager prefix/bin
+;; - ~/.local/bin is the common user-level target and fallback
+;; - local state/config
+;; - package updates are package-manager driven via node toolchain paths
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/codex")
+    (home-subpath "/.codex")
+    (home-subpath "/.cache/codex")
+)
+
+(allow file-read*
+    (home-literal "/Library/Preferences/com.openai.codex.plist")  ;; Codex macOS preferences plist.
+)

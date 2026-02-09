@@ -1,0 +1,68 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Node.js
+;; Node.js runtime with npm, yarn, pnpm, and corepack package manager paths.
+;; Source: 30-toolchains/node.sb
+;; ---------------------------------------------------------------------------
+
+;; Keep writes scoped to Node-specific directories only.
+;; Intentionally avoid broad RW grants like ~/.cache, ~/Library/Caches, ~/.local/share, ~/.local/state.
+;; This list includes common + observed-on-machine Node ecosystem caches.
+
+(allow file-read* file-write*
+    ;; Node version managers.
+    (home-subpath "/.nvm")
+    (home-subpath "/.fnm")
+
+    ;; npm
+    (home-subpath "/.npm")
+    (home-subpath "/.config/npm")
+    (home-subpath "/.cache/npm")
+    (home-subpath "/.cache/node")
+    (home-subpath "/.cache/prisma")
+    (home-subpath "/Library/Caches/npm")
+    (home-literal "/.npmrc")
+
+    ;; configstore (npm ecosystem config persistence)
+    (home-subpath "/.config/configstore")
+
+    ;; node-gyp
+    (home-subpath "/.node-gyp")
+    (home-subpath "/.cache/node-gyp")
+
+    ;; pnpm
+    (home-subpath "/.pnpm-state")
+    (home-subpath "/.pnpm-store")
+    (home-subpath "/.local/share/pnpm")
+    (home-subpath "/.local/state/pnpm")
+    (home-subpath "/Library/pnpm")
+    (home-subpath "/Library/Caches/pnpm")
+    (home-subpath "/Library/Preferences/pnpm")  ;; pnpm-managed global npmrc lives here.
+
+    ;; yarn (classic + modern)
+    (home-subpath "/.yarn")
+    (home-literal "/.yarnrc")
+    (home-literal "/.yarnrc.yml")
+    (home-subpath "/.config/yarn")
+    (home-subpath "/.cache/yarn")
+    (home-subpath "/Library/Caches/Yarn")
+
+    ;; corepack
+    (home-subpath "/.cache/node/corepack")
+    (home-subpath "/Library/Caches/node/corepack")
+
+    ;; browser automation / test runners
+    (home-subpath "/Library/Caches/ms-playwright")
+    (home-subpath "/Library/Caches/Cypress")
+
+    ;; Node ecosystem caches used by CLIs and language tooling
+    (home-subpath "/Library/Caches/typescript")
+    (home-subpath "/Library/Caches/prisma-nodejs")
+    (home-subpath "/Library/Caches/checkpoint-nodejs")
+    (home-subpath "/Library/Caches/claude-cli-nodejs")
+
+    ;; Turborepo
+    (home-subpath "/.cache/turbo")
+    (home-subpath "/Library/Caches/turbo")
+    (home-subpath "/Library/Application Support/turborepo")
+
+)

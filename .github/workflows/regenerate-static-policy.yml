@@ -1,0 +1,40 @@
+name: Regenerate Static Policy
+
+on:
+  push:
+    paths:
+      - "scripts/**"
+      - "profiles/**"
+      - "bin/generate-policy.sh"
+      - ".github/workflows/regenerate-static-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-static-policy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Regenerate policy file
+        run: ./scripts/generate-static-policy.sh
+
+      - name: Commit and push updated policy
+        run: |
+          if git diff --quiet -- generated/agent-safehouse-policy.sb; then
+            echo "No policy changes detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add generated/agent-safehouse-policy.sb
+          git commit -m "chore: regenerate agent-safehouse-policy.sb"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

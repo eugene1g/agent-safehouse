@@ -1,0 +1,6 @@
+title: Agent Safehouse
+description: Sandbox your LLM coding agents on macOS so they can only touch the files they need.
+url: ""
+baseurl: ""
+theme: null
+plugins: []

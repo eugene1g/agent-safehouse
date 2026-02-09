@@ -1,0 +1,19 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: PHP
+;; PHP runtime and Composer paths.
+;; Source: 30-toolchains/php.sb
+;; ---------------------------------------------------------------------------
+
+;; Includes common Composer + PHP env/cache locations.
+
+(allow file-read* file-write*
+    (home-subpath "/.composer")
+    (home-subpath "/.config/composer")
+    (home-subpath "/.cache/composer")
+    (home-subpath "/Library/Caches/composer")
+    (home-subpath "/.local/share/composer")
+    (home-subpath "/.phpenv")
+    (home-subpath "/.config/php")
+    (home-subpath "/.cache/php")
+    (home-literal "/.pearrc")
+)
