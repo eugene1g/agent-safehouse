@@ -1,0 +1,19 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Perl
+;; Perl runtime, cpan/cpanm, and version-manager paths.
+;; Source: 30-toolchains/perl.sb
+;; ---------------------------------------------------------------------------
+
+;; Includes common Perl version managers and package/cache locations.
+
+(allow file-read* file-write*
+    (home-subpath "/.perlbrew")
+    (home-subpath "/.plenv")
+    (home-subpath "/.cpan")
+    (home-subpath "/.cpanm")
+    (home-subpath "/.perl-cpm")
+    (home-subpath "/perl5")
+    (home-subpath "/.local/lib/perl5")
+    (home-subpath "/Library/Caches/cpanm")
+    (home-literal "/.cpanrc")
+)

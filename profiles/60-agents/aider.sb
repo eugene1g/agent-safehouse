@@ -1,0 +1,18 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Aider
+;; Aider CLI binary, state, and config paths.
+;; Source: 60-agents/aider.sb
+;; ---------------------------------------------------------------------------
+
+;; - pipx-style binary location: ~/.local/bin/aider
+;; - local state/config
+;; - package updates are package-manager driven via python toolchain paths
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/aider")
+    (home-prefix "/.local/bin/aider-install")
+    (home-prefix "/.aider")
+    (home-subpath "/.config/aider")
+    (home-subpath "/.cache/aider")
+    (home-subpath "/.local/share/aider")
+)

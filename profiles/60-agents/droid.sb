@@ -1,0 +1,14 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Droid
+;; Droid CLI binary, Factory helpers, state, and config paths.
+;; Source: 60-agents/droid.sb
+;; ---------------------------------------------------------------------------
+
+;; - install script binary location: ~/.local/bin/droid
+;; - installer also manages helper binaries under ~/.factory/bin
+;; - local state/config (Factory CLI root)
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/droid")
+    (home-subpath "/.factory")
+)

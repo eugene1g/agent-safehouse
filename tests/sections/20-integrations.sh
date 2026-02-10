@@ -48,9 +48,17 @@ run_section_integrations() {
   section_begin "macOS GUI / Electron Integration Policy Coverage"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits electron integration profile" "#safehouse-test-id:electron-integration#"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Claude Desktop open/save panel XPC service" "(global-name \"com.apple.appkit.xpc.openAndSavePanelService\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Claude Desktop powerlog XPC service" "(global-name \"com.apple.powerlog.plxpclogger.xpc\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Claude Desktop FileCoordination mach-lookup" "(global-name \"com.apple.FileCoordination\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Claude Desktop syspolicy mach-lookup" "(global-name \"com.apple.security.syspolicy\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Claude Desktop syspolicy exec mach-lookup" "(global-name \"com.apple.security.syspolicy.exec\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Claude Desktop HFS hotfile fsctl grant" "(fsctl-command (_IO \"h\" 47))"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Claude Desktop preference writes" "(preference-domain \"com.anthropic.claudefordesktop\")"
 
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes CARenderServer mach-lookup grant" "(global-name \"com.apple.CARenderServer\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes usymptomsd mach-lookup grant" "(global-name \"com.apple.usymptomsd\")"
   assert_policy_not_contains "$POLICY_MACOS_GUI" "--enable=macos-gui does not include electron integration profile" "#safehouse-test-id:electron-integration#"
 
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron integration marker" "#safehouse-test-id:electron-integration#"
@@ -65,6 +73,7 @@ run_section_integrations() {
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes crashpad handshake regex grant" "(global-name-regex #\"^org\\.chromium\\.crashpad\\.child_port_handshake\\.\")"
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies CARenderServer mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.CARenderServer\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies usymptomsd mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.usymptomsd\")"
 
   section_begin "Keychain Access"
   assert_allowed_if_exists "$POLICY_DEFAULT" "security find-certificate" "security" /usr/bin/security find-certificate -a

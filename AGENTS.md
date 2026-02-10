@@ -18,10 +18,12 @@ Tests require macOS with `sandbox-exec` available and **cannot run inside an exi
 ```bash
 ./scripts/generate-dist.sh
 ```
-This produces three deterministic dist files:
+This produces five deterministic dist files:
 - `dist/safehouse.sh` (single-file executable)
-- `dist/safehouse.generated.sb` (default policy)
-- `dist/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
+- `dist/Claude.app.sandboxed.command` (single-file Claude Desktop launcher)
+- `dist/Claude.app.sandboxed-offline.command` (single-file Claude Desktop launcher with embedded policy)
+- `dist/profiles/safehouse.generated.sb` (default policy)
+- `dist/profiles/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
 CI auto-regenerates and commits these files when profiles or runtime scripts change.
 
 **Important:** After modifying any `.sb` profile or Safehouse policy assembly logic (`bin/safehouse.sh` or `bin/lib/*.sh`), always run:
@@ -49,11 +51,13 @@ Outputs the path to the generated temp policy file when no command is provided.
 2. `profiles/10-system-runtime.sb` — system binaries, temp dirs, IPC/mach services
 3. `profiles/20-network.sb` — network policy (fully open by default)
 4. `profiles/30-toolchains/*.sb` — all toolchain profiles (Node, Python, Go, Rust, etc.)
-5. `profiles/40-agents/*.sb` — all agent profiles (Claude, Cursor, Aider, etc.) including `__common.sb` for shared agent paths
-6. `profiles/50-integrations/*.sb` — always-on integrations (git, SSH, keychain, 1password, browser-nm, etc.) + opt-in `docker`, `macos-gui`, and `electron` integrations controlled by `--enable` (`electron` also enables `macos-gui`)
-7. Dynamic CLI path grants (`--add-dirs-ro`, then `--add-dirs`)
-8. Selected workdir grant (read/write; omitted when `--workdir` is explicitly empty)
-9. Optional appended profile(s) from CLI `--append-profile` (loaded last so they win)
+5. `profiles/40-shared/*.sb` — shared cross-agent policy modules (for example shared `~/.skills`, `~/.agents`, and `~/AGENTS.md` access)
+6. `profiles/50-integrations-core/*.sb` — always-on integrations (git, SSH, keychain, 1password, browser-nm, etc.)
+7. `profiles/55-integrations-optional/*.sb` — opt-in integrations (`docker`, `macos-gui`, and `electron`) controlled by `--enable` (`electron` also enables `macos-gui`)
+8. `profiles/60-agents/*.sb` — product-specific agent profiles (Claude, Cursor, Aider, etc.)
+9. Dynamic CLI path grants (`--add-dirs-ro`, then `--add-dirs`)
+10. Selected workdir grant (read/write; omitted when `--workdir` is explicitly empty)
+11. Optional appended profile(s) from CLI `--append-profile` (loaded last so they win)
 
 **Order matters**: later rules override earlier ones. Selected workdir grants come after extra path grants. Appended profiles are loaded last so their deny rules take precedence.
 
@@ -90,8 +94,8 @@ Some profiles use `#safehouse-test-id:tag#` markers in comments — tests grep f
 
 ### CI
 
-- **tests-macos.yml** — runs `./tests/run.sh` on `macos-latest` on push/PR when bin/, profiles/, scripts/, tests/, `dist/safehouse.generated.sb`, `dist/safehouse-for-apps.generated.sb`, or `dist/safehouse.sh` change
-- **regenerate-dist.yml** — auto-regenerates and commits `dist/safehouse.sh`, `dist/safehouse.generated.sb`, and `dist/safehouse-for-apps.generated.sb` when profiles/runtime/scripts change
+- **tests-macos.yml** — runs `./tests/run.sh` on `macos-latest` on push/PR when bin/, profiles/, scripts/, tests/, `dist/profiles/safehouse.generated.sb`, `dist/profiles/safehouse-for-apps.generated.sb`, `dist/safehouse.sh`, `dist/Claude.app.sandboxed.command`, or `dist/Claude.app.sandboxed-offline.command` change
+- **regenerate-dist.yml** — auto-regenerates and commits `dist/safehouse.sh`, `dist/Claude.app.sandboxed.command`, `dist/Claude.app.sandboxed-offline.command`, `dist/profiles/safehouse.generated.sb`, and `dist/profiles/safehouse-for-apps.generated.sb` when profiles/runtime/scripts change
 
 ## Key Design Decisions
 

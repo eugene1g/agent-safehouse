@@ -1,0 +1,19 @@
+;; ---------------------------------------------------------------------------
+;; Category: Shared Agent Context
+;; Shared permissions for skills, agents, and guidance files.
+;; Source: 40-shared/agent-common.sb
+;; ---------------------------------------------------------------------------
+
+;; Shared authoring context:
+;; - ~/.skills/ (full access)
+;; - ~/.agents/ (full access)
+;; - ~/AGENTS.md (full access)
+
+(allow file-read* file-write*
+    (home-subpath "/.skills")         ;; Shared skill instructions/scripts that agents may read or update.
+    (data-home-subpath "/.skills")    ;; Same skill access on macOS Data volume path aliases.
+    (home-subpath "/.agents")         ;; Agent config/skills directory (alternate location alongside ~/.skills).
+    (data-home-subpath "/.agents")
+    (home-literal "/AGENTS.md")       ;; Shared agent policy/instructions file read+write for local workflows.
+    (data-home-literal "/AGENTS.md")  ;; Same AGENTS.md access on macOS Data volume path aliases.
+)

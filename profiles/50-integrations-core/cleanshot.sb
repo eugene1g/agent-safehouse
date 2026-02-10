@@ -1,0 +1,10 @@
+;; ---------------------------------------------------------------------------
+;; Integration: CleanShot
+;; Read access to CleanShot screenshot/recording media for pasting into agents.
+;; Source: 50-integrations-core/cleanshot.sb
+;; ---------------------------------------------------------------------------
+
+(allow file-read*
+    (home-subpath "/Library/Application Support/CleanShot/media")       ;; Screenshot and recording files saved by CleanShot X.
+    (data-home-subpath "/Library/Application Support/CleanShot/media")  ;; Data-volume variant for APFS firmlink traversal.
+)

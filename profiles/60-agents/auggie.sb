@@ -1,0 +1,14 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Auggie
+;; Auggie CLI binary, state, and config paths.
+;; Source: 60-agents/auggie.sb
+;; ---------------------------------------------------------------------------
+
+;; - npm global install path follows package-manager prefix/bin
+;; - ~/.local/bin is the common user-level target and fallback
+;; - canonical Auggie state/config root is ~/.augment
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/auggie")
+    (home-subpath "/.augment")  ;; session.json, settings.json, oauth-state.json, commands/, skills/, agents/, rules/.
+)

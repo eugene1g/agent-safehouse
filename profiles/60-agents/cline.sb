@@ -1,0 +1,16 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Cline
+;; Cline CLI binary, state, and config paths.
+;; Source: 60-agents/cline.sb
+;; ---------------------------------------------------------------------------
+
+;; - no official standalone CLI install path documented; keep ~/.local/bin fallback
+;; - local state/config
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/cline")
+    (home-subpath "/.cline")
+    (home-subpath "/.config/cline")
+    (home-subpath "/.cache/cline")
+    (home-subpath "/.local/share/cline")
+)

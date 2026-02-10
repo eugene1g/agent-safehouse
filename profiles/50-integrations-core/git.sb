@@ -1,0 +1,10 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Git
+;; Git client configuration and XDG config directory access.
+;; Source: 50-integrations-core/git.sb
+;; ---------------------------------------------------------------------------
+
+(allow file-read*
+    (home-prefix "/.gitconfig")    ;; User gitconfig and variants (.gitconfig.local, etc.) read by git CLI.
+    (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
+)

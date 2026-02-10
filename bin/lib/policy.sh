@@ -152,12 +152,8 @@ append_all_module_profiles() {
   fi
 }
 
-append_integration_profiles() {
+emit_integration_preamble() {
   local target="$1"
-  local base_dir="$2"
-  local file
-  local found_any=0
-  local added_any=0
 
   local -a opt_in_integrations=()
   if [[ "$enable_docker_integration" -ne 1 ]]; then
@@ -179,6 +175,13 @@ append_integration_profiles() {
 
   echo ";; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox." >> "$target"
   echo "" >> "$target"
+}
+
+append_optional_integration_profiles() {
+  local target="$1"
+  local base_dir="$2"
+  local file
+  local found_any=0
 
   for file in "${base_dir}"/*.sb; do
     [[ -e "$file" ]] || continue
@@ -186,27 +189,27 @@ append_integration_profiles() {
 
     local base_name
     base_name="$(basename "$file")"
-    if [[ "$base_name" == "docker.sb" && "$enable_docker_integration" -ne 1 ]]; then
-      continue
-    fi
-    if [[ "$base_name" == "macos-gui.sb" && "$enable_macos_gui_integration" -ne 1 ]]; then
-      continue
-    fi
-    if [[ "$base_name" == "electron.sb" && "$enable_electron_integration" -ne 1 ]]; then
-      continue
-    fi
+    case "$base_name" in
+      docker.sb)
+        [[ "$enable_docker_integration" -eq 1 ]] || continue
+        ;;
+      macos-gui.sb)
+        [[ "$enable_macos_gui_integration" -eq 1 ]] || continue
+        ;;
+      electron.sb)
+        [[ "$enable_electron_integration" -eq 1 ]] || continue
+        ;;
+      *)
+        echo "Unknown optional integration profile: ${base_name}" >&2
+        exit 1
+        ;;
+    esac
 
-    added_any=1
     append_profile "$target" "$file"
   done
 
   if [[ "$found_any" -eq 0 ]]; then
-    echo "No integration profiles found in: ${base_dir}" >&2
-    exit 1
-  fi
-
-  if [[ "$added_any" -eq 0 ]]; then
-    echo "No enabled integration profiles found in: ${base_dir}" >&2
+    echo "No optional integration profiles found in: ${base_dir}" >&2
     exit 1
   fi
 }
@@ -380,8 +383,11 @@ build_profile() {
   append_profile "$tmp" "${PROFILES_DIR}/20-network.sb"
 
   append_all_module_profiles "$tmp" "${PROFILES_DIR}/30-toolchains"
-  append_all_module_profiles "$tmp" "${PROFILES_DIR}/40-agents"
-  append_integration_profiles "$tmp" "${PROFILES_DIR}/50-integrations"
+  append_all_module_profiles "$tmp" "${PROFILES_DIR}/40-shared"
+  emit_integration_preamble "$tmp"
+  append_all_module_profiles "$tmp" "${PROFILES_DIR}/50-integrations-core"
+  append_optional_integration_profiles "$tmp" "${PROFILES_DIR}/55-integrations-optional"
+  append_all_module_profiles "$tmp" "${PROFILES_DIR}/60-agents"
 
   # Path-grant order:
   # 1) add-dirs-ro sources merged in precedence order (config, ENV, CLI) (RO)

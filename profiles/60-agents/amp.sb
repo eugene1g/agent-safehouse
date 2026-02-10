@@ -1,0 +1,20 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Amp
+;; Amp CLI binary, state, and config paths.
+;; Source: 60-agents/amp.sb
+;; ---------------------------------------------------------------------------
+
+;; - install script binary locations:
+;;   - ~/.amp/bin/amp
+;;   - ~/.local/bin/amp (symlink target)
+;; - local state/config
+
+(allow file-read* file-write*
+    (home-prefix "/.amp/bin/amp")
+    (home-prefix "/.local/bin/amp")
+    (home-subpath "/.amp")
+    (home-subpath "/.config/amp")
+    (home-subpath "/.cache/amp")
+    (home-subpath "/.local/share/amp")
+    (home-subpath "/.local/state/amp")
+)

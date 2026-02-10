@@ -1,0 +1,23 @@
+;; ---------------------------------------------------------------------------
+;; Agent: openCode
+;; openCode CLI binary, state, and config paths.
+;; Source: 60-agents/opencode.sb
+;; ---------------------------------------------------------------------------
+
+;; - install script binary locations:
+;;   - ~/.opencode/bin/opencode
+;;   - $XDG_BIN_DIR/opencode (commonly ~/.local/bin/opencode)
+;;   - ~/bin/opencode
+;; - local state/config
+
+(allow file-read* file-write*
+    (home-prefix "/.opencode/bin/opencode")
+    (home-prefix "/.local/bin/opencode")
+    (home-prefix "/bin/opencode")
+    (home-subpath "/.opencode")
+    (home-subpath "/.config/opencode")
+    (home-subpath "/.cache/opencode")
+    (home-subpath "/.local/share/opencode")
+    (home-subpath "/.local/share/opentui")
+    (home-subpath "/.local/state/opencode")
+)

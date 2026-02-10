@@ -15,6 +15,7 @@ run_section_tooling() {
   fi
 
   assert_allowed_if_exists "$POLICY_DEFAULT" "python3 --version" "python3" /bin/sh -c 'python3 --version'
+  assert_allowed_if_exists "$POLICY_DEFAULT" "perl -v" "perl" /bin/sh -c 'perl -v >/dev/null'
 
   section_begin "Agent Startup"
   assert_allowed_if_exists "$POLICY_DEFAULT" "claude --version" "${HOME}/.local/bin/claude" /bin/sh -c "'${HOME}/.local/bin/claude' --version"

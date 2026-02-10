@@ -1,0 +1,32 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Cursor
+;; Cursor CLI binary, state, config, and app bundle paths.
+;; Source: 60-agents/cursor-agent.sb
+;; ---------------------------------------------------------------------------
+
+;; - official cursor-agent install/update manages:
+;;   - ~/.local/bin/agent and ~/.local/bin/cursor-agent symlinks
+;;   - ~/.local/bin/cursor shim
+;;   - ~/.local/share/cursor-agent/versions/<version>/cursor-agent binary + .install.lock
+;; - local state/config defaults to ~/.cursor (including project state under ~/.cursor/projects)
+;; - wrapper sets NODE_COMPILE_CACHE under ~/Library/Caches/cursor-compile-cache on macOS
+;; - CLI reads Cursor IDE workspace metadata under ~/Library/Application Support/Cursor/User/workspaceStorage
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/agent")
+    (home-prefix "/.local/bin/cursor-agent")
+    (home-prefix "/.local/bin/cursor")
+    (home-subpath "/.local/share/cursor-agent")
+    (home-subpath "/.cursor")
+    (home-subpath "/.config/cursor")
+    (home-subpath "/.cache/cursor-compile-cache")
+    (home-subpath "/Library/Caches/cursor-compile-cache")
+)
+
+(allow file-read*
+    (home-subpath "/Library/Application Support/Cursor")
+    (literal "/Applications")
+    (literal "/usr/local/bin/cursor")
+    (literal "/opt/homebrew/bin/cursor")
+    (subpath "/Applications/Cursor.app")
+)
