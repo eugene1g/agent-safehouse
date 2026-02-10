@@ -7,7 +7,8 @@
 ;; ---------------------------------------------------------------------------
 
 ;; HOME_DIR starts as an explicit replacement placeholder.
-;; bin/generate-policy.sh replaces this token with the resolved HOME path.
+;; Safehouse policy assembly (bin/safehouse.sh via bin/lib/policy.sh)
+;; replaces this token with the resolved HOME path.
 ;;
 ;; Manual policy-only example (no generator):
 ;;   Replace the next line with:

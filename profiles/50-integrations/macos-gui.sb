@@ -1,0 +1,134 @@
+;; ---------------------------------------------------------------------------
+;; Integration: macOS GUI
+;; Window server, AppKit, accessibility, input, and framework services
+;; needed by any graphical macOS application running under sandbox.
+;; Source: 50-integrations/macos-gui.sb
+;; ---------------------------------------------------------------------------
+
+;; -- System preferences and framework data -------------------------------------
+
+(allow file-read*
+    (literal "/private/etc")
+    (literal "/private/var/db/eligibilityd/eligibility.plist")
+    (literal "/private/var/db/nsurlstoraged/dafsaData.bin")
+    (literal "/Library/Application Support/Apple/Spotlight/MailUsesCoreSpotlight")
+    (home-literal "/Library/Preferences/com.apple.universalaccess.plist")
+    (home-literal "/Library/Preferences/com.apple.Accessibility.plist")
+    (home-literal "/Library/Preferences/com.apple.CoreGraphics.plist")
+    (home-literal "/Library/Preferences/com.apple.symbolichotkeys.plist")
+    (home-literal "/Library/Preferences/com.apple.ServicesMenu.Services.plist")
+    (home-literal "/Library/Preferences/com.apple.speech.recognition.AppleSpeechRecognition.prefs.plist")
+    (home-literal "/Library/Preferences/com.apple.SpeakSelection.plist")
+    (home-literal "/Library/Preferences/com.apple.assistant.support.plist")
+    (home-literal "/Library/Preferences/com.apple.assistant.backedup.plist")
+    (home-literal "/Library/Preferences/pbs.plist")
+    (home-subpath "/Library/Preferences/com.apple.LaunchServices")
+    (home-literal "/Library/Keyboard Layouts")
+    (home-literal "/Library/Input Methods")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Accessibility")
+)
+
+;; Directory metadata (stat/readdir) for standard user and system paths
+(allow file-read-metadata
+    (literal "/private/var/db")
+    (literal "/Volumes")
+    (subpath "/Volumes")
+    (home-literal "/Desktop")
+    (home-literal "/Documents")
+    (home-literal "/Downloads")
+    (home-literal "/Applications")
+    (home-literal "/Library")
+    (home-literal "/Library/Application Support")
+    (home-literal "/Library/Caches")
+    (home-literal "/Library/CloudStorage")
+    (home-literal "/Library/Containers")
+    (home-literal "/Library/HTTPStorages")
+    (home-literal "/Library/Logs")
+    (home-literal "/Library/Mobile Documents")
+    (home-literal "/Library/Spelling")
+)
+
+(allow user-preference-read
+    (preference-domain "com.apple.hitoolbox")
+)
+
+;; -- Mach services -------------------------------------------------------------
+
+(allow mach-lookup
+    ;; Core rendering and window management
+    (global-name "com.apple.CARenderServer")
+    (global-name "com.apple.windowserver.active")
+    (global-name "com.apple.windowmanager.server")
+    (global-name "com.apple.window_proxies")
+    (global-name "com.apple.dock.server")
+    (global-name "com.apple.dock.fullscreen")
+    ;; TCC (permission) and security
+    (global-name "com.apple.tccd")
+    (global-name "com.apple.tccd.system")
+    (global-name "com.apple.universalaccessAuthWarn")
+    ;; Launch Services, Core Services, and icon resolution
+    (global-name "com.apple.lsd.mapdb")
+    (global-name "com.apple.lsd.modifydb")
+    (global-name "com.apple.iconservices")
+    (global-name "com.apple.coreservices.appleevents")
+    (global-name "com.apple.coreservices.sharedfilelistd.xpc")
+    (global-name "com.apple.coreservices.quarantine-resolver")
+    ;; HI services, input, and accessibility
+    (global-name "com.apple.hiservices-xpcservice")
+    (global-name "com.apple.iohideventsystem")
+    (global-name "com.apple.tsm.uiserver")
+    (global-name "com.apple.touchbarserver.mig")
+    (global-name "com.apple.accessibility.voices")
+    (global-name "com.apple.backboard.hid-services.xpc")
+    (global-name "com.apple.backboard.BKSEndpointProviderService")
+    (global-name "com.apple.TextInputUI.xpc.CursorUIViewService")
+    ;; AppKit and UI framework services
+    (global-name "com.apple.ViewBridgeAuxiliary")
+    (global-name "com.apple.appkit.restoration_storage")
+    (global-name "com.apple.pbs.fetch_services")
+    (global-name "com.apple.uiintelligencesupport.agent")
+    (global-name "com.apple.controlcenter.statusitems")
+    ;; XPC, directory, and system services
+    (global-name "com.apple.xpc.smd")
+    (global-name "com.apple.bsd.dirhelper")
+    (global-name "com.apple.system.opendirectoryd.membership")
+    (global-name "com.apple.logd.events")
+    (global-name "com.apple.spotlight.IndexAgent")
+    ;; Location services
+    (global-name "com.apple.CoreLocation.agent")
+    (global-name "com.apple.locationd.desktop.registration")
+    ;; Notifications and audio
+    (global-name "com.apple.usernotifications.listener")
+    (global-name "com.apple.audio.SystemSoundServer-OSX")
+    (global-name "com.apple.audio.audiohald")
+    (global-name "com.apple.cmio.registerassistantservice.system-extensions")
+    ;; Spell checking, grammar, and natural language
+    (global-name "mul-xpc (Apple)_OpenStep")
+    (global-name "com.apple.naturallanguaged")
+    (global-name "com.apple.inputanalyticsd")
+    ;; Backup
+    (global-name "com.apple.backupd.sandbox.xpc")
+    ;; SSO and Siri
+    (global-name "com.apple.AppSSO.service-xpc")
+    (global-name "com.apple.siri.VoiceShortcuts.xpc")
+    ;; Distributed notifications (per-user suffix varies)
+    (global-name-prefix "com.apple.distributed_notifications@")
+)
+
+;; Per-pid mach port registrations for accessibility, text input, and drag-and-drop
+(allow mach-register
+    (local-name "com.apple.axserver")
+    (local-name "com.apple.tsm.portname")
+    (local-name "com.apple.coredrag")
+)
+
+;; -- IOKit (power management, HID input, storage) ------------------------------
+
+(allow iokit-open
+    (iokit-user-client-class "RootDomainUserClient")
+    (iokit-user-client-class "IOHIDParamUserClient")
+    (iokit-user-client-class "AppleNVMeEANUC")
+)

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Test harness for agent-safehouse sandbox policies.
-# Generates policies via generate-policy.sh, then runs canary commands under
+# Generates policies via bin/safehouse.sh, then runs canary commands under
 # sandbox-exec to verify that allowed operations succeed and denied operations fail.
 #
 # Usage:
@@ -10,8 +10,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
-GENERATOR="${REPO_ROOT}/bin/generate-policy.sh"
-SAFEHOUSE="${REPO_ROOT}/bin/safehouse"
+GENERATOR="${REPO_ROOT}/bin/safehouse.sh"
+SAFEHOUSE="${REPO_ROOT}/bin/safehouse.sh"
 
 # Quick check: bail immediately if we're already inside a sandbox.
 # sandbox-exec cannot nest, so attempting a trivial child sandbox is the

@@ -7,18 +7,22 @@ on:
       - "profiles/**"
       - "scripts/**"
       - "tests/**"
-      - "generated/agent-safehouse-policy.sb"
+      - "dist/safehouse.generated.sb"
+      - "dist/safehouse-for-apps.generated.sb"
+      - "dist/safehouse.sh"
       - ".github/workflows/tests-macos.yml"
-      - ".github/workflows/regenerate-static-policy.yml"
+      - ".github/workflows/regenerate-dist.yml"
   pull_request:
     paths:
       - "bin/**"
       - "profiles/**"
       - "scripts/**"
       - "tests/**"
-      - "generated/agent-safehouse-policy.sb"
+      - "dist/safehouse.generated.sb"
+      - "dist/safehouse-for-apps.generated.sb"
+      - "dist/safehouse.sh"
       - ".github/workflows/tests-macos.yml"
-      - ".github/workflows/regenerate-static-policy.yml"
+      - ".github/workflows/regenerate-dist.yml"
   workflow_dispatch:
 
 jobs:

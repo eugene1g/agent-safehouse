@@ -18,47 +18,58 @@ Tests require macOS with `sandbox-exec` available and **cannot run inside an exi
 ```bash
 ./scripts/generate-static-policy.sh
 ```
-This produces `generated/agent-safehouse-policy.sb` using deterministic template paths. CI also auto-regenerates and commits this file when profiles change.
+This produces two deterministic static policy files:
+- `dist/safehouse.generated.sb` (default policy)
+- `dist/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
+CI also auto-regenerates and commits these files when profiles change.
 
-**Important:** After modifying any `.sb` profile or `bin/generate-policy.sh`, always regenerate the static policy snapshot by running `./scripts/generate-static-policy.sh`. The generated file is committed to the repo and must stay in sync with the profiles.
-
-**Generate a policy for the current directory (used internally by `safehouse`):**
+**Regenerate the single-file dist binary (after profile/runtime changes):**
 ```bash
-./bin/generate-policy.sh [--add-dirs-ro=...] [--add-dirs=...] [--enable=docker] [--output=PATH]
+./scripts/generate-dist.sh
 ```
-Outputs the path to the generated temp policy file. This is the core policy assembler.
+This produces `dist/safehouse.sh`. CI auto-regenerates and commits this file when profiles or runtime scripts change.
+
+**Important:** After modifying any `.sb` profile or Safehouse policy assembly logic (`bin/safehouse.sh` or `bin/lib/*.sh`), always regenerate both committed artifacts:
+- `./scripts/generate-static-policy.sh`
+- `./scripts/generate-dist.sh`
+
+**Generate a policy for the current directory:**
+```bash
+./bin/safehouse.sh [--add-dirs-ro=...] [--add-dirs=...] [--enable=docker] [--append-profile=PATH] [--output=PATH]
+```
+Outputs the path to the generated temp policy file when no command is provided.
 
 **Run a command inside the sandbox:**
 ```bash
-./bin/safehouse [policy options] -- <command> [args...]
-./bin/safehouse --dry-run -- claude   # inspect policy without executing
+./bin/safehouse.sh [policy options] -- <command> [args...]
+./bin/safehouse.sh --stdout
 ```
 
 ## Architecture
 
 ### Policy Assembly Pipeline
 
-`bin/generate-policy.sh` is the heart of the project. It concatenates profile modules in a fixed order into a single `.sb` policy file:
+`bin/safehouse.sh` is the primary entry point. Policy generation and CLI behavior are split into `bin/lib/*.sh`, and policy assembly concatenates profile modules in a fixed order into a single `.sb` policy file:
 
 1. `profiles/00-base.sb` — `(version 1)`, `(deny default)`, explicit HOME_DIR replacement token resolution, helper macros (`home-subpath`, `home-literal`, `home-prefix`, `data-home-subpath`, `data-home-literal`)
 2. `profiles/10-system-runtime.sb` — system binaries, temp dirs, IPC/mach services
 3. `profiles/20-network.sb` — network policy (fully open by default)
 4. `profiles/30-toolchains/*.sb` — all toolchain profiles (Node, Python, Go, Rust, etc.)
 5. `profiles/40-agents/*.sb` — all agent profiles (Claude, Cursor, Aider, etc.) including `__common.sb` for shared agent paths
-6. `profiles/50-integrations/*.sb` — always-on integrations (git, SSH, keychain, 1password, browser-nm, etc.) + opt-in `docker` integration controlled by `--enable`
+6. `profiles/50-integrations/*.sb` — always-on integrations (git, SSH, keychain, 1password, browser-nm, etc.) + opt-in `docker`, `macos-gui`, and `electron` integrations controlled by `--enable` (`electron` also enables `macos-gui`)
 7. Dynamic CLI path grants (`--add-dirs-ro`, then `--add-dirs`)
 8. Selected workdir grant (read/write; omitted when `--workdir` is explicitly empty)
-9. `profiles/99-local-overrides.sb` — final local deny rules (loaded last so they win)
+9. Optional appended profile(s) from CLI `--append-profile` (loaded last so they win)
 
-**Order matters**: later rules override earlier ones. Selected workdir grants come after extra path grants. `99-local-overrides.sb` is always last so its denies take precedence.
+**Order matters**: later rules override earlier ones. Selected workdir grants come after extra path grants. Appended profiles are loaded last so their deny rules take precedence.
 
 ### HOME_DIR Resolution
 
-`00-base.sb` defines `HOME_DIR` with an explicit placeholder string (`__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__`). `generate-policy.sh` replaces that token with the resolved `$HOME` value using awk at assembly time. All profile modules use helper macros like `(home-subpath "/.claude")` which expand using this resolved value.
+`00-base.sb` defines `HOME_DIR` with an explicit placeholder string (`__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__`). Safehouse policy assembly logic (`bin/lib/policy.sh`) replaces that token with the resolved `$HOME` value using awk at assembly time. All profile modules use helper macros like `(home-subpath "/.claude")` which expand using this resolved value.
 
 ### Ancestor Directory Literals
 
-A key pattern: agents (especially Claude Code) need `file-read*` with `literal` (not `subpath`) on every ancestor directory of CWD up to `/`. This allows `readdir()` for directory listing without granting recursive content access. `emit_path_ancestor_literals()` in `generate-policy.sh` generates these.
+A key pattern: agents (especially Claude Code) need `file-read*` with `literal` (not `subpath`) on every ancestor directory of CWD up to `/`. This allows `readdir()` for directory listing without granting recursive content access. `emit_path_ancestor_literals()` in `bin/lib/policy.sh` generates these.
 
 ### Test Framework
 
@@ -85,12 +96,12 @@ Some profiles use `#safehouse-test-id:tag#` markers in comments — tests grep f
 
 ### CI
 
-- **tests-macos.yml** — runs `./tests/run.sh` on `macos-latest` on push/PR when bin/, profiles/, scripts/, tests/, or generated/ change
-- **regenerate-static-policy.yml** — auto-regenerates and commits `generated/agent-safehouse-policy.sb` when profiles or scripts change
+- **tests-macos.yml** — runs `./tests/run.sh` on `macos-latest` on push/PR when bin/, profiles/, scripts/, tests/, `dist/safehouse.generated.sb`, `dist/safehouse-for-apps.generated.sb`, or `dist/safehouse.sh` change
+- **regenerate-dist.yml** — auto-regenerates and commits `dist/safehouse.sh`, `dist/safehouse.generated.sb`, and `dist/safehouse-for-apps.generated.sb` when profiles/runtime/scripts change
 
 ## Key Design Decisions
 
-- `99-local-overrides.sb` contains machine-specific allowances (OrbStack, CleanShot, etc.) — these are personal to the repo owner and should be modified for your own setup
-- Docker is opt-in via `--enable=docker`; all other integrations (keychain, git, SSH, 1password, spotlight, cloud-credentials, scm-clis, and browser native messaging) are always-on
+- Use `--append-profile` to apply local/team-specific allow/deny overlays as the final policy layer
+- Docker, macOS GUI, and Electron are opt-in via `--enable`; all other integrations (keychain, git, SSH, 1password, spotlight, cloud-credentials, scm-clis, and browser native messaging) are always-on
 - The `data-home-*` macros exist because macOS maps `$HOME` to `/System/Volumes/Data$HOME` in some contexts — profiles must allow both paths
 - Sandbox Profile Language (`.sb` files) uses S-expression syntax with `allow`/`deny` rules and path matchers: `literal` (exact path), `subpath` (recursive), `prefix` (starts-with), `regex`

@@ -30,11 +30,11 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 ### What we specifically deny (and why)
 
 - **`~/.ssh` private keys (default policy)** — blocked by default via the SSH integration profile; only `config` and `known_hosts` are re-allowed. If you explicitly grant `~/.ssh` later via CLI path grants, you can override this.
-- **`~/.aws` credentials** (optional) — can be blocked via `99-local-overrides.sb` for defense-in-depth. Commented out by default; uncomment if you don't need AWS access from agents.
+- **`~/.aws` credentials** (optional) — can be blocked via a custom appended profile file (`--append-profile`) for defense-in-depth.
 - **Browser profile directories (default)** — browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging support is always-on, but narrowly scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only) paths.
 - **`/dev` raw device access** — this policy allows `/dev` traversal/metadata plus specific safe device nodes (`/dev/null`, `/dev/urandom`, `/dev/tty*`, `/dev/ptmx`, `/dev/autofs_nowait`). It does not grant broad read/write access to raw device files.
 - **`forbidden-exec-sugid`** — execution of setuid/setgid binaries (`sudo`, `passwd`, etc.) is denied. Agents should never escalate privileges. If a specific setuid binary is needed, allow it by name rather than blanket-allowing privilege escalation.
-- **`osascript` execution** (optional) — if you want to hard-block AppleScript entrypoints, add a deny in `profiles/99-local-overrides.sb`. This can reduce GUI/session automation surface but may break agent notification UX.
+- **`osascript` execution** (optional) — if you want to hard-block AppleScript entrypoints, add a deny in a custom appended profile file (`--append-profile`). This can reduce GUI/session automation surface but may break agent notification UX.
 - **Raw disk/kernel devices** — `/dev/disk*`, `/dev/bpf*`, `/dev/pf`, `/dev/audit*`, `/dev/dtrace`, `/dev/fsevents`. No coding agent needs raw disk access or packet capture.
 
 ### What we do NOT protect against
@@ -46,25 +46,42 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 
 ## Setup
 
-Add a shell alias so you can run any agent inside the sandbox:
+Add shell functions so agent wrappers preserve argument boundaries and forward `"$@"` safely:
 
 ```bash
-# ~/.bashrc or ~/.zshrc — adjust to wherever you cloned this repo
-alias safehouse="/path/to/agent-safehouse/bin/safehouse"
+# ~/.bashrc or ~/.zshrc
+# Point this to your clone location
+safehouse() {
+  "$HOME/.local/share/agent-safehouse/bin/safehouse.sh" "$@"
+}
+
+safe() { safehouse --add-dirs-ro="$HOME/mywork" "$@"; }
+claude()   { safe claude --dangerously-skip-permissions "$@"; }
+codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
+amp()      { safe amp --dangerously-allow-all "$@"; }
+opencode() { OPENCODE_PERMISSION='{"*":"allow"}' safe opencode "$@"; }
+gemini()   { NO_BROWSER=true safe gemini --yolo "$@"; }
+pi()       { safe pi "$@"; }
 ```
 
-If you prefer not to use an alias, invoke the wrapper directly:
+How this works:
+- `safe <agent> ...` keeps Safehouse's default workdir behavior: read/write access to the selected workdir (`git` root above CWD, otherwise CWD).
+- `--add-dirs-ro="$HOME/mywork"` adds read-only visibility across your shared workspace so agents can inspect nearby repos/reference files.
+- Running from inside a repo under `~/mywork` gives that repo read/write plus read-only access to sibling paths under `~/mywork`.
 
-```bash
-/path/to/agent-safehouse/bin/safehouse -- claude --dangerously-skip-permissions
-```
+Run the real unsandboxed binary with `command claude` (or `command codex`, etc.) when needed.
 
 ## Usage
 
 ```bash
+# Generate a policy for the current repo and print the policy file path
+safehouse
+
 # Run Claude in the current repo (default workdir auto-selects git root, else CWD)
 cd ~/projects/my-app
 safehouse -- claude --dangerously-skip-permissions
+safehouse claude --dangerously-skip-permissions
+safe claude --dangerously-skip-permissions
 
 # Run Gemini (requires NO_BROWSER=true to avoid opening auth pages)
 NO_BROWSER=true safehouse -- gemini
@@ -75,34 +92,95 @@ safehouse --add-dirs=/tmp/scratch:/data/shared -- claude --dangerously-skip-perm
 # Grant read-only access to reference code
 safehouse --add-dirs-ro=/repos/shared-lib -- aider
 
+# Append custom policy rules (loaded last)
+safehouse --append-profile=/path/to/local-overrides.sb -- claude --dangerously-skip-permissions
+
+# Use env vars instead of CLI flags
+SAFEHOUSE_ADD_DIRS_RO=/repos/shared-lib SAFEHOUSE_ADD_DIRS=/tmp/scratch safehouse -- aider
+
 # Override the default workdir selection
 safehouse --workdir=/tmp/scratch -- claude --dangerously-skip-permissions
+
+# Or set workdir via env
+SAFEHOUSE_WORKDIR=/tmp/scratch safehouse -- claude --dangerously-skip-permissions
 
 # Disable automatic workdir grants (use only explicit --add-dirs/--add-dirs-ro)
 safehouse --workdir= --add-dirs-ro=/repos/shared-lib --add-dirs=/tmp/scratch -- aider
 
+# Load add-dirs/add-dirs-ro from <workdir>/.safehouse
+cat > .safehouse <<'EOF'
+add-dirs-ro=/repos/shared-lib
+add-dirs=/tmp/scratch
+EOF
+safehouse -- aider
+
 # Enable Docker socket access (off by default)
 safehouse --enable=docker -- docker ps
 
-# Browser native messaging integration is enabled by default
-# (the --enable=browser-nm flag is accepted for backwards compatibility)
-safehouse --enable=browser-nm -- claude --dangerously-skip-permissions
+# Browser native messaging integration is always on (not toggleable)
+
+# Enable macOS GUI integration (off by default)
+safehouse --enable=macos-gui -- /Applications/TextEdit.app/Contents/MacOS/TextEdit
+
+# Enable Electron integration (off by default; also enables macOS GUI integration)
+safehouse --enable=electron -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
 
 # Inspect the generated policy without running anything
-safehouse --dry-run -- claude
+safehouse
+safehouse --stdout
 ```
+
+### Electron apps under Safehouse
+
+Electron/Chromium helper processes try to initialize their own sandbox. Under Safehouse, the process tree is already inside macOS Seatbelt, so nested sandbox initialization is OS-blocked and cannot be solved by adding more `.sb` allow rules.
+
+Electron integration is opt-in. Enable it with `--enable=electron` (this also enables the `macos-gui` integration), then use `--no-sandbox` as the primary launch mode:
+
+```bash
+safehouse --enable=electron -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
+```
+
+Compatibility fallback (if needed):
+
+```bash
+ELECTRON_DISABLE_SANDBOX=1 safehouse --enable=electron -- /Applications/Claude.app/Contents/MacOS/Claude
+```
+
+Security note: disabling Chromium/Electron's internal sandbox removes its process-level isolation, but Safehouse's outer `sandbox-exec` policy still confines filesystem and IPC access for the full process tree.
+
+Troubleshooting: if logs show `forbidden-sandbox-reinit` or `sandbox initialization failed: Operation not permitted`, this indicates nested sandbox re-init was attempted; run the Electron app with `--no-sandbox`.
 
 ## Static Baseline Policy File
 
-If you want a single policy file without using the wrapper scripts, use `generated/agent-safehouse-policy.sb` as a baseline and customize it.
+If you want static policy files without using the wrapper scripts, use:
+- `dist/safehouse.generated.sb` (default policy)
+- `dist/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
 
-Regenerate it after profile changes:
+Regenerate them after profile changes:
 
 ```bash
 ./scripts/generate-static-policy.sh
 ```
 
-The static generator uses deterministic template paths under `/tmp/agent-safehouse-static-template` for `HOME` and invocation workdir so commits do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
+The static generator uses deterministic template paths under `/private/tmp/agent-safehouse-static-template` for `HOME` and invocation workdir so commits do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
+
+## Single-File Distribution
+
+To build a standalone executable that bundles all sandbox logic and policy modules into one file:
+
+```bash
+./scripts/generate-dist.sh
+```
+
+This writes `dist/safehouse.sh` by default. You can distribute that file directly and run it with exact CLI parity to `bin/safehouse.sh`:
+
+```bash
+./dist/safehouse.sh -- claude --dangerously-skip-permissions
+./dist/safehouse.sh --stdout
+```
+
+The dist binary is self-contained: it embeds policy modules as plain text and does not unpack helper scripts at runtime.
+`dist/safehouse.sh` is committed in the repo and auto-regenerated by CI when profiles/runtime logic change.
 
 ## How It Works
 
@@ -115,11 +193,11 @@ The static generator uses deterministic template paths under `/tmp/agent-safehou
 | `20-network.sb` | Network policy (fully open) |
 | `30-toolchains/*.sb` | Node, Python, Go, Rust, Bun, Java, PHP, Ruby |
 | `40-agents/*.sb` | Per-agent config/state paths |
-| `50-integrations/*.sb` | Git, SSH, Keychain, Spotlight, AWS, GCloud, GitHub/GitLab CLI, 1Password, Browser NM (always-on); Docker (opt-in via `--enable`) |
-| CLI path grants | `--add-dirs-ro`, `--add-dirs`, then selected workdir (unless `--workdir` is empty) |
-| `99-local-overrides.sb` | Final local/team-specific overrides (example optional `~/.aws` deny, local allow/deny tweaks) |
+| `50-integrations/*.sb` | Git, SSH, Keychain, Spotlight, AWS, GCloud, GitHub/GitLab CLI, 1Password, Browser NM (always-on); Docker, macOS GUI, Electron (opt-in via `--enable`) |
+| Config/env/CLI path grants | `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
+| Appended profile(s) | Optional extra profile files appended last via `--append-profile=PATH` (repeatable) |
 
-Later rules override earlier ones. CLI path grants are emitted late, so broad `--add-dirs` can reopen paths denied earlier. Put must-not-read paths in `99-local-overrides.sb` if you want them to remain blocked.
+Later rules override earlier ones. CLI path grants are emitted late, so broad `--add-dirs` can reopen paths denied earlier. Put must-not-read paths in appended profiles (`--append-profile`) if you want them to remain blocked.
 
 ## Options
 
@@ -128,11 +206,31 @@ Later rules override earlier ones. CLI path grants are emitted late, so broad `-
 | `--add-dirs=PATHS` | Colon-separated paths to grant read/write |
 | `--add-dirs-ro=PATHS` | Colon-separated paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
-| `--enable=FEATURES` | Enable optional features: `docker` (`browser-nm` is accepted for backwards compatibility and is already enabled by default) |
+| `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
+| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron` (`electron` also enables `macos-gui`) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
-| `--dry-run` | Print the policy path and exit without running the command |
+| `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 
 All flags accept both `--flag=value` and `--flag value` forms.
+
+Execution behavior:
+- No command args: generate a policy and print the policy file path.
+- Command args provided: generate a policy, then execute the command under `sandbox-exec`.
+- `--` separator is optional (recommended when the wrapped command starts with `-`).
+
+Environment variables:
+- `SAFEHOUSE_ADD_DIRS_RO` — Colon-separated paths to grant read-only
+- `SAFEHOUSE_ADD_DIRS` — Colon-separated paths to grant read/write
+- `SAFEHOUSE_WORKDIR` — Workdir override (`SAFEHOUSE_WORKDIR=` disables automatic workdir grants)
+
+Optional workdir config file:
+- `<workdir>/.safehouse`
+- Supported keys: `add-dirs-ro=PATHS`, `add-dirs=PATHS`
+
+Path grant merge order is:
+1. `<workdir>/.safehouse`
+2. `SAFEHOUSE_ADD_DIRS_RO` / `SAFEHOUSE_ADD_DIRS`
+3. CLI `--add-dirs-ro` / `--add-dirs`
 
 When `--workdir` is omitted, safehouse selects the workdir automatically:
 1. git root above the invocation directory (if present)
@@ -140,7 +238,7 @@ When `--workdir` is omitted, safehouse selects the workdir automatically:
 
 ## Customization
 
-- **Add credential denials:** edit `profiles/99-local-overrides.sb` to block paths like `~/.gnupg` or `~/.kube`
+- **Add credential denials:** create a custom profile file and pass it via `--append-profile` (repeatable for multiple files)
 - **Adjust network policy:** edit `profiles/20-network.sb` (commented examples for outbound-only and localhost modes)
 - **Add a new agent:** create a file in `profiles/40-agents/` following the existing pattern
 - **Add a new toolchain:** create a file in `profiles/30-toolchains/`

@@ -1,0 +1,38 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Claude Desktop App
+;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
+;; Source: 40-agents/claude-app.sb
+;; ---------------------------------------------------------------------------
+
+;; Requires: 50-integrations/macos-gui.sb   (window server, AppKit, input, accessibility)
+;;           50-integrations/electron.sb     (GPU, Metal, crashpad, WebView)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Claude")
+    (home-subpath "/Library/Logs/Claude")
+    (home-subpath "/Library/HTTPStorages/com.anthropic.claudefordesktop")
+    (home-subpath "/Library/Caches/Claude")
+    (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
+    (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
+)
+
+(allow file-read*
+    (subpath "/Applications/Claude.app")
+    (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
+)
+
+;; Background Task Management: login item status query (SMAppService.mainApp.status).
+;; Without this, SMAppService silently returns .notFound, causing the
+;; "isStartupOnLoginEnabled failed to pass validation" Electron IPC error.
+(allow mach-lookup
+    (global-name "com.apple.backgroundtaskmanagementagent")
+)
+
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID)
+(allow mach-lookup
+    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)

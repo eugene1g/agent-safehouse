@@ -1,7 +1,7 @@
 ;; ---------------------------------------------------------------------------
 ;; Agent: Claude Code
 ;; Claude Code CLI binary, state, config, and MCP integration paths.
-;; Source: 40-agents/claude.sb
+;; Source: 40-agents/claude-code.sb
 ;; ---------------------------------------------------------------------------
 
 ;; - installer-managed binary path: ~/.local/bin/claude (symlink target under ~/.local/share/claude/versions/*)

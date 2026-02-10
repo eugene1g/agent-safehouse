@@ -2,9 +2,21 @@
 
 run_section_integrations() {
   local private_key_candidates
+  local ssh_config_path ssh_config_link_target
 
   section_begin "SSH Key Protection"
-  assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config" "${HOME}/.ssh/config" /bin/cat "${HOME}/.ssh/config"
+  ssh_config_path="${HOME}/.ssh/config"
+  if [[ -L "$ssh_config_path" ]]; then
+    ssh_config_link_target="$(readlink "$ssh_config_path" 2>/dev/null || true)"
+    if [[ "$ssh_config_link_target" == /* && "$ssh_config_link_target" != "${HOME}/.ssh/"* ]]; then
+      log_skip "read ~/.ssh/config (symlink target outside ~/.ssh; allow via --append-profile if needed)"
+    else
+      assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config" "$ssh_config_path" /bin/cat "$ssh_config_path"
+    fi
+  else
+    assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config" "$ssh_config_path" /bin/cat "$ssh_config_path"
+  fi
+
   assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.ssh/known_hosts" "${HOME}/.ssh/known_hosts" /bin/cat "${HOME}/.ssh/known_hosts"
 
   private_key_candidates=0
@@ -32,6 +44,27 @@ run_section_integrations() {
     browser_name="$(echo "$browser_dir" | sed "s|.*/Application Support/||;s|/.*||")"
     assert_denied_if_exists "$POLICY_DEFAULT" "read browser profile root denied (${browser_name})" "$browser_dir" /bin/ls "$browser_dir"
   done
+
+  section_begin "macOS GUI / Electron Integration Policy Coverage"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits macOS GUI integration profile" ";; Integration: macOS GUI"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits electron integration profile" "#safehouse-test-id:electron-integration#"
+
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes macOS GUI integration profile" ";; Integration: macOS GUI"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes CARenderServer mach-lookup grant" "(global-name \"com.apple.CARenderServer\")"
+  assert_policy_not_contains "$POLICY_MACOS_GUI" "--enable=macos-gui does not include electron integration profile" "#safehouse-test-id:electron-integration#"
+
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron integration marker" "#safehouse-test-id:electron-integration#"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron GPU/Metal marker" "#safehouse-test-id:electron-gpu-metal#"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron crashpad marker" "#safehouse-test-id:electron-crashpad#"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron crashpad mach-lookup marker" "#safehouse-test-id:electron-crashpad-lookup#"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron crashpad mach-register marker" "#safehouse-test-id:electron-crashpad-register#"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes no-sandbox workaround docs" "Primary workaround under Safehouse: launch Electron with --no-sandbox."
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes MTLCompilerService mach-lookup grant" "(global-name \"com.apple.MTLCompilerService\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes IOSurfaceRootUserClient IOKit grant" "(iokit-user-client-class \"IOSurfaceRootUserClient\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes AGXDeviceUserClient IOKit grant" "(iokit-user-client-class \"AGXDeviceUserClient\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes crashpad handshake regex grant" "(global-name-regex #\"^org\\.chromium\\.crashpad\\.child_port_handshake\\.\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies CARenderServer mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.CARenderServer\")"
 
   section_begin "Keychain Access"
   assert_allowed_if_exists "$POLICY_DEFAULT" "security find-certificate" "security" /usr/bin/security find-certificate -a

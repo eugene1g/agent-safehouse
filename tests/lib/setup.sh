@@ -75,8 +75,10 @@ setup_test_environment() {
   echo "Generating policy with extra dirs (ro=${TEST_RO_DIR}, rw=${TEST_RW_DIR})..."
   POLICY_EXTRA="$(cd "$TEST_CWD" && "$GENERATOR" --add-dirs-ro="$TEST_RO_DIR" --add-dirs="$TEST_RW_DIR")"
 
-  echo "Generating feature-toggle policies (--enable=docker)..."
+  echo "Generating feature-toggle policies (--enable=docker, --enable=macos-gui, --enable=electron)..."
   POLICY_DOCKER="$(cd "$TEST_CWD" && "$GENERATOR" --enable=docker)"
+  POLICY_MACOS_GUI="$(cd "$TEST_CWD" && "$GENERATOR" --enable=macos-gui)"
+  POLICY_ELECTRON="$(cd "$TEST_CWD" && "$GENERATOR" --enable=electron)"
 
   echo "Generating merged grant policy (repeat flags, colon lists, overlap, spaces, file grants)..."
   POLICY_MERGE="$(cd "$TEST_CWD" && "$GENERATOR" \
@@ -129,6 +131,12 @@ cleanup_test_environment() {
   fi
   if [[ -n "${POLICY_DOCKER:-}" && -f "${POLICY_DOCKER:-}" ]]; then
     rm -f "$POLICY_DOCKER"
+  fi
+  if [[ -n "${POLICY_MACOS_GUI:-}" && -f "${POLICY_MACOS_GUI:-}" ]]; then
+    rm -f "$POLICY_MACOS_GUI"
+  fi
+  if [[ -n "${POLICY_ELECTRON:-}" && -f "${POLICY_ELECTRON:-}" ]]; then
+    rm -f "$POLICY_ELECTRON"
   fi
   if [[ -n "${POLICY_MERGE:-}" && -f "${POLICY_MERGE:-}" ]]; then
     rm -f "$POLICY_MERGE"

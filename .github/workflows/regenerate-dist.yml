@@ -1,19 +1,19 @@
-name: Regenerate Static Policy
+name: Regenerate Dist Artifacts
 
 on:
   push:
     paths:
       - "scripts/**"
       - "profiles/**"
-      - "bin/generate-policy.sh"
-      - ".github/workflows/regenerate-static-policy.yml"
+      - "bin/**"
+      - ".github/workflows/regenerate-dist.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  regenerate-static-policy:
+  regenerate-dist-artifacts:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,18 +23,21 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref_name }}
 
-      - name: Regenerate policy file
-        run: ./scripts/generate-static-policy.sh
-
-      - name: Commit and push updated policy
+      - name: Regenerate dist artifacts
         run: |
-          if git diff --quiet -- generated/agent-safehouse-policy.sb; then
-            echo "No policy changes detected."
+          ./scripts/generate-dist.sh
+          ./scripts/generate-static-policy.sh
+
+      - name: Commit and push updated dist artifacts
+        run: |
+          git add -A dist
+
+          if git diff --cached --quiet -- dist; then
+            echo "No dist artifact changes detected."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add generated/agent-safehouse-policy.sb
-          git commit -m "chore: regenerate agent-safehouse-policy.sb"
+          git commit -m "chore: regenerate dist artifacts"
           git push origin "HEAD:${GITHUB_REF_NAME}"
