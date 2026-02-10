@@ -26,7 +26,6 @@ jobs:
       - name: Regenerate dist artifacts
         run: |
           ./scripts/generate-dist.sh
-          ./scripts/generate-static-policy.sh
 
       - name: Commit and push updated dist artifacts
         run: |

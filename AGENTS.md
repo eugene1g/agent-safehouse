@@ -14,23 +14,17 @@ Agent Safehouse is a macOS sandbox toolkit that confines LLM coding agents (Clau
 ```
 Tests require macOS with `sandbox-exec` available and **cannot run inside an existing sandbox** (e.g. from a sandboxed agent session). The runner detects this at startup and exits early. No arguments accepted.
 
-**Regenerate the static baseline policy (after profile changes):**
-```bash
-./scripts/generate-static-policy.sh
-```
-This produces two deterministic static policy files:
-- `dist/safehouse.generated.sb` (default policy)
-- `dist/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
-CI also auto-regenerates and commits these files when profiles change.
-
-**Regenerate the single-file dist binary (after profile/runtime changes):**
+**Regenerate all committed dist artifacts (after profile/runtime changes):**
 ```bash
 ./scripts/generate-dist.sh
 ```
-This produces `dist/safehouse.sh`. CI auto-regenerates and commits this file when profiles or runtime scripts change.
+This produces three deterministic dist files:
+- `dist/safehouse.sh` (single-file executable)
+- `dist/safehouse.generated.sb` (default policy)
+- `dist/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
+CI auto-regenerates and commits these files when profiles or runtime scripts change.
 
-**Important:** After modifying any `.sb` profile or Safehouse policy assembly logic (`bin/safehouse.sh` or `bin/lib/*.sh`), always regenerate both committed artifacts:
-- `./scripts/generate-static-policy.sh`
+**Important:** After modifying any `.sb` profile or Safehouse policy assembly logic (`bin/safehouse.sh` or `bin/lib/*.sh`), always run:
 - `./scripts/generate-dist.sh`
 
 **Generate a policy for the current directory:**

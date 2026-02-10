@@ -166,7 +166,7 @@
     /* ========== HERO ========== */
     .hero {
       position: relative;
-      padding: 72px 0 64px;
+      padding: 88px 0 80px;
       overflow: hidden;
     }
     .hero::before {
@@ -217,12 +217,12 @@
       align-items: center;
       justify-content: space-between;
       gap: 32px;
-      margin-bottom: 36px;
+      margin-bottom: 56px;
     }
     .hero-headline-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 12px;
     }
     .hero-headline {
       font-family: var(--font-display);
@@ -230,7 +230,7 @@
       font-weight: 400;
       line-height: 1.1;
       letter-spacing: -1.5px;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       color: var(--text-bright);
       white-space: nowrap;
     }
@@ -239,7 +239,7 @@
     .hero-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: 40px;
       align-items: center;
     }
 
@@ -696,7 +696,7 @@
     /* ========== AGENTS GRID ========== */
     .agents-grid {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 32px 16px;
     }
     .agent-card {
@@ -878,34 +878,6 @@
       transition: all 0.15s;
     }
 
-    /* ========== ALIASES ========== */
-    .alias-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-top: 40px;
-    }
-    .alias-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      transition: border-color 0.2s;
-    }
-    .alias-card:hover { border-color: var(--border-bright); }
-    .alias-card h4 {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--text-bright);
-      margin-bottom: 4px;
-    }
-    .alias-desc {
-      font-size: 0.813rem;
-      color: var(--text-muted);
-      margin-bottom: 14px;
-      line-height: 1.5;
-    }
-    .alias-card pre { font-size: 0.75rem; padding: 12px 16px; margin: 0; }
 
     /* ========== TEST GRID ========== */
     .test-grid {
@@ -1324,35 +1296,51 @@
 <section id="getting-started">
   <div class="container">
     <h2 class="section-title">Getting started</h2>
-    <p class="section-sub">Clone the repo, add a shell function, and wrap your agent command. That's it &mdash; no build step, no dependencies.</p>
+    <p class="section-sub">Download a single shell script, make it executable, and run your agent inside it. No build step, no dependencies &mdash; just Bash and macOS.</p>
 
-    <pre class="fade-in"><code><span class="c"># 1. Clone the repo</span>
-<span class="k">git clone</span> <span class="s">https://github.com/eugene1g/agent-safehouse.git</span> <span class="f">~/.local/share/agent-safehouse</span>
+    <pre class="fade-in"><code><span class="c"># 1. Download safehouse (single self-contained script)</span>
+<span class="k">curl</span> <span class="f">-fsSL</span> <span class="s">https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/safehouse.sh</span> \
+  <span class="f">-o</span> <span class="s">/usr/local/bin/safehouse</span>
+<span class="k">chmod</span> <span class="f">+x</span> <span class="s">/usr/local/bin/safehouse</span>
 
-<span class="c"># 2. Add a function (add this to ~/.zshrc or ~/.bashrc)</span>
-<span class="k">safehouse</span>() { <span class="s">"$HOME/.local/share/agent-safehouse/bin/safehouse.sh"</span> <span class="s">"$@"</span>; }
-
-<span class="c"># 3. Run any agent inside Safehouse</span>
+<span class="c"># 2. Run any agent inside Safehouse</span>
 <span class="k">cd</span> ~/projects/my-app
 <span class="k">safehouse</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span></code></pre>
 
-    <p style="color: var(--text-muted); margin-top: 20px; line-height: 1.7;">Safehouse automatically grants read/write access to the selected workdir (git root by default, otherwise the invocation directory) and read access to your installed toolchains. Most of your home directory &mdash; SSH keys, other repos, personal files &mdash; is denied by the kernel. Cloud credential paths are allowed by default and can be denied by appending a custom profile file with <code class="il">--append-profile</code>.</p>
+    <p style="color: var(--text-muted); margin-top: 20px; line-height: 1.7;">Safehouse automatically grants read/write access to the selected workdir (git root by default, otherwise the invocation directory) and read access to your installed toolchains. Most of your home directory &mdash; SSH keys, other repos, personal files &mdash; is denied by the kernel.</p>
+
+    <h3 class="fade-in" style="margin-top: 40px; font-size: 1rem; font-weight: 600; color: var(--text-bright);">See it fail &mdash; proof the sandbox works</h3>
+    <p style="color: var(--text-muted); margin-top: 8px; margin-bottom: 16px; line-height: 1.7;">Try reading something sensitive inside safehouse. The kernel blocks it before the process ever sees the data.</p>
+    <pre class="fade-in"><code><span class="c"># Try to read your SSH private key &mdash; denied by the kernel</span>
+<span class="k">safehouse</span> <span class="f">--</span> cat ~/.ssh/id_ed25519
+<span class="c"># cat: /Users/you/.ssh/id_ed25519: Operation not permitted</span>
+
+<span class="c"># Try to list another repo &mdash; invisible</span>
+<span class="k">safehouse</span> <span class="f">--</span> ls ~/other-project
+<span class="c"># ls: /Users/you/other-project: Operation not permitted</span>
+
+<span class="c"># But your current project works fine</span>
+<span class="k">safehouse</span> <span class="f">--</span> ls .
+<span class="c"># README.md  src/  package.json  ...</span>
+
+<span class="c"># Run Claude with full auto-approve &mdash; safely sandboxed</span>
+<span class="k">safehouse</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span>
+<span class="c"># Claude runs normally, but can't touch anything outside your project</span></code></pre>
   </div>
 </section>
 
-<section id="aliases">
+<section id="shell-functions">
   <div class="container">
     <h2 class="section-title">Use shell functions to be safe by default</h2>
     <p class="section-sub">Add these functions to your shell config and every agent runs inside Safehouse automatically &mdash; you don't have to remember. This convention keeps full access to the active project (git root by default) while adding read-only access to a shared workspace like <code class="il">~/mywork</code>. To run an agent <em>without</em> the sandbox, type <code class="il">command claude</code> to bypass the function and invoke the real binary.</p>
 
     <pre class="fade-in" style="margin-bottom: 16px;"><code><span class="c"># ~/.zshrc or ~/.bashrc</span>
-<span class="c"># Point this to your clone location</span>
-<span class="k">safehouse</span>() { <span class="s">"$HOME/.local/share/agent-safehouse/bin/safehouse.sh"</span> <span class="s">"$@"</span>; }
+<span class="c"># Assumes safehouse is on your PATH (e.g. /usr/local/bin/safehouse)</span>
 
 <span class="c"># Shared convention:</span>
 <span class="c"># - Read/write: selected workdir (git root above CWD, else CWD)</span>
 <span class="c"># - Read-only:  $HOME/mywork (reference repos/docs/snippets)</span>
-<span class="k">safe</span>() { <span class="k">safehouse</span> <span class="f">--add-dirs-ro=</span><span class="s">"$HOME/mywork"</span> <span class="s">"$@"</span>; }
+<span class="k">safe</span>() { safehouse <span class="f">--add-dirs-ro=</span><span class="s">"$HOME/mywork"</span> <span class="s">"$@"</span>; }
 
 <span class="c"># Sandboxed — the default. Just type the command name.</span>
 <span class="k">claude</span>()   { <span class="k">safe</span> claude <span class="f">--dangerously-skip-permissions</span> <span class="s">"$@"</span>; }
@@ -1365,9 +1353,7 @@
 <span class="c"># Unsandboxed — use `command` to bypass the function and run the real binary.</span>
 <span class="c"># command claude              — plain interactive session</span>
 <span class="c"># command claude &lt;flags&gt;      — pass any flags directly</span>
-
-<span class="c"># Extras — optional Docker wrapper</span>
-<span class="k">claude_docker</span>() { <span class="k">safehouse</span> <span class="f">--add-dirs-ro=</span><span class="s">"$HOME/mywork"</span> <span class="f">--enable=</span><span class="s">docker</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span> <span class="s">"$@"</span>; }</code></pre>
+</code></pre>
 
     <p style="color: var(--text-muted); line-height: 1.7;">Example: from <code class="il">~/mywork/app-a</code>, <code class="il">safe claude</code> can edit <code class="il">app-a</code> (workdir grant) and read other paths under <code class="il">~/mywork</code>. The same command run from a repo outside <code class="il">~/mywork</code> still grants that repo read/write while keeping <code class="il">~/mywork</code> read-only.</p>
 
@@ -1377,9 +1363,13 @@
 <section id="usage">
   <div class="container">
     <h2 class="section-title">Usage</h2>
+    <p class="section-sub">Safehouse has two modes: <strong>execute mode</strong> wraps a command inside the sandbox, and <strong>policy mode</strong> generates the <code class="il">.sb</code> policy file so you can use it yourself.</p>
 
-    <pre class="fade-in"><code><span class="c"># Run Claude in the current repo (default workdir: git root, else CWD)</span>
-<span class="k">cd</span> ~/projects/my-app
+    <div class="two-col fade-in" style="margin-bottom: 32px;">
+      <div>
+        <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;">Execute mode</h3>
+        <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px;">Pass a command after <code class="il">--</code> and Safehouse generates a policy, then runs it inside.</p>
+        <pre><code><span class="c"># Run Claude in the current repo</span>
 <span class="k">safehouse</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span>
 
 <span class="c"># Grant extra writable directories</span>
@@ -1388,67 +1378,47 @@
 <span class="c"># Grant read-only access to reference code</span>
 <span class="k">safehouse</span> <span class="f">--add-dirs-ro=</span><span class="s">/repos/shared-lib</span> <span class="f">--</span> aider
 
-<span class="c"># Append custom policy rules loaded after generated rules</span>
-<span class="k">safehouse</span> <span class="f">--append-profile=</span><span class="s">/path/to/local-overrides.sb</span> <span class="f">--</span> claude
-
 <span class="c"># Enable Docker socket access (off by default)</span>
-<span class="k">safehouse</span> <span class="f">--enable=</span><span class="s">docker</span> <span class="f">--</span> docker ps
-
-<span class="c"># Inspect the generated policy without running anything</span>
+<span class="k">safehouse</span> <span class="f">--enable=</span><span class="s">docker</span> <span class="f">--</span> docker ps</code></pre>
+      </div>
+      <div>
+        <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;">Policy mode</h3>
+        <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px;">Run with no command to generate a policy file. Feed it to <code class="il">sandbox-exec</code> yourself, or inspect it first.</p>
+        <pre><code><span class="c"># Print the policy file path</span>
 <span class="k">safehouse</span>
-<span class="k">safehouse</span> <span class="f">--stdout</span></code></pre>
 
-    <div class="callout fade-in" style="margin-top: 20px;">
-      <h3>Electron apps under Safehouse</h3>
-      <p>Electron/Chromium helper processes try to initialize an internal sandbox. Under Safehouse, the process tree is already inside macOS Seatbelt, so nested sandbox re-init is OS-blocked and cannot be solved by adding more <code class="il">.sb</code> allow rules.</p>
-      <pre><code><span class="c"># Primary launch mode</span>
+<span class="c"># Print the full policy text to stdout</span>
+<span class="k">safehouse</span> <span class="f">--stdout</span>
+
+<span class="c"># Write to a specific file</span>
+<span class="k">safehouse</span> <span class="f">--output=</span><span class="s">my-policy.sb</span>
+
+<span class="c"># Use the generated policy with sandbox-exec</span>
+<span class="k">sandbox-exec</span> <span class="f">-f</span> <span class="s">"$(safehouse)"</span> <span class="f">--</span> claude</code></pre>
+      </div>
+    </div>
+
+    <h3 class="fade-in" style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;">Appending custom rules</h3>
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px; line-height: 1.7;">Use <code class="il">--append-profile</code> to layer your own sandbox rules on top of the generated policy. Appended rules load last, so they can tighten or extend access. Repeatable &mdash; pass it multiple times and files are appended in order.</p>
+    <pre class="fade-in"><code><span class="c"># deny-aws.sb &mdash; block AWS credential reads</span>
+<span class="f">(deny file-read*</span> <span class="s">(home-subpath "/.aws")</span><span class="f">)</span>
+
+<span class="c"># allow-data.sb &mdash; grant access to a shared data directory</span>
+<span class="f">(allow file-read*</span> <span class="s">(subpath "/data/shared")</span><span class="f">)</span></code></pre>
+    <pre class="fade-in" style="margin-top: 10px;"><code><span class="c"># Stack personal rules onto the default policy</span>
+<span class="k">safehouse</span> <span class="f">--append-profile=</span><span class="s">deny-aws.sb</span> <span class="f">--append-profile=</span><span class="s">allow-data.sb</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span></code></pre>
+
+    <h3 class="fade-in" style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-top: 40px; margin-bottom: 6px;">Electron apps under Safehouse</h3>
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px; line-height: 1.7;">Electron/Chromium helpers try to init an internal sandbox. Under Safehouse the process tree is already inside macOS Seatbelt, so nested sandbox re-init is OS-blocked. Launch with <code class="il">--no-sandbox</code> to disable the inner sandbox while keeping the outer policy.</p>
+    <pre class="fade-in"><code><span class="c"># Primary launch mode</span>
 <span class="k">safehouse</span> <span class="f">--enable=</span><span class="s">electron</span> <span class="f">--</span> /Applications/Claude.app/Contents/MacOS/Claude <span class="f">--no-sandbox</span>
 
 <span class="c"># Compatibility fallback</span>
 <span class="k">ELECTRON_DISABLE_SANDBOX=1</span> <span class="k">safehouse</span> <span class="f">--enable=</span><span class="s">electron</span> <span class="f">--</span> /Applications/Claude.app/Contents/MacOS/Claude</code></pre>
-      <p><strong>Security note:</strong> disabling Chromium/Electron's internal sandbox removes its process-level isolation, but Safehouse's outer <code class="il">sandbox-exec</code> policy still confines the full process tree.</p>
-      <p><strong>Troubleshooting:</strong> if logs show <code class="il">forbidden-sandbox-reinit</code> or <code class="il">sandbox initialization failed: Operation not permitted</code>, run the app with <code class="il">--no-sandbox</code>.</p>
-    </div>
   </div>
 </section>
 
-<section id="dist-binary">
-  <div class="container">
-    <h2 class="section-title">Single-file dist binary</h2>
-    <p class="section-sub">Build a self-contained wrapper script that embeds all profiles and runtime logic.</p>
 
-    <div class="callout fade-in">
-      <h3>Generate and run</h3>
-      <pre><code><span class="c"># Generate canonical dist artifact</span>
-<span class="k">./scripts/generate-dist.sh</span>
-
-<span class="c"># Run with exact CLI parity to bin/safehouse.sh</span>
-<span class="k">./dist/safehouse.sh</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span>
-<span class="k">./dist/safehouse.sh</span> <span class="f">--stdout</span></code></pre>
-      <p><strong>Parity:</strong> <code class="il">dist/safehouse.sh</code> supports the same CLI/options as <code class="il">bin/safehouse.sh</code>.</p>
-    </div>
-  </div>
-</section>
-
-<section id="static-policy">
-  <div class="container">
-    <h2 class="section-title">Just grab the policy file</h2>
-    <p class="section-sub">All profiles flattened into a single <code class="il">.sb</code> file. Run directly with <code class="il">sandbox-exec</code>.</p>
-
-    <div class="callout fade-in">
-      <h3>Copy, paste, and go</h3>
-      <p>Use <code class="il">dist/safehouse.generated.sb</code> (default) or <code class="il">dist/safehouse-for-apps.generated.sb</code> (includes macOS GUI + Electron), then replace the two template placeholders.</p>
-      <p><a href="https://github.com/eugene1g/agent-safehouse/blob/main/dist/safehouse.generated.sb" class="btn btn-primary btn-sm"><span class="gh-icon"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></span>Open default policy on GitHub</a></p>
-      <pre><code><span class="c"># After saving the file locally, replace the template paths</span>
-<span class="k">sed</span> <span class="f">-i ''</span> <span class="s">'s|/private/tmp/agent-safehouse-static-template/home|'$HOME'|g'</span> safehouse.generated.sb
-<span class="k">sed</span> <span class="f">-i ''</span> <span class="s">'s|/private/tmp/agent-safehouse-static-template/workspace|'$PWD'|g'</span> safehouse.generated.sb
-
-<span class="c"># Run any agent under the policy</span>
-<span class="k">sandbox-exec</span> <span class="f">-f</span> safehouse.generated.sb claude <span class="f">--dangerously-skip-permissions</span></code></pre>
-    </div>
-
-  </div>
-</section>
 
 <script>
 // Close mobile nav on link click

@@ -4,22 +4,37 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
 
-output_path="${ROOT_DIR}/dist/safehouse.sh"
+output_dir="${ROOT_DIR}/dist"
+output_path="${output_dir}/safehouse.sh"
+default_policy_path="${output_dir}/safehouse.generated.sb"
+apps_policy_path="${output_dir}/safehouse-for-apps.generated.sb"
+output_path_explicit=0
+output_dir_explicit=0
+
+GENERATOR="${ROOT_DIR}/bin/safehouse.sh"
+template_root="/tmp/agent-safehouse-static-template"
+template_home="${template_root}/home"
+template_workdir="${template_root}/workspace"
 
 profile_files=()
 
 usage() {
   cat <<USAGE
 Usage:
-  $(basename "$0") [--output PATH]
+  $(basename "$0") [--output PATH] [--output-dir PATH]
 
 Description:
-  Generate a single-file safehouse executable in dist/ with embedded profile
-  modules and inlined runtime logic from bin/safehouse.sh + bin/lib/*.sh.
+  Generate all committed dist artifacts:
+    - safehouse.sh (single-file executable with embedded profiles/runtime)
+    - safehouse.generated.sb (default static policy)
+    - safehouse-for-apps.generated.sb (--enable=macos-gui,electron)
 
 Options:
   --output PATH
-      Output file path (default: ${output_path})
+      Dist executable output file path (default: ${output_path})
+
+  --output-dir PATH
+      Directory for static policy outputs (default: ${output_dir})
 
   -h, --help
       Show this help
@@ -106,6 +121,25 @@ marker_for_path() {
   marker="${marker//./_}"
   marker="${marker//-/_}"
   printf '__SAFEHOUSE_EMBEDDED_%s__' "$marker"
+}
+
+resolve_output_paths() {
+  if [[ "$output_path_explicit" -eq 1 ]]; then
+    output_path="$(to_abs_path "$output_path")"
+  fi
+
+  if [[ "$output_dir_explicit" -eq 1 ]]; then
+    output_dir="$(to_abs_path "$output_dir")"
+  fi
+
+  if [[ "$output_path_explicit" -eq 0 && "$output_dir_explicit" -eq 1 ]]; then
+    output_path="${output_dir%/}/safehouse.sh"
+  fi
+
+  output_path="$(to_abs_path "$output_path")"
+  output_dir="$(to_abs_path "$output_dir")"
+  default_policy_path="${output_dir%/}/safehouse.generated.sb"
+  apps_policy_path="${output_dir%/}/safehouse-for-apps.generated.sb"
 }
 
 emit_banner() {
@@ -348,15 +382,45 @@ append_integration_profiles() {
 SCRIPT
 }
 
+generate_static_policy_files() {
+  if [[ ! -x "$GENERATOR" ]]; then
+    echo "Policy generator is missing or not executable: ${GENERATOR}" >&2
+    exit 1
+  fi
+
+  mkdir -p "$output_dir" "$template_home" "$template_workdir"
+
+  (
+    cd "$template_workdir"
+    HOME="$template_home" "$GENERATOR" --output "$default_policy_path" >/dev/null
+    HOME="$template_home" "$GENERATOR" --enable=macos-gui,electron --output "$apps_policy_path" >/dev/null
+  )
+
+  chmod 0644 "$default_policy_path" "$apps_policy_path"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output)
       [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
       output_path="$2"
+      output_path_explicit=1
       shift 2
       ;;
     --output=*)
       output_path="${1#*=}"
+      output_path_explicit=1
+      shift
+      ;;
+    --output-dir)
+      [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+      output_dir="$2"
+      output_dir_explicit=1
+      shift 2
+      ;;
+    --output-dir=*)
+      output_dir="${1#*=}"
+      output_dir_explicit=1
       shift
       ;;
     -h|--help)
@@ -371,7 +435,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-output_path="$(to_abs_path "$output_path")"
+resolve_output_paths
 
 collect_profiles
 validate_profiles
@@ -400,4 +464,8 @@ chmod 0755 "$tmp_output"
 mv "$tmp_output" "$output_path"
 trap - EXIT
 
+generate_static_policy_files
+
 printf '%s\n' "$output_path"
+printf '%s\n' "$default_policy_path"
+printf '%s\n' "$apps_policy_path"

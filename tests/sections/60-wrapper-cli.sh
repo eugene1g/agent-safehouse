@@ -106,8 +106,8 @@ EOF
     log_pass "unknown --enable feature exits non-zero"
   fi
 
-  section_begin "Static Policy Script"
-  assert_command_succeeds "generate-static-policy script succeeds" "${REPO_ROOT}/scripts/generate-static-policy.sh"
+  section_begin "Dist Artifact Generator Script"
+  assert_command_succeeds "generate-dist script regenerates committed dist artifacts" "${REPO_ROOT}/scripts/generate-dist.sh"
   assert_policy_contains "${REPO_ROOT}/profiles/00-base.sb" "base profile exposes explicit HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
   assert_policy_contains "${REPO_ROOT}/dist/safehouse.generated.sb" "default static policy file contains sandbox header" "(version 1)"
   assert_policy_contains "${REPO_ROOT}/dist/safehouse.generated.sb" "default static policy file uses deterministic template HOME" "/private/tmp/agent-safehouse-static-template/home"
@@ -118,7 +118,7 @@ EOF
   assert_policy_contains "${REPO_ROOT}/dist/safehouse-for-apps.generated.sb" "apps static policy includes electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "${REPO_ROOT}/dist/safehouse-for-apps.generated.sb" "apps static policy includes macOS GUI integration profile" ";; Integration: macOS GUI"
 
-  section_begin "Dist Generator Script"
+  section_begin "Dist Binary Generator Script"
   dist_path="${TEST_CWD}/safehouse-dist.sh"
   dist_stdout_canary="${TEST_CWD}/dist-stdout-canary.$$"
   dist_output_policy="${TEST_CWD}/dist-output-policy.sb"

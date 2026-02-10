@@ -156,23 +156,28 @@ If you want static policy files without using the wrapper scripts, use:
 - `dist/safehouse.generated.sb` (default policy)
 - `dist/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
 
-Regenerate them after profile changes:
+Regenerate them after profile or runtime changes:
 
 ```bash
-./scripts/generate-static-policy.sh
+./scripts/generate-dist.sh
 ```
 
 The static generator uses deterministic template paths under `/private/tmp/agent-safehouse-static-template` for `HOME` and invocation workdir so commits do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
 
 ## Single-File Distribution
 
-To build a standalone executable that bundles all sandbox logic and policy modules into one file:
+To build the standalone executable and regenerate all committed `dist/` artifacts:
 
 ```bash
 ./scripts/generate-dist.sh
 ```
 
-This writes `dist/safehouse.sh` by default. You can distribute that file directly and run it with exact CLI parity to `bin/safehouse.sh`:
+This writes these files by default:
+- `dist/safehouse.sh`
+- `dist/safehouse.generated.sb`
+- `dist/safehouse-for-apps.generated.sb`
+
+You can distribute `dist/safehouse.sh` directly and run it with exact CLI parity to `bin/safehouse.sh`:
 
 ```bash
 ./dist/safehouse.sh -- claude --dangerously-skip-permissions
