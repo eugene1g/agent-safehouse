@@ -19,8 +19,9 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 
 - **Filesystem reads for system paths**  - `/usr`, `/bin`, `/opt`, `/System`, `/Library/Frameworks`, etc. Agents spawn shells, compilers, and package managers that link against system libraries. Denying these breaks everything.
 - **Full process exec/fork**  - agents orchestrate deep subprocess trees (shell > git > ssh > credential-helper). Restricting process creation is impractical.
-- **Toolchain and agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) and agent (`~/.claude`, `~/.codex`, etc.) gets scoped read+write to its own paths. No broader access.
+- **Toolchain and agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`). Use `--enable=all-agents` to restore legacy behavior and load every agent profile.
 - **Keychain and Security framework** (always-on)  - most agents (Claude Code, Amp, etc.) store login tokens in macOS Keychain and cannot authenticate without it. Read+write access to Keychain files and Security mach services is required for credential storage, retrieval, and TLS certificate validation. This is not a feature toggle because agents fail to start without it.
+- **Cloud credential stores** (always-on)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are enabled by default for compatibility. Safehouse does **not** protect cloud credentials by default; block them with `--append-profile` denies if needed.
 - **Shell startup files**  - `~/.zshenv`, `~/.zprofile`, `/etc/zshrc`, etc. Without these, agents get a broken PATH and misconfigured environment.
 - **SSH config (not `~/.ssh` keys)**  - `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
 - **Runtime mach services**  - notification center, logd, diagnosticd, CoreServices, DiskArbitration, DNS-SD, opendirectory, FSEvents, trustd, etc. These are framework-level dependencies that many CLI tools probe during init.
@@ -30,7 +31,6 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 ### What we specifically deny (and why)
 
 - **`~/.ssh` private keys (default policy)**  - blocked by default via the SSH integration profile; only `config` and `known_hosts` are re-allowed. If you explicitly grant `~/.ssh` later via CLI path grants, you can override this.
-- **`~/.aws` credentials** (optional)  - can be blocked via a custom appended profile file (`--append-profile`) for defense-in-depth.
 - **Browser profile directories (default)**  - browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging support is always-on, but narrowly scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only) paths.
 - **`/dev` raw device access**  - this policy allows `/dev` traversal/metadata plus specific safe device nodes (`/dev/null`, `/dev/urandom`, `/dev/tty*`, `/dev/ptmx`, `/dev/autofs_nowait`). It does not grant broad read/write access to raw device files.
 - **`forbidden-exec-sugid`**  - execution of setuid/setgid binaries (`sudo`, `passwd`, etc.) is denied. Agents should never escalate privileges. If a specific setuid binary is needed, allow it by name rather than blanket-allowing privilege escalation.
@@ -59,7 +59,7 @@ Then add shell functions so agent wrappers preserve argument boundaries and forw
 ```bash
 # ~/.bashrc or ~/.zshrc
 # Ensure ~/.local/bin is on your PATH
-safe() { safehouse --add-dirs-ro="$HOME/mywork" "$@"; }
+safe() { safehouse --add-dirs-ro=~/mywork "$@"; }
 claude()   { safe claude --dangerously-skip-permissions "$@"; }
 codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
 amp()      { safe amp --dangerously-allow-all "$@"; }
@@ -70,7 +70,7 @@ pi()       { safe pi "$@"; }
 
 How this works:
 - `safe <agent> ...` keeps Safehouse's default workdir behavior: read/write access to the selected workdir (`git` root above CWD, otherwise CWD).
-- `--add-dirs-ro="$HOME/mywork"` adds read-only visibility across your shared workspace so agents can inspect nearby repos/reference files.
+- `--add-dirs-ro=~/mywork` adds read-only visibility across your shared workspace so agents can inspect nearby repos/reference files.
 - Running from inside a repo under `~/mywork` gives that repo read/write plus read-only access to sibling paths under `~/mywork`.
 
 Run the real unsandboxed binary with `command claude` (or `command codex`, etc.) when needed.
@@ -157,6 +157,9 @@ safehouse aider
 # Enable Docker socket access (off by default)
 safehouse --enable=docker -- docker ps
 
+# Restore legacy behavior and include all agent profiles
+safehouse --enable=all-agents codex
+
 # Browser native messaging integration is always on (not toggleable)
 
 # Enable macOS GUI integration (off by default)
@@ -195,6 +198,8 @@ Troubleshooting: if logs show `forbidden-sandbox-reinit` or `sandbox initializat
 If you want static policy files without using the wrapper scripts, use:
 - `dist/profiles/safehouse.generated.sb` (default policy)
 - `dist/profiles/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
+
+Committed `dist/profiles/*.generated.sb` artifacts are generated with `--enable=all-agents` for broad compatibility when used directly.
 
 Regenerate them after profile or runtime changes:
 
@@ -242,11 +247,11 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 | `40-shared/*.sb` | Shared cross-agent policy modules |
 | `50-integrations-core/*.sb` | Always-on integrations: Git, SSH, Keychain, Spotlight, AWS, GCloud, GitHub/GitLab CLI, 1Password, Browser NM |
 | `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: Docker, macOS GUI, Electron (`electron` also enables `macos-gui`) |
-| `60-agents/*.sb` | Product-specific per-agent config/state paths |
+| `60-agents/*.sb` | Product-specific per-agent config/state paths, selected by wrapped command basename (`--enable=all-agents` loads all) |
 | Config/env/CLI path grants | `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
 | Appended profile(s) | Optional extra profile files appended last via `--append-profile=PATH` (repeatable) |
 
-Later rules override earlier ones. CLI path grants are emitted late, so broad `--add-dirs` can reopen paths denied earlier. Put must-not-read paths in appended profiles (`--append-profile`) if you want them to remain blocked.
+Later rules override earlier ones. CLI path grants are emitted late, so broad `--add-dirs` can reopen paths denied earlier. Put must-not-read paths in appended profiles (`--append-profile`) if you want them to remain blocked. Cloud credential stores are allowed by default via always-on integrations; deny them explicitly if your threat model requires it.
 
 ## Options
 
@@ -256,11 +261,11 @@ Later rules override earlier ones. CLI path grants are emitted late, so broad `-
 | `--add-dirs-ro=PATHS` | Colon-separated paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
-| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron` (`electron` also enables `macos-gui`) |
+| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron`, `all-agents` (`electron` also enables `macos-gui`) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 
-All flags accept both `--flag=value` and `--flag value` forms.
+All flags accept both `--flag=value` and `--flag value` forms. For path-based flags/config values, `~` and `~/...` are supported.
 
 Execution behavior:
 - No command args: generate a policy and print the policy file path.
@@ -275,6 +280,7 @@ Environment variables:
 Optional workdir config file:
 - `<workdir>/.safehouse`
 - Supported keys: `add-dirs-ro=PATHS`, `add-dirs=PATHS`
+- Treat `<workdir>/.safehouse` as trusted input. Do not run Safehouse against untrusted repos that can edit this file.
 
 Path grant merge order is:
 1. `<workdir>/.safehouse`

@@ -34,8 +34,9 @@ Policy scope options:
   --enable FEATURES
   --enable=FEATURES
       Comma-separated optional features to enable
-      Supported values: docker, macos-gui, electron
+      Supported values: docker, macos-gui, electron, all-agents
       Note: electron implies macos-gui
+      Note: all-agents restores legacy behavior by loading every 60-agents profile
       Browser native messaging is always on (not toggleable)
 
   --add-dirs-ro PATHS
@@ -152,6 +153,17 @@ main() {
     if [[ -n "${detected_app_bundle:-}" ]]; then
       policy_args+=("--add-dirs-ro=${detected_app_bundle}")
     fi
+  fi
+
+  invoked_command_path=""
+  invoked_command_basename=""
+  invoked_command_app_bundle=""
+  selected_agent_profile_basenames=()
+  selected_agent_profiles_resolved=0
+  if [[ "${#command_args[@]}" -gt 0 ]]; then
+    invoked_command_path="${command_args[0]}"
+    invoked_command_basename="$(basename "${command_args[0]}")"
+    invoked_command_app_bundle="${detected_app_bundle:-}"
   fi
 
   if [[ "${#policy_args[@]}" -gt 0 ]]; then

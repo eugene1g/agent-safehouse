@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 run_section_policy_behavior() {
+  local policy_all_agents
+
   section_begin "Feature Toggles"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits docker socket grants" "/var/run/docker.sock"
   assert_policy_contains "$POLICY_DOCKER" "--enable=docker includes docker socket grants" "/var/run/docker.sock"
@@ -10,14 +12,20 @@ run_section_policy_behavior() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits broad ~/.local read grant" "(home-subpath \"/.local\")"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped ~/.local pipx grant" "/.local/pipx"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped uv binary grant" "/.local/bin/uv"
-  assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped aider-install binary grant" "/.local/bin/aider-install"
-  assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped opentui data grant" "/.local/share/opentui"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits aider-specific grants when no command is provided" "/.local/bin/aider-install"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits openCode-specific grants when no command is provided" "/.local/share/opentui"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped pnpm XDG config grant" "/.config/pnpm"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes runtime manager proto grant" "/.proto"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes runtime manager pkgx grant" "/.pkgx"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes Azure CLI grant" "/.azure"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes Azure Developer CLI grant" "/.azd"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes regex 1Password socket-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t(/.*)?$"
+
+  policy_all_agents="${TEST_CWD}/policy-all-agents-feature-toggle.sb"
+  assert_command_succeeds "--enable=all-agents restores legacy agent-specific grants in policy mode" "$GENERATOR" --output "$policy_all_agents" --enable=all-agents
+  assert_policy_contains "$policy_all_agents" "all-agents policy includes aider-install binary grant" "/.local/bin/aider-install"
+  assert_policy_contains "$policy_all_agents" "all-agents policy includes opentui data grant" "/.local/share/opentui"
+  rm -f "$policy_all_agents"
 
   for docker_sock in \
     "/var/run/docker.sock" \

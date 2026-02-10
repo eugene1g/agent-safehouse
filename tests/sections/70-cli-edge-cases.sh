@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_macos_gui policy_enable_electron policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_macos_gui policy_enable_electron policy_enable_all_agents policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config missing_path home_not_dir
+  local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
+  local policy_agent_codex policy_agent_unknown policy_agent_claude_app policy_agent_all_agents
   local output_space output_nested args_file workdir_config_file safehouse_env_policy safehouse_env_status
+  local fake_codex_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin
+  local append_profile_tilde_file
+  local test_ro_dir_rel test_ro_dir_2_rel test_rw_dir_2_rel
   local resolved_test_rw_dir resolved_test_ro_dir
   local marker_dynamic marker_workdir marker_append_profile_one marker_append_profile_two
 
@@ -14,6 +19,9 @@ run_section_cli_edge_cases() {
   marker_append_profile_two="#safehouse-test-id:append-profile-two#"
   resolved_test_rw_dir="$(cd "$TEST_RW_DIR" && pwd -P)"
   resolved_test_ro_dir="$(cd "$TEST_RO_DIR" && pwd -P)"
+  test_ro_dir_rel="${TEST_RO_DIR#"${HOME}/"}"
+  test_ro_dir_2_rel="${TEST_RO_DIR_2#"${HOME}/"}"
+  test_rw_dir_2_rel="${TEST_RW_DIR_2#"${HOME}/"}"
 
   section_begin "Binary Entry Points"
   assert_command_succeeds "bin/safehouse.sh works from /tmp via absolute path (policy mode)" /bin/sh -c "cd /tmp && '${SAFEHOUSE}' >/dev/null"
@@ -39,6 +47,10 @@ run_section_cli_edge_cases() {
   assert_command_succeeds "--enable=electron parses and implies macos-gui" "$GENERATOR" --output "$policy_enable_electron" --enable=electron
   assert_policy_contains "$policy_enable_electron" "--enable=electron includes electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "$policy_enable_electron" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
+  policy_enable_all_agents="${TEST_CWD}/policy-enable-all-agents.sb"
+  assert_command_succeeds "--enable=all-agents restores full 60-agents module inclusion" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
+  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Claude Code profile" ";; Source: 60-agents/claude-code.sb"
+  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Codex profile" ";; Source: 60-agents/codex.sb"
 
   section_begin "Workdir Flag Parsing"
   policy_workdir_empty_eq="${TEST_CWD}/policy-workdir-empty-equals.sb"
@@ -88,6 +100,71 @@ EOF
   assert_policy_contains "$policy_workdir_config" "workdir config file emits read/write grant" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
   rm -f "$workdir_config_file"
 
+  section_begin "Tilde Path Expansion"
+  policy_tilde_flags="${TEST_CWD}/policy-tilde-flags.sb"
+  policy_tilde_config="${TEST_CWD}/policy-tilde-config.sb"
+  policy_tilde_workdir="${TEST_CWD}/policy-tilde-workdir.sb"
+  policy_tilde_append_profile="${TEST_CWD}/policy-tilde-append-profile.sb"
+  append_profile_tilde_file="${HOME}/.safehouse-append-tilde-$$.sb"
+
+  assert_command_succeeds "--add-dirs flags expand ~ and ~/... values" "$GENERATOR" --output "$policy_tilde_flags" --add-dirs-ro="~/${test_ro_dir_rel}" --add-dirs="~/${test_rw_dir_2_rel}"
+  assert_policy_contains "$policy_tilde_flags" "--add-dirs-ro with ~ expands to HOME path" "(subpath \"${TEST_RO_DIR}\")"
+  assert_policy_contains "$policy_tilde_flags" "--add-dirs with ~ expands to HOME path" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
+
+  cat > "$workdir_config_file" <<EOF
+add-dirs-ro=~/${test_ro_dir_2_rel}
+add-dirs=~/${test_rw_dir_2_rel}
+EOF
+  assert_command_succeeds "workdir config add-dirs values expand ~ and ~/..." /bin/sh -c "cd '${TEST_CWD}' && '${GENERATOR}' --output '${policy_tilde_config}'"
+  assert_policy_contains "$policy_tilde_config" "workdir config add-dirs-ro with ~ expands to HOME path" "(subpath \"${TEST_RO_DIR_2}\")"
+  assert_policy_contains "$policy_tilde_config" "workdir config add-dirs with ~ expands to HOME path" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
+  rm -f "$workdir_config_file"
+
+  assert_command_succeeds "--workdir expands ~ and ~/..." "$GENERATOR" --output "$policy_tilde_workdir" --workdir="~/${test_rw_dir_2_rel}"
+  assert_policy_contains "$policy_tilde_workdir" "--workdir with ~ selects expanded HOME path" "(subpath \"${TEST_RW_DIR_2}\")"
+
+  cat > "$append_profile_tilde_file" <<'EOF'
+;; #safehouse-test-id:append-profile-tilde#
+(allow file-read-metadata (literal "/tmp"))
+EOF
+  assert_command_succeeds "--append-profile expands ~ and ~/..." "$GENERATOR" --output "$policy_tilde_append_profile" --append-profile="~/.safehouse-append-tilde-$$.sb"
+  assert_policy_contains "$policy_tilde_append_profile" "--append-profile with ~ appends expanded file" "#safehouse-test-id:append-profile-tilde#"
+  rm -f "$append_profile_tilde_file"
+
+  section_begin "Agent Profile Selection"
+  policy_agent_codex="${TEST_CWD}/policy-agent-codex.sb"
+  policy_agent_unknown="${TEST_CWD}/policy-agent-unknown.sb"
+  policy_agent_claude_app="${TEST_CWD}/policy-agent-claude-app.sb"
+  policy_agent_all_agents="${TEST_CWD}/policy-agent-all-agents.sb"
+  fake_codex_bin="${TEST_CWD}/codex"
+  fake_unknown_bin="${TEST_CWD}/not-an-agent"
+  fake_claude_app_dir="${TEST_CWD}/Claude.app"
+  fake_claude_app_bin="${fake_claude_app_dir}/Contents/MacOS/Claude"
+
+  cp /usr/bin/true "$fake_codex_bin"
+  cp /usr/bin/true "$fake_unknown_bin"
+  mkdir -p "$(dirname "$fake_claude_app_bin")"
+  cp /usr/bin/true "$fake_claude_app_bin"
+
+  assert_command_succeeds "safehouse selects the matching Codex profile for codex command basename" "$SAFEHOUSE" --output "$policy_agent_codex" -- "$fake_codex_bin"
+  assert_policy_contains "$policy_agent_codex" "codex command includes codex agent profile only" ";; Source: 60-agents/codex.sb"
+  assert_policy_not_contains "$policy_agent_codex" "codex command omits unrelated claude-code profile" ";; Source: 60-agents/claude-code.sb"
+
+  assert_command_succeeds "safehouse skips 60-agents modules for unknown commands by default" "$SAFEHOUSE" --output "$policy_agent_unknown" -- "$fake_unknown_bin"
+  assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits codex agent profile" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$policy_agent_unknown" "unknown command policy emits skip note for 60-agents layer" "No command-matched agent profile selected; skipping 60-agents modules."
+
+  assert_command_succeeds "safehouse detects Claude.app command path and includes claude-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_claude_app" -- "$fake_claude_app_bin"
+  assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes claude-app profile" ";; Source: 60-agents/claude-app.sb"
+  assert_policy_not_contains "$policy_agent_claude_app" "Claude.app command omits claude-code profile" ";; Source: 60-agents/claude-code.sb"
+
+  assert_command_succeeds "--enable=all-agents in execute mode restores full 60-agents inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes codex profile" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
+
+  rm -f "$fake_codex_bin" "$fake_unknown_bin" "$policy_agent_codex" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_all_agents"
+  rm -rf "$fake_claude_app_dir"
+
   section_begin "Generator Path/Home Validation"
   missing_path="/tmp/safehouse-missing-path-$$"
   rm -rf "$missing_path"
@@ -101,6 +178,10 @@ EOF
 
   section_begin "Policy Emission Order"
   assert_policy_order_literal "$POLICY_MERGE" "dynamic grants are emitted before workdir grant" "$marker_dynamic" "$marker_workdir"
+  assert_policy_order_literal "$POLICY_DEFAULT" "toolchain modules are emitted in deterministic lexical order" ";; Source: 30-toolchains/bun.sb" ";; Source: 30-toolchains/deno.sb"
+  assert_policy_order_literal "$POLICY_DEFAULT" "core integration modules are emitted in deterministic lexical order" ";; Source: 50-integrations-core/1password.sb" ";; Source: 50-integrations-core/browser-native-messaging.sb"
+  assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic agent module order" ";; Source: 60-agents/aider.sb" ";; Source: 60-agents/amp.sb"
+  assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Claude module order" ";; Source: 60-agents/claude-app.sb" ";; Source: 60-agents/claude-code.sb"
 
   section_begin "Append Profile Option"
   policy_append_profile="${TEST_CWD}/policy-append-profile.sb"

@@ -2,6 +2,7 @@
 
 run_section_tooling() {
   local node_bin
+  local policy_claude_startup policy_amp_startup
 
   section_begin "Toolchains"
   assert_allowed_if_exists "$POLICY_DEFAULT" "git --version" "git" /bin/sh -c 'git --version'
@@ -18,8 +19,16 @@ run_section_tooling() {
   assert_allowed_if_exists "$POLICY_DEFAULT" "perl -v" "perl" /bin/sh -c 'perl -v >/dev/null'
 
   section_begin "Agent Startup"
-  assert_allowed_if_exists "$POLICY_DEFAULT" "claude --version" "${HOME}/.local/bin/claude" /bin/sh -c "'${HOME}/.local/bin/claude' --version"
-  assert_allowed_if_exists "$POLICY_DEFAULT" "amp --version" "${HOME}/.amp/bin/amp" /bin/sh -c "'${HOME}/.amp/bin/amp' --version"
+  policy_claude_startup="${TEST_CWD}/policy-agent-startup-claude.sb"
+  policy_amp_startup="${TEST_CWD}/policy-agent-startup-amp.sb"
+
+  assert_command_succeeds "safehouse generates command-scoped policy for claude startup checks" "$SAFEHOUSE" --stdout --output "$policy_claude_startup" -- claude --version
+  assert_command_succeeds "safehouse generates command-scoped policy for amp startup checks" "$SAFEHOUSE" --stdout --output "$policy_amp_startup" -- amp --version
+
+  assert_allowed_if_exists "$policy_claude_startup" "claude --version" "${HOME}/.local/bin/claude" /bin/sh -c "'${HOME}/.local/bin/claude' --version"
+  assert_allowed_if_exists "$policy_amp_startup" "amp --version" "${HOME}/.amp/bin/amp" /bin/sh -c "'${HOME}/.amp/bin/amp' --version"
+
+  rm -f "$policy_claude_startup" "$policy_amp_startup"
 
   section_begin "Git Operations"
   assert_allowed "$POLICY_DEFAULT" "git init in CWD" /bin/sh -c "cd '${TEST_CWD}' && git init -q"

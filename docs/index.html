@@ -1248,7 +1248,7 @@
             <li><span>~/my-project/</span> <span class="access-tag rw">read/write</span></li>
             <li><span>~/shared-lib/</span> <span class="access-tag ro">read-only</span></li>
             <li><span>~/.ssh/id_ed25519</span> <span class="access-tag denied">denied</span></li>
-            <li><span>~/.aws/credentials</span> <span class="access-tag rw">read/write (default)</span></li>
+            <li><span>~/.aws/credentials</span> <span class="access-tag rw">read/write (default, not protected)</span></li>
             <li><span>~/other-repos/</span> <span class="access-tag denied">denied</span></li>
           </ul>
         </div>
@@ -1268,11 +1268,12 @@
           <li>System path reads (<code class="il">/usr</code>, <code class="il">/bin</code>, <code class="il">/System</code>)</li>
           <li>Full process exec/fork (agents spawn deep trees)</li>
           <li>Scoped toolchain caches (<code class="il">~/.cargo</code>, <code class="il">~/.npm</code>, etc.)</li>
-          <li>Scoped agent config dirs (<code class="il">~/.claude</code>, <code class="il">~/.cursor</code>, etc.)</li>
+          <li>Command-matched agent config dirs (<code class="il">~/.claude</code>, <code class="il">~/.cursor</code>, etc.)</li>
           <li>Keychain and Security framework (always-on)</li>
           <li>Shell startup files (<code class="il">~/.zshenv</code>, <code class="il">~/.zprofile</code>)</li>
           <li>Network (fully open by default)</li>
           <li>SSH config and known_hosts (not private keys)</li>
+          <li>Cloud credentials (always-on by default; deny via overrides if needed)</li>
           <li>Temp directories (<code class="il">/tmp</code>, <code class="il">/var/folders</code>)</li>
         </ul>
       </div>
@@ -1284,7 +1285,7 @@
           <li>Raw device access (<code class="il">/dev/disk*</code>, <code class="il">/dev/bpf*</code>)</li>
           <li>Setuid/setgid binaries (<code class="il">sudo</code>, <code class="il">passwd</code>)</li>
           <li>Everything not explicitly allowed (deny-first)</li>
-          <li>AWS credentials (optional, via overrides)</li>
+          <li>Cloud credentials are NOT denied by default (deny via overrides)</li>
           <li>Directories outside your project and toolchains</li>
         </ul>
       </div>
@@ -1355,7 +1356,7 @@
 <span class="c"># Shared convention:</span>
 <span class="c"># - Read/write: selected workdir (git root above CWD, else CWD)</span>
 <span class="c"># - Read-only:  $HOME/mywork (reference repos/docs/snippets)</span>
-<span class="k">safe</span>() { safehouse <span class="f">--add-dirs-ro=</span><span class="s">"$HOME/mywork"</span> <span class="s">"$@"</span>; }
+<span class="k">safe</span>() { safehouse <span class="f">--add-dirs-ro=</span><span class="s">~/mywork</span> <span class="s">"$@"</span>; }
 
 <span class="c"># Sandboxed  - the default. Just type the command name.</span>
 <span class="k">claude</span>()   { <span class="k">safe</span> claude <span class="f">--dangerously-skip-permissions</span> <span class="s">"$@"</span>; }
@@ -1379,6 +1380,7 @@
   <div class="container">
     <h2 class="section-title">Usage</h2>
     <p class="section-sub">Safehouse has two modes: <strong>execute mode</strong> wraps a command inside the sandbox, and <strong>policy mode</strong> generates the <code class="il">.sb</code> policy file so you can use it yourself.</p>
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px; line-height: 1.7;">If you use a per-repo <code class="il">.safehouse</code> file for path grants, treat it as trusted input. Do not run Safehouse against untrusted repos that can edit this file.</p>
 
     <div class="two-col fade-in" style="margin-bottom: 32px;">
       <div>
@@ -1394,7 +1396,10 @@
 <span class="k">safehouse</span> <span class="f">--add-dirs-ro=</span><span class="s">/repos/shared-lib</span> <span class="f">--</span> aider
 
 <span class="c"># Enable Docker socket access (off by default)</span>
-<span class="k">safehouse</span> <span class="f">--enable=</span><span class="s">docker</span> <span class="f">--</span> docker ps</code></pre>
+<span class="k">safehouse</span> <span class="f">--enable=</span><span class="s">docker</span> <span class="f">--</span> docker ps
+
+<span class="c"># Restore legacy behavior and load all agent profiles</span>
+<span class="k">safehouse</span> <span class="f">--enable=</span><span class="s">all-agents</span> codex</code></pre>
       </div>
       <div>
         <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;">Policy mode</h3>

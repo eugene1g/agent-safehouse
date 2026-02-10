@@ -1,0 +1,42 @@
+name: Shell Lint
+
+on:
+  push:
+    paths:
+      - "bin/**"
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/shell-lint.yml"
+  pull_request:
+    paths:
+      - "bin/**"
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/shell-lint.yml"
+  workflow_dispatch:
+
+jobs:
+  lint-shell:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
+      - name: Install shellcheck and shfmt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck shfmt
+
+      - name: Run shellcheck
+        run: |
+          shellcheck --external-sources \
+            bin/safehouse.sh \
+            scripts/generate-dist.sh
+
+      - name: Run shfmt check (advisory)
+        continue-on-error: true
+        run: |
+          shfmt -d -i 2 -ci \
+            bin/safehouse.sh \
+            scripts/generate-dist.sh

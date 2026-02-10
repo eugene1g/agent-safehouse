@@ -194,7 +194,7 @@ insert_policy_project_banner() {
       next
     }
     { print }
-  ' "$policy_path" > "$tmp_policy"
+  ' "$policy_path" >"$tmp_policy"
 
   mv "$tmp_policy" "$policy_path"
 }
@@ -327,6 +327,8 @@ append_all_module_profiles() {
   local target="$1"
   local base_dir="$2"
   local found_any=0
+  local appended_any=0
+  local is_agent_dir=0
   local key profile_prefix
 
   case "$base_dir" in
@@ -341,6 +343,7 @@ append_all_module_profiles() {
       ;;
     "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
       profile_prefix="profiles/60-agents/"
+      is_agent_dir=1
       ;;
     *)
       echo "No module profiles found in: ${base_dir}" >&2
@@ -351,11 +354,35 @@ append_all_module_profiles() {
   for key in "${PROFILE_KEYS[@]}"; do
     [[ "$key" == "${profile_prefix}"* ]] || continue
     found_any=1
+    if [[ "$is_agent_dir" -eq 1 ]] && ! should_include_agent_profile_file "$key"; then
+      continue
+    fi
+    appended_any=1
     append_profile "$target" "$key"
   done
 
   if [[ "$found_any" -eq 0 ]]; then
     echo "No module profiles found in: ${base_dir}" >&2
+    exit 1
+  fi
+
+  if [[ "$is_agent_dir" -eq 1 ]]; then
+    if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+      return 0
+    fi
+
+    if [[ "$appended_any" -eq 0 ]]; then
+      {
+        echo ";; No command-matched agent profile selected; skipping 60-agents modules."
+        echo ";; Use --enable=all-agents to restore legacy all-agent profile behavior."
+        echo ""
+      } >> "$target"
+    fi
+    return 0
+  fi
+
+  if [[ "$appended_any" -eq 0 ]]; then
+    echo "No module profiles selected in: ${base_dir}" >&2
     exit 1
   fi
 }
@@ -427,7 +454,7 @@ write_dist_script() {
   {
     emit_dist_script_body
     echo 'main "$@"'
-  } > "$tmp_output"
+  } >"$tmp_output"
 
   chmod 0755 "$tmp_output"
   mv "$tmp_output" "$target_path"
@@ -603,7 +630,7 @@ POLICY
 
 main "\$@"
 SCRIPT
-  } > "$tmp_output"
+  } >"$tmp_output"
 
   chmod 0755 "$tmp_output"
   mv "$tmp_output" "$target_path"
@@ -772,7 +799,7 @@ POLICY
 
 main "$@"
 SCRIPT
-  } > "$tmp_output"
+  } >"$tmp_output"
 
   chmod 0755 "$tmp_output"
   mv "$tmp_output" "$target_path"
@@ -788,8 +815,8 @@ generate_static_policy_files() {
 
   (
     cd "$template_workdir"
-    HOME="$template_home" "$GENERATOR" --output "$default_policy_path" >/dev/null
-    HOME="$template_home" "$GENERATOR" --enable=macos-gui,electron --output "$apps_policy_path" >/dev/null
+    HOME="$template_home" "$GENERATOR" --enable=all-agents --output "$default_policy_path" >/dev/null
+    HOME="$template_home" "$GENERATOR" --enable=macos-gui,electron,all-agents --output "$apps_policy_path" >/dev/null
   )
 
   insert_policy_project_banner "$default_policy_path"
@@ -801,7 +828,10 @@ generate_static_policy_files() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output)
-      [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for $1" >&2
+        exit 1
+      }
       output_path="$2"
       output_path_explicit=1
       shift 2
@@ -812,7 +842,10 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --output-dir)
-      [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for $1" >&2
+        exit 1
+      }
       output_dir="$2"
       output_dir_explicit=1
       shift 2
@@ -822,7 +855,7 @@ while [[ $# -gt 0 ]]; do
       output_dir_explicit=1
       shift
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

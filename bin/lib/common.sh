@@ -39,6 +39,27 @@ trim_whitespace() {
   printf '%s' "$s"
 }
 
+to_lowercase() {
+  local value="$1"
+  printf '%s' "$value" | tr '[:upper:]' '[:lower:]'
+}
+
+expand_tilde() {
+  local p="$1"
+
+  case "$p" in
+    "~")
+      printf '%s\n' "$home_dir"
+      ;;
+    "~/"*)
+      printf '%s\n' "${home_dir}${p:1}"
+      ;;
+    *)
+      printf '%s\n' "$p"
+      ;;
+  esac
+}
+
 append_colon_list() {
   local existing="$1"
   local addition="$2"
