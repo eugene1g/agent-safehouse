@@ -5,12 +5,19 @@ run_section_policy_behavior() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits docker socket grants" "/var/run/docker.sock"
   assert_policy_contains "$POLICY_DOCKER" "--enable=docker includes docker socket grants" "/var/run/docker.sock"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes browser native messaging grants" "/NativeMessagingHosts"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Firefox native messaging grants" "/Mozilla/NativeMessagingHosts"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes extensions read grants" "/Default/Extensions"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits broad ~/.local read grant" "(home-subpath \"/.local\")"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped ~/.local pipx grant" "/.local/pipx"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped uv binary grant" "/.local/bin/uv"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped aider-install binary grant" "/.local/bin/aider-install"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped opentui data grant" "/.local/share/opentui"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped pnpm XDG config grant" "/.config/pnpm"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes runtime manager proto grant" "/.proto"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes runtime manager pkgx grant" "/.pkgx"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Azure CLI grant" "/.azure"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes Azure Developer CLI grant" "/.azd"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes regex 1Password socket-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t(/.*)?$"
 
   for docker_sock in \
     "/var/run/docker.sock" \

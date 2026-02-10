@@ -3,6 +3,7 @@
 run_section_integrations() {
   local private_key_candidates
   local ssh_config_path ssh_config_link_target
+  local onepassword_group_container_dir onepassword_socket_dir
 
   section_begin "SSH Key Protection"
   ssh_config_path="${HOME}/.ssh/config"
@@ -44,6 +45,17 @@ run_section_integrations() {
     browser_name="$(echo "$browser_dir" | sed "s|.*/Application Support/||;s|/.*||")"
     assert_denied_if_exists "$POLICY_DEFAULT" "read browser profile root denied (${browser_name})" "$browser_dir" /bin/ls "$browser_dir"
   done
+
+  section_begin "Browser Native Messaging and 1Password Socket Access"
+  assert_allowed_if_exists "$POLICY_DEFAULT" "read Firefox native messaging hosts dir" "${HOME}/Library/Application Support/Mozilla/NativeMessagingHosts" /bin/ls "${HOME}/Library/Application Support/Mozilla/NativeMessagingHosts"
+  onepassword_group_container_dir="$(find "${HOME}/Library/Group Containers" -mindepth 1 -maxdepth 1 -type d -name "*.com.1password" 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$onepassword_group_container_dir" ]]; then
+    onepassword_socket_dir="${onepassword_group_container_dir}/t"
+    assert_allowed_if_exists "$POLICY_DEFAULT" "read 1Password socket directory" "$onepassword_socket_dir" /bin/ls "$onepassword_socket_dir"
+  else
+    log_skip "read 1Password socket directory (matching Group Container not found)"
+  fi
+  assert_allowed_if_exists "$POLICY_DEFAULT" "access 1Password SSH agent socket symlink" "${HOME}/.1password/agent.sock" /bin/ls "${HOME}/.1password/agent.sock"
 
   section_begin "macOS GUI / Electron Integration Policy Coverage"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits macOS GUI integration profile" ";; Integration: macOS GUI"

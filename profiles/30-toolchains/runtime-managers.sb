@@ -25,4 +25,15 @@
     (home-subpath "/Library/Caches/asdf")
     (home-literal "/.asdfrc")
     (home-literal "/.tool-versions")
+
+    ;; proto
+    (home-subpath "/.proto")
+    (home-literal "/.prototools")
+
+    ;; pkgx
+    (home-subpath "/.pkgx")
+    (home-subpath "/.local/share/pkgx")
+    (home-subpath "/.cache/pkgx")
+    (home-subpath "/Library/Caches/pkgx")
+    (home-subpath "/Library/Packages")
 )

@@ -1,13 +1,14 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: Browser Native Messaging
-;; Chromium native messaging host registration and extension detection.
+;; Browser native messaging host registration (Chromium + Firefox) and Chromium extension detection.
 ;; Source: 50-integrations-core/browser-native-messaging.sb
 ;; ---------------------------------------------------------------------------
 
-;; Three things are needed per browser:
+;; Three things are needed per Chromium browser:
 ;;   1. Directory listing on the browser root (check if browser is installed)
 ;;   2. Read+write on NativeMessagingHosts (register/update the native messaging manifest)
 ;;   3. Read on Default/Extensions (check if a specific extension is installed)
+;; Firefox support only needs NativeMessagingHosts registration paths.
 ;; Extensions dir only contains publicly-available extension source/manifests — no browsing data.
 ;; No access to cookies, passwords, history, bookmarks, or profile data.
 
@@ -19,6 +20,8 @@
     (home-literal "/Library/Application Support/Chromium")
     (home-literal "/Library/Application Support/Vivaldi")
     (home-literal "/Library/Application Support/com.operasoftware.Opera")
+    (home-literal "/Library/Application Support/Firefox")
+    (home-literal "/Library/Application Support/Mozilla")
     (data-home-literal "/Library/Application Support/Google/Chrome")
     (data-home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
     (data-home-literal "/Library/Application Support/Arc/User Data")
@@ -26,6 +29,8 @@
     (data-home-literal "/Library/Application Support/Chromium")
     (data-home-literal "/Library/Application Support/Vivaldi")
     (data-home-literal "/Library/Application Support/com.operasoftware.Opera")
+    (data-home-literal "/Library/Application Support/Firefox")
+    (data-home-literal "/Library/Application Support/Mozilla")
     (home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
     (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
     (home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
@@ -50,6 +55,7 @@
     (home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
     (home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
     (home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
@@ -57,4 +63,5 @@
     (data-home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
 )

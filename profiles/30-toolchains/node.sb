@@ -30,6 +30,7 @@
     (home-subpath "/.cache/node-gyp")
 
     ;; pnpm
+    (home-subpath "/.config/pnpm")
     (home-subpath "/.pnpm-state")
     (home-subpath "/.pnpm-store")
     (home-subpath "/.local/share/pnpm")

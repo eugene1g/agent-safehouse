@@ -288,6 +288,7 @@
     (home-subpath "/.cache/node-gyp")
 
     ;; pnpm
+    (home-subpath "/.config/pnpm")
     (home-subpath "/.pnpm-state")
     (home-subpath "/.pnpm-store")
     (home-subpath "/.local/share/pnpm")
@@ -451,6 +452,17 @@
     (home-subpath "/Library/Caches/asdf")
     (home-literal "/.asdfrc")
     (home-literal "/.tool-versions")
+
+    ;; proto
+    (home-subpath "/.proto")
+    (home-literal "/.prototools")
+
+    ;; pkgx
+    (home-subpath "/.pkgx")
+    (home-subpath "/.local/share/pkgx")
+    (home-subpath "/.cache/pkgx")
+    (home-subpath "/Library/Caches/pkgx")
+    (home-subpath "/Library/Packages")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -505,6 +517,9 @@
 
 (allow file-read* file-write*
     (home-subpath "/.config/op")                               ;; 1Password CLI (op) config and session tokens.
+    (home-subpath "/.1password")                               ;; 1Password SSH agent symlink dir (includes ~/.1password/agent.sock).
+    (regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))       ;; Team-ID prefix can vary by build/signing identity.
+    (regex (string-append "^" DATA_HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))  ;; Data-volume variant for APFS firmlink traversal.
 )
 
 (allow mach-lookup
@@ -514,14 +529,15 @@
 
 ;; ---------------------------------------------------------------------------
 ;; Integration: Browser Native Messaging
-;; Chromium native messaging host registration and extension detection.
+;; Browser native messaging host registration (Chromium + Firefox) and Chromium extension detection.
 ;; Source: 50-integrations-core/browser-native-messaging.sb
 ;; ---------------------------------------------------------------------------
 
-;; Three things are needed per browser:
+;; Three things are needed per Chromium browser:
 ;;   1. Directory listing on the browser root (check if browser is installed)
 ;;   2. Read+write on NativeMessagingHosts (register/update the native messaging manifest)
 ;;   3. Read on Default/Extensions (check if a specific extension is installed)
+;; Firefox support only needs NativeMessagingHosts registration paths.
 ;; Extensions dir only contains publicly-available extension source/manifests — no browsing data.
 ;; No access to cookies, passwords, history, bookmarks, or profile data.
 
@@ -533,6 +549,8 @@
     (home-literal "/Library/Application Support/Chromium")
     (home-literal "/Library/Application Support/Vivaldi")
     (home-literal "/Library/Application Support/com.operasoftware.Opera")
+    (home-literal "/Library/Application Support/Firefox")
+    (home-literal "/Library/Application Support/Mozilla")
     (data-home-literal "/Library/Application Support/Google/Chrome")
     (data-home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
     (data-home-literal "/Library/Application Support/Arc/User Data")
@@ -540,6 +558,8 @@
     (data-home-literal "/Library/Application Support/Chromium")
     (data-home-literal "/Library/Application Support/Vivaldi")
     (data-home-literal "/Library/Application Support/com.operasoftware.Opera")
+    (data-home-literal "/Library/Application Support/Firefox")
+    (data-home-literal "/Library/Application Support/Mozilla")
     (home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
     (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
     (home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
@@ -564,6 +584,7 @@
     (home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
     (home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
     (home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
@@ -571,6 +592,7 @@
     (data-home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
     (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
+    (data-home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -596,7 +618,8 @@
 (allow file-read* file-write*
     (home-subpath "/.aws")            ;; AWS profiles/sso/cache files needed for aws cli and SDK auth flows.
     (home-subpath "/.config/gcloud")  ;; gcloud account/config/token files needed for CLI auth and project commands.
-    ;; (home-subpath "/.azure")         ;; Azure CLI config/credentials (uncomment if needed).
+    (home-subpath "/.azure")          ;; Azure CLI config, credentials, and token cache.
+    (home-subpath "/.azd")            ;; Azure Developer CLI environment/auth state.
 )
 
 ;; ---------------------------------------------------------------------------
