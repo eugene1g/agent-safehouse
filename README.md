@@ -9,7 +9,7 @@ Uses macOS `sandbox-exec` with composable policy profiles to confine agents like
 
 ## Why
 
-LLM coding agents run shell commands with broad filesystem access. A prompt injection, confused deputy, or hallucinated `rm -rf` can reach your SSH keys, AWS credentials, other repos, or anything else your user account can touch. This kit shrinks the blast radius to the project directory and the toolchains the agent actually needs — without breaking normal development workflows.
+LLM coding agents run shell commands with broad filesystem access. A prompt injection, confused deputy, or hallucinated `rm -rf` can reach your SSH keys, AWS credentials, other repos, or anything else your user account can touch. This kit shrinks the blast radius to the project directory and the toolchains the agent actually needs  - without breaking normal development workflows.
 
 ## Guiding Philosophy
 
@@ -17,44 +17,48 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 
 ### What we allow (and why)
 
-- **Filesystem reads for system paths** — `/usr`, `/bin`, `/opt`, `/System`, `/Library/Frameworks`, etc. Agents spawn shells, compilers, and package managers that link against system libraries. Denying these breaks everything.
-- **Full process exec/fork** — agents orchestrate deep subprocess trees (shell > git > ssh > credential-helper). Restricting process creation is impractical.
-- **Toolchain and agent config directories** — each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) and agent (`~/.claude`, `~/.codex`, etc.) gets scoped read+write to its own paths. No broader access.
-- **Keychain and Security framework** (always-on) — most agents (Claude Code, Amp, etc.) store login tokens in macOS Keychain and cannot authenticate without it. Read+write access to Keychain files and Security mach services is required for credential storage, retrieval, and TLS certificate validation. This is not a feature toggle because agents fail to start without it.
-- **Shell startup files** — `~/.zshenv`, `~/.zprofile`, `/etc/zshrc`, etc. Without these, agents get a broken PATH and misconfigured environment.
-- **SSH config (not `~/.ssh` keys)** — `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
-- **Runtime mach services** — notification center, logd, diagnosticd, CoreServices, DiskArbitration, DNS-SD, opendirectory, FSEvents, trustd, etc. These are framework-level dependencies that many CLI tools probe during init.
-- **Network (fully open)** — agents need package registries, APIs, MCP servers, and git remotes. Restricting network is possible but breaks most workflows.
-- **Temp directories** — `/tmp`, `/var/folders`. Transient files, IPC sockets, build artifacts.
+- **Filesystem reads for system paths**  - `/usr`, `/bin`, `/opt`, `/System`, `/Library/Frameworks`, etc. Agents spawn shells, compilers, and package managers that link against system libraries. Denying these breaks everything.
+- **Full process exec/fork**  - agents orchestrate deep subprocess trees (shell > git > ssh > credential-helper). Restricting process creation is impractical.
+- **Toolchain and agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) and agent (`~/.claude`, `~/.codex`, etc.) gets scoped read+write to its own paths. No broader access.
+- **Keychain and Security framework** (always-on)  - most agents (Claude Code, Amp, etc.) store login tokens in macOS Keychain and cannot authenticate without it. Read+write access to Keychain files and Security mach services is required for credential storage, retrieval, and TLS certificate validation. This is not a feature toggle because agents fail to start without it.
+- **Shell startup files**  - `~/.zshenv`, `~/.zprofile`, `/etc/zshrc`, etc. Without these, agents get a broken PATH and misconfigured environment.
+- **SSH config (not `~/.ssh` keys)**  - `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
+- **Runtime mach services**  - notification center, logd, diagnosticd, CoreServices, DiskArbitration, DNS-SD, opendirectory, FSEvents, trustd, etc. These are framework-level dependencies that many CLI tools probe during init.
+- **Network (fully open)**  - agents need package registries, APIs, MCP servers, and git remotes. Restricting network is possible but breaks most workflows.
+- **Temp directories**  - `/tmp`, `/var/folders`. Transient files, IPC sockets, build artifacts.
 
 ### What we specifically deny (and why)
 
-- **`~/.ssh` private keys (default policy)** — blocked by default via the SSH integration profile; only `config` and `known_hosts` are re-allowed. If you explicitly grant `~/.ssh` later via CLI path grants, you can override this.
-- **`~/.aws` credentials** (optional) — can be blocked via a custom appended profile file (`--append-profile`) for defense-in-depth.
-- **Browser profile directories (default)** — browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging support is always-on, but narrowly scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only) paths.
-- **`/dev` raw device access** — this policy allows `/dev` traversal/metadata plus specific safe device nodes (`/dev/null`, `/dev/urandom`, `/dev/tty*`, `/dev/ptmx`, `/dev/autofs_nowait`). It does not grant broad read/write access to raw device files.
-- **`forbidden-exec-sugid`** — execution of setuid/setgid binaries (`sudo`, `passwd`, etc.) is denied. Agents should never escalate privileges. If a specific setuid binary is needed, allow it by name rather than blanket-allowing privilege escalation.
-- **`osascript` execution** (optional) — if you want to hard-block AppleScript entrypoints, add a deny in a custom appended profile file (`--append-profile`). This can reduce GUI/session automation surface but may break agent notification UX.
-- **Raw disk/kernel devices** — `/dev/disk*`, `/dev/bpf*`, `/dev/pf`, `/dev/audit*`, `/dev/dtrace`, `/dev/fsevents`. No coding agent needs raw disk access or packet capture.
+- **`~/.ssh` private keys (default policy)**  - blocked by default via the SSH integration profile; only `config` and `known_hosts` are re-allowed. If you explicitly grant `~/.ssh` later via CLI path grants, you can override this.
+- **`~/.aws` credentials** (optional)  - can be blocked via a custom appended profile file (`--append-profile`) for defense-in-depth.
+- **Browser profile directories (default)**  - browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging support is always-on, but narrowly scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only) paths.
+- **`/dev` raw device access**  - this policy allows `/dev` traversal/metadata plus specific safe device nodes (`/dev/null`, `/dev/urandom`, `/dev/tty*`, `/dev/ptmx`, `/dev/autofs_nowait`). It does not grant broad read/write access to raw device files.
+- **`forbidden-exec-sugid`**  - execution of setuid/setgid binaries (`sudo`, `passwd`, etc.) is denied. Agents should never escalate privileges. If a specific setuid binary is needed, allow it by name rather than blanket-allowing privilege escalation.
+- **`osascript` execution** (optional)  - if you want to hard-block AppleScript entrypoints, add a deny in a custom appended profile file (`--append-profile`). This can reduce GUI/session automation surface but may break agent notification UX.
+- **Raw disk/kernel devices**  - `/dev/disk*`, `/dev/bpf*`, `/dev/pf`, `/dev/audit*`, `/dev/dtrace`, `/dev/fsevents`. No coding agent needs raw disk access or packet capture.
 
 ### What we do NOT protect against
 
-- **Network exfiltration / C2** — network is fully open. If an agent can read a file and has network access, it can send the contents anywhere. See `profiles/20-network.sb` for restrictive alternatives.
-- **Sandbox escapes** — `sandbox-exec` is a userspace mechanism, not a hypervisor. Apple has deprecated the public API, though the kernel enforcement still works.
-- **Credential theft via IPC** — Mach services like SecurityServer and 1Password are allowed for keychain/auth workflows, which means an agent could theoretically interact with them.
-- **Data exfiltration via allowed paths** — the sandbox limits *which* files are visible, not what happens with their contents once read.
+- **Network exfiltration / C2**  - network is fully open. If an agent can read a file and has network access, it can send the contents anywhere. See `profiles/20-network.sb` for restrictive alternatives.
+- **Sandbox escapes**  - `sandbox-exec` is a userspace mechanism, not a hypervisor. Apple has deprecated the public API, though the kernel enforcement still works.
+- **Credential theft via IPC**  - Mach services like SecurityServer and 1Password are allowed for keychain/auth workflows, which means an agent could theoretically interact with them.
+- **Data exfiltration via allowed paths**  - the sandbox limits *which* files are visible, not what happens with their contents once read.
 
 ## Setup
 
-Add shell functions so agent wrappers preserve argument boundaries and forward `"$@"` safely:
+```bash
+# Download safehouse (single self-contained script)
+mkdir -p ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/safehouse.sh \
+  -o ~/.local/bin/safehouse
+chmod +x ~/.local/bin/safehouse
+```
+
+Then add shell functions so agent wrappers preserve argument boundaries and forward `"$@"` safely:
 
 ```bash
 # ~/.bashrc or ~/.zshrc
-# Point this to your clone location
-safehouse() {
-  "$HOME/.local/share/agent-safehouse/bin/safehouse.sh" "$@"
-}
-
+# Ensure ~/.local/bin is on your PATH
 safe() { safehouse --add-dirs-ro="$HOME/mywork" "$@"; }
 claude()   { safe claude --dangerously-skip-permissions "$@"; }
 codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
@@ -79,12 +83,11 @@ safehouse
 
 # Run Claude in the current repo (default workdir auto-selects git root, else CWD)
 cd ~/projects/my-app
-safehouse -- claude --dangerously-skip-permissions
 safehouse claude --dangerously-skip-permissions
 safe claude --dangerously-skip-permissions
 
 # Run Gemini (requires NO_BROWSER=true to avoid opening auth pages)
-NO_BROWSER=true safehouse -- gemini
+NO_BROWSER=true safehouse gemini
 
 # Grant extra writable directories
 safehouse --add-dirs=/tmp/scratch:/data/shared -- claude --dangerously-skip-permissions
@@ -96,13 +99,13 @@ safehouse --add-dirs-ro=/repos/shared-lib -- aider
 safehouse --append-profile=/path/to/local-overrides.sb -- claude --dangerously-skip-permissions
 
 # Use env vars instead of CLI flags
-SAFEHOUSE_ADD_DIRS_RO=/repos/shared-lib SAFEHOUSE_ADD_DIRS=/tmp/scratch safehouse -- aider
+SAFEHOUSE_ADD_DIRS_RO=/repos/shared-lib SAFEHOUSE_ADD_DIRS=/tmp/scratch safehouse aider
 
 # Override the default workdir selection
 safehouse --workdir=/tmp/scratch -- claude --dangerously-skip-permissions
 
 # Or set workdir via env
-SAFEHOUSE_WORKDIR=/tmp/scratch safehouse -- claude --dangerously-skip-permissions
+SAFEHOUSE_WORKDIR=/tmp/scratch safehouse claude --dangerously-skip-permissions
 
 # Disable automatic workdir grants (use only explicit --add-dirs/--add-dirs-ro)
 safehouse --workdir= --add-dirs-ro=/repos/shared-lib --add-dirs=/tmp/scratch -- aider
@@ -112,7 +115,7 @@ cat > .safehouse <<'EOF'
 add-dirs-ro=/repos/shared-lib
 add-dirs=/tmp/scratch
 EOF
-safehouse -- aider
+safehouse aider
 
 # Enable Docker socket access (off by default)
 safehouse --enable=docker -- docker ps
@@ -180,7 +183,7 @@ This writes these files by default:
 You can distribute `dist/safehouse.sh` directly and run it with exact CLI parity to `bin/safehouse.sh`:
 
 ```bash
-./dist/safehouse.sh -- claude --dangerously-skip-permissions
+./dist/safehouse.sh claude --dangerously-skip-permissions
 ./dist/safehouse.sh --stdout
 ```
 
@@ -221,12 +224,12 @@ All flags accept both `--flag=value` and `--flag value` forms.
 Execution behavior:
 - No command args: generate a policy and print the policy file path.
 - Command args provided: generate a policy, then execute the command under `sandbox-exec`.
-- `--` separator is optional (recommended when the wrapped command starts with `-`).
+- `--` separator is optional (needed when safehouse flags precede the command, e.g. `safehouse --enable=docker -- docker ps`).
 
 Environment variables:
-- `SAFEHOUSE_ADD_DIRS_RO` — Colon-separated paths to grant read-only
-- `SAFEHOUSE_ADD_DIRS` — Colon-separated paths to grant read/write
-- `SAFEHOUSE_WORKDIR` — Workdir override (`SAFEHOUSE_WORKDIR=` disables automatic workdir grants)
+- `SAFEHOUSE_ADD_DIRS_RO`  - Colon-separated paths to grant read-only
+- `SAFEHOUSE_ADD_DIRS`  - Colon-separated paths to grant read/write
+- `SAFEHOUSE_WORKDIR`  - Workdir override (`SAFEHOUSE_WORKDIR=` disables automatic workdir grants)
 
 Optional workdir config file:
 - `<workdir>/.safehouse`
@@ -260,7 +263,7 @@ The runner accepts no arguments and executes modular test sections under `tests/
 
 ## Debugging Sandbox Denials
 
-Use `/usr/bin/log` (not `log` — some shells shadow it with a builtin).
+Use `/usr/bin/log` (not `log`  - some shells shadow it with a builtin).
 
 **Live stream all denials:**
 ```bash
@@ -317,10 +320,10 @@ Sandbox profiles apply to the process and all children (fork+exec inherits). Exe
 
 ## Reference & Prior Art
 
-- **[anthropic-experimental/sandbox-runtime](https://github.com/anthropic-experimental/sandbox-runtime)** — Official Anthropic reference implementation. TypeScript/Node, cross-platform, includes a network proxy for allowlisting API endpoints. ([macos-sandbox-utils.ts](https://github.com/anthropic-experimental/sandbox-runtime/blob/4fad8fa35db3f09958db1df401b30bd00402b611/src/sandbox/macos-sandbox-utils.ts), [sandbox-utils.ts](https://github.com/anthropic-experimental/sandbox-runtime/blob/4fad8fa35db3f09958db1df401b30bd00402b611/src/sandbox/sandbox-utils.ts))
+- **[anthropic-experimental/sandbox-runtime](https://github.com/anthropic-experimental/sandbox-runtime)**  - Official Anthropic reference implementation. TypeScript/Node, cross-platform, includes a network proxy for allowlisting API endpoints. ([macos-sandbox-utils.ts](https://github.com/anthropic-experimental/sandbox-runtime/blob/4fad8fa35db3f09958db1df401b30bd00402b611/src/sandbox/macos-sandbox-utils.ts), [sandbox-utils.ts](https://github.com/anthropic-experimental/sandbox-runtime/blob/4fad8fa35db3f09958db1df401b30bd00402b611/src/sandbox/sandbox-utils.ts))
 
-- **[neko-kai/claude-code-sandbox](https://github.com/neko-kai/claude-code-sandbox)** — Restrictive reads via `noread.sb` + wrapper script for ancestor dir listing. Key insight: Claude Code needs `(allow file-read* (literal "/each/parent/dir"))` for every ancestor of the CWD, or it sets `PATH=""` and disables colored output. Only needs `literal` (dir listing), not `subpath` (recursive content).
+- **[neko-kai/claude-code-sandbox](https://github.com/neko-kai/claude-code-sandbox)**  - Restrictive reads via `noread.sb` + wrapper script for ancestor dir listing. Key insight: Claude Code needs `(allow file-read* (literal "/each/parent/dir"))` for every ancestor of the CWD, or it sets `PATH=""` and disables colored output. Only needs `literal` (dir listing), not `subpath` (recursive content).
 
-- **[n8henrie/trace.sh](https://gist.github.com/n8henrie/eaaa1a25753fadbd7715e85a38b99831)** — Gist with `trace.sh` (automated deny-to-allow loop) and `shrink.sh` (remove unnecessary allow rules by testing each one). Invaluable for building and minimizing profiles from scratch.
+- **[n8henrie/trace.sh](https://gist.github.com/n8henrie/eaaa1a25753fadbd7715e85a38b99831)**  - Gist with `trace.sh` (automated deny-to-allow loop) and `shrink.sh` (remove unnecessary allow rules by testing each one). Invaluable for building and minimizing profiles from scratch.
 
-- **[luiscardoso.dev — Sandboxes for AI](https://www.luiscardoso.dev/blog/sandboxes-for-ai)** — Overview of sandboxing approaches for AI agents.
+- **[luiscardoso.dev  - Sandboxes for AI](https://www.luiscardoso.dev/blog/sandboxes-for-ai)**  - Overview of sandboxing approaches for AI agents.

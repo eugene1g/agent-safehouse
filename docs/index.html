@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Safehouse — Sandbox your LLM coding agents on macOS</title>
+  <title>Agent Safehouse  - Sandbox your LLM coding agents on macOS</title>
   <meta name="description" content="Confine Claude, Cursor, Aider, Gemini and other AI coding agents to only the files they need using macOS native sandbox-exec.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -1134,7 +1134,7 @@
     <div class="hero-headline-row">
       <div class="hero-headline-group">
         <h1 class="hero-headline">Native macOS sandboxing for Agents</h1>
-        <p class="hero-desc"><code>sandbox-exec</code> policies for coding agents &mdash; deny-first, composable, thoroughly tested.</p>
+        <p class="hero-desc"><code>sandbox-exec</code> policies for coding agents  - deny-first, composable, thoroughly tested.</p>
       </div>
       <div class="hero-badges">
         <span class="hero-badge"><span class="check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5"/></svg></span>Pure Bash</span>
@@ -1153,7 +1153,7 @@
           </div>
           <div class="safety-point">
             <span class="sp-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 2.5L6 10l-3.5-3.5"/></svg></span>
-            <span><strong class="sp-no">No full read access</strong> &mdash; only what the agent needs</span>
+            <span><strong class="sp-no">No full read access</strong>  - only what the agent needs</span>
           </div>
           <div class="safety-point">
             <span class="sp-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 2.5L6 10l-3.5-3.5"/></svg></span>
@@ -1206,17 +1206,17 @@
 <section id="why">
   <div class="container">
     <h2 class="section-title">Why Safehouse?</h2>
-    <p class="section-sub">Coding agents run as your user. They inherit every permission you have &mdash; read your SSH keys, browse your credentials, write anywhere on disk. The built-in permission prompts help, but skipping them (which most people do) means the agent has the same access as <code class="il">sudo -u $USER</code>. Safehouse uses macOS <code class="il">sandbox-exec</code> to enforce kernel-level restrictions that the agent process cannot bypass, even if it tries.</p>
+    <p class="section-sub">Coding agents run as your user. They inherit every permission you have  - read your SSH keys, browse your credentials, write anywhere on disk. The built-in permission prompts help, but skipping them (which most people do) means the agent has the same access as <code class="il">sudo -u $USER</code>. Safehouse uses macOS <code class="il">sandbox-exec</code> to enforce kernel-level restrictions that the agent process cannot bypass, even if it tries.</p>
     <ul class="why-list fade-in">
-      <li><strong>Kernel-level enforcement</strong> &mdash; <code class="il">sandbox-exec</code> runs in the macOS kernel. The agent can't escape it, disable it, or write around it. A denied operation returns <code class="il">EPERM</code>, period.</li>
-      <li><strong>Deny-first, allow-list model</strong> &mdash; the policy starts with <code class="il">(deny default)</code>. File reads, writes, network, IPC &mdash; everything is blocked unless a rule explicitly permits it.</li>
-      <li><strong>Scoped to your project</strong> &mdash; the selected workdir gets read/write (git root by default, otherwise the invocation directory). Toolchains (<code class="il">~/.cargo</code>, <code class="il">~/.npm</code>, etc.) get their own scoped access. Most of your home directory &mdash; SSH keys, other repos, personal files &mdash; is invisible.</li>
-      <li><strong>Zero friction</strong> &mdash; no permission prompts, no babysitting. Safehouse enforces boundaries silently. You just type <code class="il">safehouse -- claude --dangerously-skip-permissions</code> and work.</li>
+      <li><strong>Kernel-level enforcement</strong>  - <code class="il">sandbox-exec</code> runs in the macOS kernel. The agent can't escape it, disable it, or write around it. A denied operation returns <code class="il">EPERM</code>, period.</li>
+      <li><strong>Deny-first, allow-list model</strong>  - the policy starts with <code class="il">(deny default)</code>. File reads, writes, network, IPC  - everything is blocked unless a rule explicitly permits it.</li>
+      <li><strong>Scoped to your project</strong>  - the selected workdir gets read/write (git root by default, otherwise the invocation directory). Toolchains (<code class="il">~/.cargo</code>, <code class="il">~/.npm</code>, etc.) get their own scoped access. Most of your home directory  - SSH keys, other repos, personal files  - is invisible.</li>
+      <li><strong>Zero friction</strong>  - no permission prompts, no babysitting. Safehouse enforces boundaries silently. You just type <code class="il">safehouse claude --dangerously-skip-permissions</code> and work.</li>
     </ul>
 
     <div class="value-banner fade-in" style="margin-top: 48px;">
       <h2><span class="no">No</span> read access to your entire home. <span class="yes">Only</span> what the agent needs.</h2>
-      <p>Agents inherit your full user permissions. Safehouse flips this to deny-first &mdash; nothing is readable unless explicitly granted.</p>
+      <p>Agents inherit your full user permissions. Safehouse flips this to deny-first  - nothing is readable unless explicitly granted.</p>
       <div class="access-compare">
         <div class="access-box without">
           <h4>Without Safehouse</h4>
@@ -1283,12 +1283,12 @@
     <h2 class="section-title">Necessary evils</h2>
     <p class="section-sub">Access that looks scary but is genuinely required. Narrowest scope possible.</p>
     <ul class="why-list fade-in">
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations/keychain.sb">Keychain &amp; Security framework</a></strong> &mdash; most agents store login tokens in macOS Keychain and cannot authenticate without it. We allow read/write to Keychain files and Security mach services (<code class="il">com.apple.SecurityServer</code>, <code class="il">trustd</code>) because agents fail to start without them. This also covers TLS certificate validation.</li>
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/10-system-runtime.sb">Device nodes</a></strong> &mdash; agents need <code class="il">/dev/null</code>, <code class="il">/dev/urandom</code>, <code class="il">/dev/tty*</code>, and <code class="il">/dev/ptmx</code> for basic I/O, randomness, and pseudo-terminal allocation. We allow these specific safe nodes but deny raw disk access (<code class="il">/dev/disk*</code>), packet capture (<code class="il">/dev/bpf*</code>), and audit devices.</li>
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/20-network.sb">Full network access</a></strong> <span class="evil-tag">Configurable</span> &mdash; agents need package registries, LLM APIs, MCP servers, git remotes, and localhost dev servers. The default policy is fully open, but <a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/20-network.sb">profiles/20-network.sb</a> includes commented alternatives for outbound-only or localhost-only modes.</li>
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/10-system-runtime.sb">Mach services &amp; IPC</a></strong> &mdash; macOS frameworks probe dozens of mach services during process init &mdash; notification center, <code class="il">logd</code>, <code class="il">diagnosticd</code>, CoreServices, and more. Without these, even basic CLI tools like <code class="il">git</code> and <code class="il">node</code> crash on startup.</li>
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/00-base.sb">Full process exec &amp; fork</a></strong> &mdash; agents orchestrate deep subprocess trees: shell &rarr; git &rarr; ssh &rarr; credential-helper. Restricting <code class="il">process-exec</code> or <code class="il">process-fork</code> would break every agent immediately. Instead, we constrain <em>what</em> those processes can access via filesystem rules.</li>
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations/1password.sb">1Password &amp; credential helpers</a></strong> <span class="evil-tag">Configurable</span> &mdash; git credential helpers, SSH agent forwarding, and CLI tools like <code class="il">gh</code> and <code class="il">glab</code> often rely on 1Password or the macOS SSH agent socket. The <a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations/ssh.sb">SSH profile</a> still denies private key files &mdash; only the agent socket and 1Password CLI integration are allowed.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations/keychain.sb">Keychain &amp; Security framework</a></strong>  - most agents store login tokens in macOS Keychain and cannot authenticate without it. We allow read/write to Keychain files and Security mach services (<code class="il">com.apple.SecurityServer</code>, <code class="il">trustd</code>) because agents fail to start without them. This also covers TLS certificate validation.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/10-system-runtime.sb">Device nodes</a></strong>  - agents need <code class="il">/dev/null</code>, <code class="il">/dev/urandom</code>, <code class="il">/dev/tty*</code>, and <code class="il">/dev/ptmx</code> for basic I/O, randomness, and pseudo-terminal allocation. We allow these specific safe nodes but deny raw disk access (<code class="il">/dev/disk*</code>), packet capture (<code class="il">/dev/bpf*</code>), and audit devices.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/20-network.sb">Full network access</a></strong> <span class="evil-tag">Configurable</span>  - agents need package registries, LLM APIs, MCP servers, git remotes, and localhost dev servers. The default policy is fully open, but <a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/20-network.sb">profiles/20-network.sb</a> includes commented alternatives for outbound-only or localhost-only modes.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/10-system-runtime.sb">Mach services &amp; IPC</a></strong>  - macOS frameworks probe dozens of mach services during process init  - notification center, <code class="il">logd</code>, <code class="il">diagnosticd</code>, CoreServices, and more. Without these, even basic CLI tools like <code class="il">git</code> and <code class="il">node</code> crash on startup.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/00-base.sb">Full process exec &amp; fork</a></strong>  - agents orchestrate deep subprocess trees: shell &rarr; git &rarr; ssh &rarr; credential-helper. Restricting <code class="il">process-exec</code> or <code class="il">process-fork</code> would break every agent immediately. Instead, we constrain <em>what</em> those processes can access via filesystem rules.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations/1password.sb">1Password &amp; credential helpers</a></strong> <span class="evil-tag">Configurable</span>  - git credential helpers, SSH agent forwarding, and CLI tools like <code class="il">gh</code> and <code class="il">glab</code> often rely on 1Password or the macOS SSH agent socket. The <a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations/ssh.sb">SSH profile</a> still denies private key files  - only the agent socket and 1Password CLI integration are allowed.</li>
     </ul>
   </div>
 </section>
@@ -1296,35 +1296,36 @@
 <section id="getting-started">
   <div class="container">
     <h2 class="section-title">Getting started</h2>
-    <p class="section-sub">Download a single shell script, make it executable, and run your agent inside it. No build step, no dependencies &mdash; just Bash and macOS.</p>
+    <p class="section-sub">Download a single shell script, make it executable, and run your agent inside it. No build step, no dependencies  - just Bash and macOS.</p>
 
     <pre class="fade-in"><code><span class="c"># 1. Download safehouse (single self-contained script)</span>
+<span class="k">mkdir</span> <span class="f">-p</span> <span class="s">~/.local/bin</span>
 <span class="k">curl</span> <span class="f">-fsSL</span> <span class="s">https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/safehouse.sh</span> \
-  <span class="f">-o</span> <span class="s">/usr/local/bin/safehouse</span>
-<span class="k">chmod</span> <span class="f">+x</span> <span class="s">/usr/local/bin/safehouse</span>
+  <span class="f">-o</span> <span class="s">~/.local/bin/safehouse</span>
+<span class="k">chmod</span> <span class="f">+x</span> <span class="s">~/.local/bin/safehouse</span>
 
 <span class="c"># 2. Run any agent inside Safehouse</span>
 <span class="k">cd</span> ~/projects/my-app
-<span class="k">safehouse</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span></code></pre>
+<span class="k">safehouse</span> claude <span class="f">--dangerously-skip-permissions</span></code></pre>
 
-    <p style="color: var(--text-muted); margin-top: 20px; line-height: 1.7;">Safehouse automatically grants read/write access to the selected workdir (git root by default, otherwise the invocation directory) and read access to your installed toolchains. Most of your home directory &mdash; SSH keys, other repos, personal files &mdash; is denied by the kernel.</p>
+    <p style="color: var(--text-muted); margin-top: 20px; line-height: 1.7;">Safehouse automatically grants read/write access to the selected workdir (git root by default, otherwise the invocation directory) and read access to your installed toolchains. Most of your home directory  - SSH keys, other repos, personal files  - is denied by the kernel.</p>
 
-    <h3 class="fade-in" style="margin-top: 40px; font-size: 1rem; font-weight: 600; color: var(--text-bright);">See it fail &mdash; proof the sandbox works</h3>
+    <h3 class="fade-in" style="margin-top: 40px; font-size: 1rem; font-weight: 600; color: var(--text-bright);">See it fail  - proof the sandbox works</h3>
     <p style="color: var(--text-muted); margin-top: 8px; margin-bottom: 16px; line-height: 1.7;">Try reading something sensitive inside safehouse. The kernel blocks it before the process ever sees the data.</p>
-    <pre class="fade-in"><code><span class="c"># Try to read your SSH private key &mdash; denied by the kernel</span>
-<span class="k">safehouse</span> <span class="f">--</span> cat ~/.ssh/id_ed25519
+    <pre class="fade-in"><code><span class="c"># Try to read your SSH private key  - denied by the kernel</span>
+<span class="k">safehouse</span> cat ~/.ssh/id_ed25519
 <span class="c"># cat: /Users/you/.ssh/id_ed25519: Operation not permitted</span>
 
-<span class="c"># Try to list another repo &mdash; invisible</span>
-<span class="k">safehouse</span> <span class="f">--</span> ls ~/other-project
+<span class="c"># Try to list another repo  - invisible</span>
+<span class="k">safehouse</span> ls ~/other-project
 <span class="c"># ls: /Users/you/other-project: Operation not permitted</span>
 
 <span class="c"># But your current project works fine</span>
-<span class="k">safehouse</span> <span class="f">--</span> ls .
+<span class="k">safehouse</span> ls .
 <span class="c"># README.md  src/  package.json  ...</span>
 
-<span class="c"># Run Claude with full auto-approve &mdash; safely sandboxed</span>
-<span class="k">safehouse</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span>
+<span class="c"># Run Claude with full auto-approve  - safely sandboxed</span>
+<span class="k">safehouse</span> claude <span class="f">--dangerously-skip-permissions</span>
 <span class="c"># Claude runs normally, but can't touch anything outside your project</span></code></pre>
   </div>
 </section>
@@ -1332,17 +1333,17 @@
 <section id="shell-functions">
   <div class="container">
     <h2 class="section-title">Use shell functions to be safe by default</h2>
-    <p class="section-sub">Add these functions to your shell config and every agent runs inside Safehouse automatically &mdash; you don't have to remember. This convention keeps full access to the active project (git root by default) while adding read-only access to a shared workspace like <code class="il">~/mywork</code>. To run an agent <em>without</em> the sandbox, type <code class="il">command claude</code> to bypass the function and invoke the real binary.</p>
+    <p class="section-sub">Add these functions to your shell config and every agent runs inside Safehouse automatically  - you don't have to remember. This convention keeps full access to the active project (git root by default) while adding read-only access to a shared workspace like <code class="il">~/mywork</code>. To run an agent <em>without</em> the sandbox, type <code class="il">command claude</code> to bypass the function and invoke the real binary.</p>
 
     <pre class="fade-in" style="margin-bottom: 16px;"><code><span class="c"># ~/.zshrc or ~/.bashrc</span>
-<span class="c"># Assumes safehouse is on your PATH (e.g. /usr/local/bin/safehouse)</span>
+<span class="c"># Assumes ~/.local/bin is on your PATH</span>
 
 <span class="c"># Shared convention:</span>
 <span class="c"># - Read/write: selected workdir (git root above CWD, else CWD)</span>
 <span class="c"># - Read-only:  $HOME/mywork (reference repos/docs/snippets)</span>
 <span class="k">safe</span>() { safehouse <span class="f">--add-dirs-ro=</span><span class="s">"$HOME/mywork"</span> <span class="s">"$@"</span>; }
 
-<span class="c"># Sandboxed — the default. Just type the command name.</span>
+<span class="c"># Sandboxed  - the default. Just type the command name.</span>
 <span class="k">claude</span>()   { <span class="k">safe</span> claude <span class="f">--dangerously-skip-permissions</span> <span class="s">"$@"</span>; }
 <span class="k">codex</span>()    { <span class="k">safe</span> codex <span class="f">--dangerously-bypass-approvals-and-sandbox</span> <span class="s">"$@"</span>; }
 <span class="k">amp</span>()      { <span class="k">safe</span> amp <span class="f">--dangerously-allow-all</span> <span class="s">"$@"</span>; }
@@ -1350,9 +1351,9 @@
 <span class="k">gemini</span>()   { NO_BROWSER=true <span class="k">safe</span> gemini <span class="f">--yolo</span> <span class="s">"$@"</span>; }
 <span class="k">pi</span>()       { <span class="k">safe</span> pi <span class="s">"$@"</span>; }
 
-<span class="c"># Unsandboxed — use `command` to bypass the function and run the real binary.</span>
-<span class="c"># command claude              — plain interactive session</span>
-<span class="c"># command claude &lt;flags&gt;      — pass any flags directly</span>
+<span class="c"># Unsandboxed  - use `command` to bypass the function and run the real binary.</span>
+<span class="c"># command claude               - plain interactive session</span>
+<span class="c"># command claude &lt;flags&gt;       - pass any flags directly</span>
 </code></pre>
 
     <p style="color: var(--text-muted); line-height: 1.7;">Example: from <code class="il">~/mywork/app-a</code>, <code class="il">safe claude</code> can edit <code class="il">app-a</code> (workdir grant) and read other paths under <code class="il">~/mywork</code>. The same command run from a repo outside <code class="il">~/mywork</code> still grants that repo read/write while keeping <code class="il">~/mywork</code> read-only.</p>
@@ -1368,9 +1369,9 @@
     <div class="two-col fade-in" style="margin-bottom: 32px;">
       <div>
         <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;">Execute mode</h3>
-        <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px;">Pass a command after <code class="il">--</code> and Safehouse generates a policy, then runs it inside.</p>
+        <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px;">Pass a command and Safehouse generates a policy, then runs it inside.</p>
         <pre><code><span class="c"># Run Claude in the current repo</span>
-<span class="k">safehouse</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span>
+<span class="k">safehouse</span> claude <span class="f">--dangerously-skip-permissions</span>
 
 <span class="c"># Grant extra writable directories</span>
 <span class="k">safehouse</span> <span class="f">--add-dirs=</span><span class="s">/tmp/scratch:/data/shared</span> <span class="f">--</span> claude
@@ -1399,11 +1400,11 @@
     </div>
 
     <h3 class="fade-in" style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;">Appending custom rules</h3>
-    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px; line-height: 1.7;">Use <code class="il">--append-profile</code> to layer your own sandbox rules on top of the generated policy. Appended rules load last, so they can tighten or extend access. Repeatable &mdash; pass it multiple times and files are appended in order.</p>
-    <pre class="fade-in"><code><span class="c"># deny-aws.sb &mdash; block AWS credential reads</span>
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px; line-height: 1.7;">Use <code class="il">--append-profile</code> to layer your own sandbox rules on top of the generated policy. Appended rules load last, so they can tighten or extend access. Repeatable  - pass it multiple times and files are appended in order.</p>
+    <pre class="fade-in"><code><span class="c"># deny-aws.sb  - block AWS credential reads</span>
 <span class="f">(deny file-read*</span> <span class="s">(home-subpath "/.aws")</span><span class="f">)</span>
 
-<span class="c"># allow-data.sb &mdash; grant access to a shared data directory</span>
+<span class="c"># allow-data.sb  - grant access to a shared data directory</span>
 <span class="f">(allow file-read*</span> <span class="s">(subpath "/data/shared")</span><span class="f">)</span></code></pre>
     <pre class="fade-in" style="margin-top: 10px;"><code><span class="c"># Stack personal rules onto the default policy</span>
 <span class="k">safehouse</span> <span class="f">--append-profile=</span><span class="s">deny-aws.sb</span> <span class="f">--append-profile=</span><span class="s">allow-data.sb</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span></code></pre>
