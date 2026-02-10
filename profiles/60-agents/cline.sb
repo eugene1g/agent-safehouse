@@ -13,4 +13,6 @@
     (home-subpath "/.config/cline")
     (home-subpath "/.cache/cline")
     (home-subpath "/.local/share/cline")
+    (home-subpath "/.local/state/cline")
+    (home-subpath "/Documents/Cline")               ;; Cline MCP servers, rules, workflows, hooks.
 )

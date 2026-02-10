@@ -17,4 +17,6 @@
     (home-subpath "/.coursier")
     (home-subpath "/Library/Application Support/Coursier")
     (home-subpath "/Library/Caches/Coursier")
+    (home-subpath "/.java")
+    (home-literal "/.mavenrc")
 )

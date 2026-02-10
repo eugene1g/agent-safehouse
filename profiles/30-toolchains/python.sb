@@ -35,4 +35,13 @@
     (home-subpath "/.pyenv")                   ;; pyenv interpreter shims/versions used by many repos.
     (home-literal "/.pypirc")                  ;; Python package index credentials/config file path.
     (home-literal "/.python_history")          ;; REPL history file touched by Python subprocess sessions.
+    ;; conda / miniconda / miniforge
+    (home-subpath "/.conda")
+    (home-subpath "/miniconda3")
+    (home-subpath "/miniforge3")
+    (home-literal "/.condarc")
+    ;; hatch
+    (home-subpath "/.cache/hatch")
+    (home-subpath "/.config/hatch")
+    (home-subpath "/.local/share/hatch")
 )

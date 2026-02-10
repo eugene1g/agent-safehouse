@@ -11,7 +11,9 @@
     (home-subpath "/.config/mise")
     (home-subpath "/.local/share/mise")
     (home-subpath "/.local/state/mise")
+    (home-subpath "/.cache/mise")
     (home-subpath "/Library/Caches/mise")
+    (home-literal "/.mise.toml")
 
     ;; volta
     (home-subpath "/.volta")

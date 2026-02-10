@@ -1,0 +1,11 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Deno
+;; Deno runtime, cache, and config paths.
+;; Source: 30-toolchains/deno.sb
+;; ---------------------------------------------------------------------------
+
+(allow file-read* file-write*
+    (home-subpath "/.deno")
+    (home-subpath "/.cache/deno")
+    (home-subpath "/Library/Caches/deno")
+)

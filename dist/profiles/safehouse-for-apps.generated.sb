@@ -210,7 +210,19 @@
     (home-subpath "/.local/share/bun")
     (home-subpath "/Library/Caches/bun")
     (home-literal "/.bunfig.toml")
-    (home-literal "/.config/.bunfig.toml")
+    (home-literal "/.config/bunfig.toml")
+)
+
+;; ---------------------------------------------------------------------------
+;; Toolchain: Deno
+;; Deno runtime, cache, and config paths.
+;; Source: 30-toolchains/deno.sb
+;; ---------------------------------------------------------------------------
+
+(allow file-read* file-write*
+    (home-subpath "/.deno")
+    (home-subpath "/.cache/deno")
+    (home-subpath "/Library/Caches/deno")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -233,6 +245,8 @@
     (home-subpath "/Library/Caches/golangci-lint")
     (home-subpath "/.config/golangci-lint")
     (home-subpath "/.local/share/go")
+    (home-subpath "/.goenv")
+    (home-subpath "/.cache/gopls")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -254,6 +268,8 @@
     (home-subpath "/.coursier")
     (home-subpath "/Library/Application Support/Coursier")
     (home-subpath "/Library/Caches/Coursier")
+    (home-subpath "/.java")
+    (home-literal "/.mavenrc")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -403,6 +419,15 @@
     (home-subpath "/.pyenv")                   ;; pyenv interpreter shims/versions used by many repos.
     (home-literal "/.pypirc")                  ;; Python package index credentials/config file path.
     (home-literal "/.python_history")          ;; REPL history file touched by Python subprocess sessions.
+    ;; conda / miniconda / miniforge
+    (home-subpath "/.conda")
+    (home-subpath "/miniconda3")
+    (home-subpath "/miniforge3")
+    (home-literal "/.condarc")
+    ;; hatch
+    (home-subpath "/.cache/hatch")
+    (home-subpath "/.config/hatch")
+    (home-subpath "/.local/share/hatch")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -423,6 +448,10 @@
     (home-subpath "/.cache/rubygems")
     (home-subpath "/Library/Caches/bundle")
     (home-literal "/.gemrc")
+    (home-literal "/.irbrc")
+    (home-literal "/.irb_history")
+    (home-literal "/.pryrc")
+    (home-literal "/.pry_history")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -438,7 +467,9 @@
     (home-subpath "/.config/mise")
     (home-subpath "/.local/share/mise")
     (home-subpath "/.local/state/mise")
+    (home-subpath "/.cache/mise")
     (home-subpath "/Library/Caches/mise")
+    (home-literal "/.mise.toml")
 
     ;; volta
     (home-subpath "/.volta")
@@ -481,6 +512,7 @@
     (home-subpath "/Library/Caches/cargo")
     (home-subpath "/.cache/sccache")
     (home-subpath "/Library/Caches/sccache")
+    (home-subpath "/Library/Application Support/Mozilla.sccache")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -518,8 +550,14 @@
 (allow file-read* file-write*
     (home-subpath "/.config/op")                               ;; 1Password CLI (op) config and session tokens.
     (home-subpath "/.1password")                               ;; 1Password SSH agent symlink dir (includes ~/.1password/agent.sock).
-    (regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))       ;; Team-ID prefix can vary by build/signing identity.
+    (subpath "/Users/Shared/.1password")                       ;; Some installs use shared path for SSH agent socket.
+    (regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))       ;; 1Password SSH agent socket directory (team prefix varies).
     (regex (string-append "^" DATA_HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))  ;; Data-volume variant for APFS firmlink traversal.
+)
+
+;; 1Password SSH agent config
+(allow file-read*
+    (home-subpath "/.config/1Password")  ;; ssh/agent.toml — controls which keys are offered.
 )
 
 (allow mach-lookup
@@ -631,6 +669,7 @@
 (allow file-read*
     (home-prefix "/.gitconfig")    ;; User gitconfig and variants (.gitconfig.local, etc.) read by git CLI.
     (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
+    (home-literal "/.gitattributes")  ;; Global gitattributes file.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -697,6 +736,7 @@
     (home-subpath "/.config/glab-cli")       ;; glab auth tokens/config for GitLab automation.
     (home-subpath "/.cache/glab-cli")        ;; glab cache for API and command acceleration.
     (home-subpath "/.local/share/glab-cli")  ;; glab persistent state.
+    (home-subpath "/.local/state/glab-cli")  ;; glab runtime state files.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -739,10 +779,18 @@
 (allow file-read*
     (home-literal "/.ssh/known_hosts")                              ;; Host verification for GitHub/remote connections.
     (home-literal "/.ssh/config")                                   ;; Custom host definitions used by git-ssh and scp.
+    (home-subpath "/.ssh/config.d")                                 ;; Include-based SSH config fragments.
+    (home-literal "/.ssh/allowed_signers")                          ;; SSH signature verification (git commit signing).
     (literal "/private/etc/ssh/ssh_config")                         ;; System SSH client config read during ssh/git-ssh connections.
     (subpath "/private/etc/ssh/ssh_config.d")                       ;; SSH config.d drop-in directory read by modern ssh clients.
     (literal "/private/etc/ssh/crypto.conf")                        ;; System-wide SSH crypto policy (ciphers, MACs, KEX algorithms).
     (subpath "/private/etc/ssh/crypto")                             ;; SSH crypto config subdirectory (e.g. apple.conf).
+)
+
+;; Allow writing known_hosts so first-connect host key acceptance persists.
+(allow file-write*
+    (home-literal "/.ssh/known_hosts")                              ;; Persist host keys on first connection.
+    (home-literal "/.ssh/known_hosts.old")                          ;; Rotated during host key updates.
 )
 
 ;; SSH agent socket access via launchd-managed SSH_AUTH_SOCK.
@@ -860,6 +908,9 @@
 ;; -- Mach services -------------------------------------------------------------
 
 (allow mach-lookup
+    ;; Font services
+    (global-name "com.apple.fonts")
+    (global-name "com.apple.FontObjectsServer")
     ;; Core rendering and window management
     (global-name "com.apple.CARenderServer")
     (global-name "com.apple.windowserver.active")
@@ -1096,6 +1147,8 @@
     (home-subpath "/.config/cline")
     (home-subpath "/.cache/cline")
     (home-subpath "/.local/share/cline")
+    (home-subpath "/.local/state/cline")
+    (home-subpath "/Documents/Cline")               ;; Cline MCP servers, rules, workflows, hooks.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1184,6 +1237,11 @@
     (home-subpath "/.cache/gemini")
 )
 
+;; Enterprise managed settings
+(allow file-read*
+    (subpath "/Library/Application Support/GeminiCli")
+)
+
 ;; ---------------------------------------------------------------------------
 ;; Agent: openCode
 ;; openCode CLI binary, state, and config paths.
@@ -1206,6 +1264,12 @@
     (home-subpath "/.local/share/opencode")
     (home-subpath "/.local/share/opentui")
     (home-subpath "/.local/state/opencode")
+    (home-literal "/.opencode.json")                ;; Home-dir config file.
+)
+
+;; GitHub Copilot token read for auth
+(allow file-read*
+    (home-subpath "/.config/github-copilot")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1222,8 +1286,6 @@
 (allow file-read* file-write*
     (home-prefix "/.local/bin/pi")
     (home-subpath "/.pi")
-    (home-subpath "/.cache/pi")
-    (home-subpath "/.local/share/pi")
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.

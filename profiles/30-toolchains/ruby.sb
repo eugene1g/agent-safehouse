@@ -16,4 +16,8 @@
     (home-subpath "/.cache/rubygems")
     (home-subpath "/Library/Caches/bundle")
     (home-literal "/.gemrc")
+    (home-literal "/.irbrc")
+    (home-literal "/.irb_history")
+    (home-literal "/.pryrc")
+    (home-literal "/.pry_history")
 )

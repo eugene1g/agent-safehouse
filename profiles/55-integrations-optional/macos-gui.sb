@@ -58,6 +58,9 @@
 ;; -- Mach services -------------------------------------------------------------
 
 (allow mach-lookup
+    ;; Font services
+    (global-name "com.apple.fonts")
+    (global-name "com.apple.FontObjectsServer")
     ;; Core rendering and window management
     (global-name "com.apple.CARenderServer")
     (global-name "com.apple.windowserver.active")

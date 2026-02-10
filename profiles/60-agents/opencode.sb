@@ -20,4 +20,10 @@
     (home-subpath "/.local/share/opencode")
     (home-subpath "/.local/share/opentui")
     (home-subpath "/.local/state/opencode")
+    (home-literal "/.opencode.json")                ;; Home-dir config file.
+)
+
+;; GitHub Copilot token read for auth
+(allow file-read*
+    (home-subpath "/.config/github-copilot")
 )

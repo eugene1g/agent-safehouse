@@ -14,3 +14,8 @@
     (home-subpath "/.gemini")
     (home-subpath "/.cache/gemini")
 )
+
+;; Enterprise managed settings
+(allow file-read*
+    (subpath "/Library/Application Support/GeminiCli")
+)

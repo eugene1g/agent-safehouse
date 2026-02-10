@@ -19,5 +19,5 @@
     (home-subpath "/.local/share/bun")
     (home-subpath "/Library/Caches/bun")
     (home-literal "/.bunfig.toml")
-    (home-literal "/.config/.bunfig.toml")
+    (home-literal "/.config/bunfig.toml")
 )

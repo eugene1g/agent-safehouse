@@ -7,4 +7,5 @@
 (allow file-read*
     (home-prefix "/.gitconfig")    ;; User gitconfig and variants (.gitconfig.local, etc.) read by git CLI.
     (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
+    (home-literal "/.gitattributes")  ;; Global gitattributes file.
 )

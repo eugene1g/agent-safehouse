@@ -18,4 +18,6 @@
     (home-subpath "/Library/Caches/golangci-lint")
     (home-subpath "/.config/golangci-lint")
     (home-subpath "/.local/share/go")
+    (home-subpath "/.goenv")
+    (home-subpath "/.cache/gopls")
 )

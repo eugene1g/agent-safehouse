@@ -22,10 +22,18 @@
 (allow file-read*
     (home-literal "/.ssh/known_hosts")                              ;; Host verification for GitHub/remote connections.
     (home-literal "/.ssh/config")                                   ;; Custom host definitions used by git-ssh and scp.
+    (home-subpath "/.ssh/config.d")                                 ;; Include-based SSH config fragments.
+    (home-literal "/.ssh/allowed_signers")                          ;; SSH signature verification (git commit signing).
     (literal "/private/etc/ssh/ssh_config")                         ;; System SSH client config read during ssh/git-ssh connections.
     (subpath "/private/etc/ssh/ssh_config.d")                       ;; SSH config.d drop-in directory read by modern ssh clients.
     (literal "/private/etc/ssh/crypto.conf")                        ;; System-wide SSH crypto policy (ciphers, MACs, KEX algorithms).
     (subpath "/private/etc/ssh/crypto")                             ;; SSH crypto config subdirectory (e.g. apple.conf).
+)
+
+;; Allow writing known_hosts so first-connect host key acceptance persists.
+(allow file-write*
+    (home-literal "/.ssh/known_hosts")                              ;; Persist host keys on first connection.
+    (home-literal "/.ssh/known_hosts.old")                          ;; Rotated during host key updates.
 )
 
 ;; SSH agent socket access via launchd-managed SSH_AUTH_SOCK.

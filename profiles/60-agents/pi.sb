@@ -12,6 +12,4 @@
 (allow file-read* file-write*
     (home-prefix "/.local/bin/pi")
     (home-subpath "/.pi")
-    (home-subpath "/.cache/pi")
-    (home-subpath "/.local/share/pi")
 )
