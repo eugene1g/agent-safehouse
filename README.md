@@ -5,7 +5,7 @@
 
 Sandbox your LLM coding agents on macOS so they can only touch the files they need.
 
-Uses macOS `sandbox-exec` with composable policy profiles to confine agents like Claude Code, Codex, Gemini CLI, Cursor, Aider, Kilo Code, and others. Starts from **deny-all** and selectively opens access to toolchains, agent configs, integrations, and the directories you specify.
+Uses macOS `sandbox-exec` with composable policy profiles to confine agents like Claude Code, Codex, Gemini CLI, Goose, Cursor, Aider, Kilo Code, and others. Starts from **deny-all** and selectively opens access to toolchains, agent configs, integrations, and the directories you specify.
 
 ## Why
 
@@ -65,6 +65,7 @@ codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
 amp()      { safe amp --dangerously-allow-all "$@"; }
 opencode() { OPENCODE_PERMISSION='{"*":"allow"}' safe opencode "$@"; }
 gemini()   { NO_BROWSER=true safe gemini --yolo "$@"; }
+goose()    { safe goose "$@"; }
 kilo()     { safe kilo "$@"; }
 pi()       { safe pi "$@"; }
 ```

@@ -5,9 +5,9 @@ run_section_cli_edge_cases() {
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
-  local policy_agent_codex policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_all_agents
+  local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_all_agents
   local output_space output_nested args_file workdir_config_file safehouse_env_policy safehouse_env_status
-  local fake_codex_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin kilo_cmd
+  local fake_codex_bin fake_goose_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin kilo_cmd
   local append_profile_tilde_file
   local test_ro_dir_rel test_ro_dir_2_rel test_rw_dir_2_rel
   local resolved_test_rw_dir resolved_test_ro_dir
@@ -51,6 +51,7 @@ run_section_cli_edge_cases() {
   assert_command_succeeds "--enable=all-agents restores full 60-agents module inclusion" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Claude Code profile" ";; Source: 60-agents/claude-code.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Codex profile" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Goose profile" ";; Source: 60-agents/goose.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Kilo Code profile" ";; Source: 60-agents/kilo-code.sb"
 
   section_begin "Workdir Flag Parsing"
@@ -134,16 +135,19 @@ EOF
 
   section_begin "Agent Profile Selection"
   policy_agent_codex="${TEST_CWD}/policy-agent-codex.sb"
+  policy_agent_goose="${TEST_CWD}/policy-agent-goose.sb"
   policy_agent_kilo="${TEST_CWD}/policy-agent-kilo.sb"
   policy_agent_unknown="${TEST_CWD}/policy-agent-unknown.sb"
   policy_agent_claude_app="${TEST_CWD}/policy-agent-claude-app.sb"
   policy_agent_all_agents="${TEST_CWD}/policy-agent-all-agents.sb"
   fake_codex_bin="${TEST_CWD}/codex"
+  fake_goose_bin="${TEST_CWD}/goose"
   fake_unknown_bin="${TEST_CWD}/not-an-agent"
   fake_claude_app_dir="${TEST_CWD}/Claude.app"
   fake_claude_app_bin="${fake_claude_app_dir}/Contents/MacOS/Claude"
 
   cp /usr/bin/true "$fake_codex_bin"
+  cp /usr/bin/true "$fake_goose_bin"
   cp /usr/bin/true "$fake_unknown_bin"
   mkdir -p "$(dirname "$fake_claude_app_bin")"
   cp /usr/bin/true "$fake_claude_app_bin"
@@ -151,6 +155,10 @@ EOF
   assert_command_succeeds "safehouse selects the matching Codex profile for codex command basename" "$SAFEHOUSE" --output "$policy_agent_codex" -- "$fake_codex_bin"
   assert_policy_contains "$policy_agent_codex" "codex command includes codex agent profile only" ";; Source: 60-agents/codex.sb"
   assert_policy_not_contains "$policy_agent_codex" "codex command omits unrelated claude-code profile" ";; Source: 60-agents/claude-code.sb"
+
+  assert_command_succeeds "safehouse selects the matching Goose profile for goose command basename" "$SAFEHOUSE" --output "$policy_agent_goose" -- "$fake_goose_bin"
+  assert_policy_contains "$policy_agent_goose" "goose command includes goose agent profile" ";; Source: 60-agents/goose.sb"
+  assert_policy_not_contains "$policy_agent_goose" "goose command omits unrelated codex profile" ";; Source: 60-agents/codex.sb"
 
   kilo_cmd="${TEST_CWD}/kilo"
   cp /usr/bin/true "$kilo_cmd"
@@ -170,9 +178,10 @@ EOF
   assert_command_succeeds "--enable=all-agents in execute mode restores full 60-agents inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes codex profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes goose profile" ";; Source: 60-agents/goose.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes kilo-code profile" ";; Source: 60-agents/kilo-code.sb"
 
-  rm -f "$fake_codex_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_all_agents"
+  rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_all_agents"
   rm -rf "$fake_claude_app_dir"
 
   section_begin "Generator Path/Home Validation"
@@ -192,6 +201,7 @@ EOF
   assert_policy_order_literal "$POLICY_DEFAULT" "core integration modules are emitted in deterministic lexical order" ";; Source: 50-integrations-core/1password.sb" ";; Source: 50-integrations-core/browser-native-messaging.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic agent module order" ";; Source: 60-agents/aider.sb" ";; Source: 60-agents/amp.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Claude module order" ";; Source: 60-agents/claude-app.sb" ";; Source: 60-agents/claude-code.sb"
+  assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Goose module order" ";; Source: 60-agents/gemini.sb" ";; Source: 60-agents/goose.sb"
 
   section_begin "Append Profile Option"
   policy_append_profile="${TEST_CWD}/policy-append-profile.sb"

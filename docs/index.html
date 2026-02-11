@@ -710,17 +710,20 @@
     /* ========== AGENTS GRID ========== */
     .agents-grid {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 32px 16px;
+      grid-template-columns: repeat(7, 72px);
+      justify-content: space-between;
+      gap: 32px 0;
     }
     .agent-card {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 10px;
+      overflow: visible;
       transition: transform 0.2s;
     }
     .agent-card:hover { transform: translateY(-3px); }
+    .agent-card-placeholder:hover { transform: none; }
     .agent-card img {
       width: 72px;
       height: 72px;
@@ -733,6 +736,7 @@
       font-weight: 600;
       color: var(--text-muted);
       text-align: center;
+      white-space: nowrap;
       transition: color 0.2s;
     }
     .agent-card:hover .agent-name { color: var(--text-bright); }
@@ -1189,14 +1193,16 @@
       <div class="agent-card"><img src="https://github.com/openai.png?size=256" alt="Codex" loading="lazy"><span class="agent-name">Codex</span></div>
       <div class="agent-card"><img src="https://github.com/opencode-ai.png?size=256" alt="OpenCode" loading="lazy"><span class="agent-name">OpenCode</span></div>
       <div class="agent-card"><img src="https://github.com/ampcode-com.png?size=256" alt="Amp" loading="lazy"><span class="agent-name">Amp</span></div>
-      <div class="agent-card"><img src="https://github.com/cursor.png?size=256" alt="Cursor" loading="lazy"><span class="agent-name">Cursor</span></div>
+      <div class="agent-card"><img src="https://geminicli.com/icon.png" alt="Gemini CLI" loading="lazy"><span class="agent-name">Gemini CLI</span></div>
       <div class="agent-card"><img src="https://github.com/Aider-AI.png?size=256" alt="Aider" loading="lazy"><span class="agent-name">Aider</span></div>
-      <div class="agent-card"><img src="https://www.gstatic.com/lamda/images/gemini_sparkle_4g_512_lt_f94943af3be039176192d.png" alt="Gemini CLI" loading="lazy"><span class="agent-name">Gemini CLI</span></div>
-      <div class="agent-card"><img src="https://github.com/cline.png?size=256" alt="Cline" loading="lazy"><span class="agent-name">Cline</span></div>
-      <div class="agent-card"><img src="https://github.com/augmentcode.png?size=256" alt="Augment Code" loading="lazy"><span class="agent-name">Augment Code</span></div>
-      <div class="agent-card"><img src="https://github.com/Factory-AI.png?size=256" alt="Droid" loading="lazy"><span class="agent-name">Droid</span></div>
+      <div class="agent-card"><img src="https://block.github.io/goose/img/logo_dark.png" alt="Goose" loading="lazy"><span class="agent-name">Goose</span></div>
+      <div class="agent-card"><img src="https://www.augmentcode.com/favicon.svg" alt="Auggie" loading="lazy"><span class="agent-name">Auggie</span></div>
       <div class="agent-card"><img src="https://pi.dev/logo.svg" alt="Pi" loading="lazy"><span class="agent-name">Pi</span></div>
+      <div class="agent-card"><img src="https://github.com/cursor.png?size=256" alt="Cursor Agent" loading="lazy"><span class="agent-name">Cursor Agent</span></div>
+      <div class="agent-card"><img src="https://github.com/cline.png?size=256" alt="Cline" loading="lazy"><span class="agent-name">Cline</span></div>
       <div class="agent-card"><img src="https://raw.githubusercontent.com/Kilo-Org/kilocode/main/src/assets/icons/kilo-dark.png" alt="Kilo Code" loading="lazy"><span class="agent-name">Kilo Code</span></div>
+      <div class="agent-card"><img src="https://github.com/Factory-AI.png?size=256" alt="Droid" loading="lazy"><span class="agent-name">Droid</span></div>
+      <div class="agent-card agent-card-placeholder"><div style="width:72px;height:72px;border-radius:16px;border:2px dashed rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:1.5rem;font-weight:300">+</div><span class="agent-name">yours</span></div>
     </div>
   </div>
 </section>

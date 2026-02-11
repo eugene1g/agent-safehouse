@@ -1243,6 +1243,25 @@
 )
 
 ;; ---------------------------------------------------------------------------
+;; Agent: Goose
+;; Goose CLI binary, state, and config paths.
+;; Source: 60-agents/goose.sb
+;; ---------------------------------------------------------------------------
+
+;; - install script and package-manager installs commonly place `goose` under ~/.local/bin
+;; - local state/config paths (XDG + legacy home root)
+;; - package updates are package-manager or self-update driven via entrypoint
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/goose")
+    (home-subpath "/.goose")
+    (home-subpath "/.config/goose")
+    (home-subpath "/.cache/goose")
+    (home-subpath "/.local/share/goose")
+    (home-subpath "/.local/state/goose")
+)
+
+;; ---------------------------------------------------------------------------
 ;; Agent: Kilo Code
 ;; Kilo Code CLI binary, state, and config paths.
 ;; Source: 60-agents/kilo-code.sb
