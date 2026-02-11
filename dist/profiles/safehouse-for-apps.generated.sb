@@ -20,7 +20,7 @@
 ;;   Replace the next line with:
 ;;     (define HOME_DIR "/Users/alice")
 ;;   and keep DATA_HOME_DIR unchanged.
-(define HOME_DIR "/private/tmp/agent-safehouse-static-template/home")
+(define HOME_DIR "/tmp/agent-safehouse-static-template/home")
 (define DATA_HOME_DIR (string-append "/System/Volumes/Data" HOME_DIR))
 
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
@@ -872,7 +872,13 @@
     (home-literal "/Library/Preferences/com.apple.assistant.support.plist")
     (home-literal "/Library/Preferences/com.apple.assistant.backedup.plist")
     (home-literal "/Library/Preferences/pbs.plist")
+    (home-literal "/Library/Preferences/com.apple.HIToolbox.plist")
+    (literal "/Library/Preferences/com.apple.HIToolbox.plist")
     (home-subpath "/Library/Preferences/com.apple.LaunchServices")
+    (home-subpath "/Library/Application Support/CrashReporter")
+    (data-home-subpath "/Library/Application Support/CrashReporter")
+    (home-subpath "/Library/Spelling")
+    (data-home-subpath "/Library/Spelling")
     (home-literal "/Library/Keyboard Layouts")
     (home-literal "/Library/Input Methods")
 )
@@ -898,7 +904,10 @@
     (home-literal "/Library/HTTPStorages")
     (home-literal "/Library/Logs")
     (home-literal "/Library/Mobile Documents")
+    (home-subpath "/Library/Mobile Documents")
+    (data-home-subpath "/Library/Mobile Documents")
     (home-literal "/Library/Spelling")
+    (home-literal "/.Trash")
 )
 
 (allow user-preference-read
@@ -925,6 +934,7 @@
     ;; Launch Services, Core Services, and icon resolution
     (global-name "com.apple.lsd.mapdb")
     (global-name "com.apple.lsd.modifydb")
+    (global-name "com.apple.lsd.advertisingidentifiers")
     (global-name "com.apple.iconservices")
     (global-name "com.apple.coreservices.appleevents")
     (global-name "com.apple.coreservices.sharedfilelistd.xpc")
@@ -938,12 +948,18 @@
     (global-name "com.apple.backboard.hid-services.xpc")
     (global-name "com.apple.backboard.BKSEndpointProviderService")
     (global-name "com.apple.TextInputUI.xpc.CursorUIViewService")
+    (global-name "com.apple.inputmethodkit.launchagent")
+    (global-name "com.apple.inputmethodkit.launcher")
+    (global-name "com.apple.inputmethodkit.getxpcendpoint")
     ;; AppKit and UI framework services
     (global-name "com.apple.ViewBridgeAuxiliary")
     (global-name "com.apple.appkit.restoration_storage")
     (global-name "com.apple.pbs.fetch_services")
     (global-name "com.apple.uiintelligencesupport.agent")
     (global-name "com.apple.controlcenter.statusitems")
+    (global-name "com.apple.sidecar-relay")            ;; Sidecar/AirPlay display menu probing in AppKit.
+    (global-name "com.apple.storekitagent")
+    (global-name "com.apple.scopedbookmarksagent.xpc")
     ;; XPC, directory, and system services
     (global-name "com.apple.xpc.smd")
     (global-name "com.apple.bsd.dirhelper")
@@ -968,6 +984,7 @@
     ;; SSO and Siri
     (global-name "com.apple.AppSSO.service-xpc")
     (global-name "com.apple.siri.VoiceShortcuts.xpc")
+    (global-name "com.apple.proactive.app-client.donation")
     ;; Distributed notifications (per-user suffix varies)
     (global-name-prefix "com.apple.distributed_notifications@")
 )
@@ -1329,8 +1346,90 @@
     (home-subpath "/.pi")
 )
 
+;; ---------------------------------------------------------------------------
+;; Agent: Visual Studio Code App
+;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
+;; including DeveloperTools state and optional extension pairing storage.
+;; Source: 60-agents/vscode-app.sb
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
+
+(allow file-read* file-write*
+    ;; Stable
+    (home-subpath "/Library/Application Support/Code")
+    (home-subpath "/Library/Logs/Code")
+    (home-subpath "/Library/HTTPStorages/com.microsoft.VSCode")
+    (home-subpath "/Library/Caches/com.microsoft.VSCode")
+    (home-subpath "/Library/Caches/com.microsoft.VSCode.ShipIt")
+    (home-subpath "/Library/Saved Application State/com.microsoft.VSCode.savedState")
+    (home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
+    (data-home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
+    (home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
+    (data-home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
+    (home-subpath "/.vscode")
+
+    ;; Direct plist writes/unlink probes used during some Electron preference sync flows.
+    (home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
+    (data-home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
+    (home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
+    (data-home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
+
+    ;; Insiders
+    (home-subpath "/Library/Application Support/Code - Insiders")
+    (home-subpath "/Library/Logs/Code - Insiders")
+    (home-subpath "/Library/HTTPStorages/com.microsoft.VSCodeInsiders")
+    (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders")
+    (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
+    (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
+    (home-subpath "/.vscode-insiders")
+)
+
+(allow file-read*
+    ;; Common install locations
+    (subpath "/Applications/Visual Studio Code.app")
+    (subpath "/Applications/Visual Studio Code - Insiders.app")
+)
+
+;; VS Code persists app preferences via cfprefsd under these domains.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.microsoft.VSCode")
+    (preference-domain "com.microsoft.VSCodeInsiders")
+)
+
+;; Background Task Management: login item status query (SMAppService.mainApp.status).
+;; File chooser/open panel dialogs use this AppKit XPC service.
+;; powerlog logger service is probed by Electron on startup.
+;; File coordination and syspolicy services are queried by AppKit/LaunchServices
+;; flows during file operations and app trust checks.
+(allow mach-lookup
+    (global-name "com.apple.backgroundtaskmanagementagent")
+    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
+    (global-name "com.apple.powerlog.plxpclogger.xpc")
+    (global-name "com.apple.FileCoordination")
+    (global-name "com.apple.security.syspolicy")
+    (global-name "com.apple.security.syspolicy.exec")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
+)
+
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle IDs)
+(allow mach-lookup
+    (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
+)
+
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: /private/tmp/agent-safehouse-static-template/workspace
+;; Generated ancestor directory literals for selected workdir: /tmp/agent-safehouse-static-template/workspace
 ;;
 ;; Why file-read* (not file-read-metadata) with literal (not subpath):
 ;; Agents (notably Claude Code) call readdir() on every ancestor of the working
@@ -1341,11 +1440,10 @@
 ;; grant recursive read access to files or subdirectories under it.
 (allow file-read*
     (literal "/")
-    (literal "/private")
-    (literal "/private/tmp")
-    (literal "/private/tmp/agent-safehouse-static-template")
-    (literal "/private/tmp/agent-safehouse-static-template/workspace")
+    (literal "/tmp")
+    (literal "/tmp/agent-safehouse-static-template")
+    (literal "/tmp/agent-safehouse-static-template/workspace")
 )
 
-(allow file-read* file-write* (subpath "/private/tmp/agent-safehouse-static-template/workspace"))
+(allow file-read* file-write* (subpath "/tmp/agent-safehouse-static-template/workspace"))
 

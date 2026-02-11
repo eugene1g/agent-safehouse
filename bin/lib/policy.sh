@@ -83,9 +83,12 @@ parse_enabled_features() {
       all-agents)
         enable_all_agents_profiles=1
         ;;
+      wide-read)
+        enable_wide_read_access=1
+        ;;
       *)
         echo "Unknown feature in --enable: ${trimmed}" >&2
-        echo "Supported features: docker, macos-gui, electron, all-agents" >&2
+        echo "Supported features: docker, macos-gui, electron, all-agents, wide-read" >&2
         exit 1
         ;;
     esac
@@ -121,9 +124,14 @@ resolve_selected_agent_profiles() {
   cmd="$(to_lowercase "${invoked_command_basename:-}")"
   app_bundle_base="$(to_lowercase "$(basename "${invoked_command_app_bundle:-}")")"
 
-  if [[ "$app_bundle_base" == "claude.app" ]]; then
-    append_selected_agent_profile "claude-app.sb"
-  fi
+  case "$app_bundle_base" in
+    claude.app)
+      append_selected_agent_profile "claude-app.sb"
+      ;;
+    "visual studio code.app"|"visual studio code - insiders.app")
+      append_selected_agent_profile "vscode-app.sb"
+      ;;
+  esac
 
   case "$cmd" in
     aider)
@@ -434,6 +442,23 @@ emit_extra_access_rules() {
   fi
 }
 
+emit_wide_read_access() {
+  local target="$1"
+
+  if [[ "$enable_wide_read_access" -ne 1 ]]; then
+    return 0
+  fi
+
+  {
+    echo ";; #safehouse-test-id:wide-read# Broad read-only visibility across the full filesystem."
+    echo ";; Added by --enable=wide-read. This emits a recursive read grant on /."
+    echo ";; WARNING: because this rule is emitted late, it can override earlier deny file-read* rules."
+    echo ";; Use --append-profile deny rules if you must keep specific paths unreadable."
+    echo "(allow file-read* (subpath \"/\"))"
+    echo ""
+  } >> "$target"
+}
+
 emit_workdir_access() {
   local target="$1"
   local path="$2"
@@ -533,11 +558,13 @@ build_profile() {
   # Path-grant order:
   # 1) add-dirs-ro sources merged in precedence order (config, ENV, CLI) (RO)
   # 2) add-dirs sources merged in precedence order (config, ENV, CLI) (RW)
-  # 3) selected workdir (RW; omitted when disabled via --workdir= or SAFEHOUSE_WORKDIR=)
-  # 4) appended profile(s) from --append-profile (final extension point)
-  # Keep the selected workdir grant last among grants so it can take precedence over
+  # 3) optional --enable=wide-read grant (RO, recursive /)
+  # 4) selected workdir (RW; omitted when disabled via --workdir= or SAFEHOUSE_WORKDIR=)
+  # 5) appended profile(s) from --append-profile (final extension point)
+  # Keep the selected workdir grant late among grants so it can take precedence over
   # add-dirs/add-dirs-ro if order matters. --append-profile rules are appended last.
   emit_extra_access_rules "$tmp"
+  emit_wide_read_access "$tmp"
   emit_workdir_access "$tmp" "$effective_workdir"
   append_cli_profiles "$tmp"
 

@@ -12,6 +12,7 @@ enable_docker_integration=0
 enable_macos_gui_integration=0
 enable_electron_integration=0
 enable_all_agents_profiles=0
+enable_wide_read_access=0
 output_path=""
 add_dirs_ro_list_cli=""
 add_dirs_list_cli=""

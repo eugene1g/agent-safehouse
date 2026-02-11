@@ -22,7 +22,13 @@
     (home-literal "/Library/Preferences/com.apple.assistant.support.plist")
     (home-literal "/Library/Preferences/com.apple.assistant.backedup.plist")
     (home-literal "/Library/Preferences/pbs.plist")
+    (home-literal "/Library/Preferences/com.apple.HIToolbox.plist")
+    (literal "/Library/Preferences/com.apple.HIToolbox.plist")
     (home-subpath "/Library/Preferences/com.apple.LaunchServices")
+    (home-subpath "/Library/Application Support/CrashReporter")
+    (data-home-subpath "/Library/Application Support/CrashReporter")
+    (home-subpath "/Library/Spelling")
+    (data-home-subpath "/Library/Spelling")
     (home-literal "/Library/Keyboard Layouts")
     (home-literal "/Library/Input Methods")
 )
@@ -48,7 +54,10 @@
     (home-literal "/Library/HTTPStorages")
     (home-literal "/Library/Logs")
     (home-literal "/Library/Mobile Documents")
+    (home-subpath "/Library/Mobile Documents")
+    (data-home-subpath "/Library/Mobile Documents")
     (home-literal "/Library/Spelling")
+    (home-literal "/.Trash")
 )
 
 (allow user-preference-read
@@ -75,6 +84,7 @@
     ;; Launch Services, Core Services, and icon resolution
     (global-name "com.apple.lsd.mapdb")
     (global-name "com.apple.lsd.modifydb")
+    (global-name "com.apple.lsd.advertisingidentifiers")
     (global-name "com.apple.iconservices")
     (global-name "com.apple.coreservices.appleevents")
     (global-name "com.apple.coreservices.sharedfilelistd.xpc")
@@ -88,12 +98,18 @@
     (global-name "com.apple.backboard.hid-services.xpc")
     (global-name "com.apple.backboard.BKSEndpointProviderService")
     (global-name "com.apple.TextInputUI.xpc.CursorUIViewService")
+    (global-name "com.apple.inputmethodkit.launchagent")
+    (global-name "com.apple.inputmethodkit.launcher")
+    (global-name "com.apple.inputmethodkit.getxpcendpoint")
     ;; AppKit and UI framework services
     (global-name "com.apple.ViewBridgeAuxiliary")
     (global-name "com.apple.appkit.restoration_storage")
     (global-name "com.apple.pbs.fetch_services")
     (global-name "com.apple.uiintelligencesupport.agent")
     (global-name "com.apple.controlcenter.statusitems")
+    (global-name "com.apple.sidecar-relay")            ;; Sidecar/AirPlay display menu probing in AppKit.
+    (global-name "com.apple.storekitagent")
+    (global-name "com.apple.scopedbookmarksagent.xpc")
     ;; XPC, directory, and system services
     (global-name "com.apple.xpc.smd")
     (global-name "com.apple.bsd.dirhelper")
@@ -118,6 +134,7 @@
     ;; SSO and Siri
     (global-name "com.apple.AppSSO.service-xpc")
     (global-name "com.apple.siri.VoiceShortcuts.xpc")
+    (global-name "com.apple.proactive.app-client.donation")
     ;; Distributed notifications (per-user suffix varies)
     (global-name-prefix "com.apple.distributed_notifications@")
 )
