@@ -48,7 +48,9 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_electron" "--enable=electron includes electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "$policy_enable_electron" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
   policy_enable_all_agents="${TEST_CWD}/policy-enable-all-agents.sb"
-  assert_command_succeeds "--enable=all-agents restores full 60-agents module inclusion" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
+  assert_command_succeeds "--enable=all-agents restores full scoped profile inclusion (60-agents + 65-apps)" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
+  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Claude Desktop app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes VS Code app profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Claude Code profile" ";; Source: 60-agents/claude-code.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Codex profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Goose profile" ";; Source: 60-agents/goose.sb"
@@ -137,7 +139,7 @@ EOF
   assert_policy_contains "$policy_tilde_append_profile" "--append-profile with ~ appends expanded file" "#safehouse-test-id:append-profile-tilde#"
   rm -f "$append_profile_tilde_file"
 
-  section_begin "Agent Profile Selection"
+  section_begin "Scoped Profile Selection"
   policy_agent_codex="${TEST_CWD}/policy-agent-codex.sb"
   policy_agent_goose="${TEST_CWD}/policy-agent-goose.sb"
   policy_agent_kilo="${TEST_CWD}/policy-agent-kilo.sb"
@@ -176,20 +178,22 @@ EOF
   assert_policy_contains "$policy_agent_kilo" "kilo command includes kilo-code agent profile" ";; Source: 60-agents/kilo-code.sb"
   assert_policy_not_contains "$policy_agent_kilo" "kilo command omits unrelated codex profile" ";; Source: 60-agents/codex.sb"
 
-  assert_command_succeeds "safehouse skips 60-agents modules for unknown commands by default" "$SAFEHOUSE" --output "$policy_agent_unknown" -- "$fake_unknown_bin"
+  assert_command_succeeds "safehouse skips scoped app/agent modules for unknown commands by default" "$SAFEHOUSE" --output "$policy_agent_unknown" -- "$fake_unknown_bin"
   assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits codex agent profile" ";; Source: 60-agents/codex.sb"
-  assert_policy_contains "$policy_agent_unknown" "unknown command policy emits skip note for 60-agents layer" "No command-matched agent profile selected; skipping 60-agents modules."
+  assert_policy_contains "$policy_agent_unknown" "unknown command policy emits skip note for scoped profile layers" "No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
 
   assert_command_succeeds "safehouse detects Claude.app command path and includes claude-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_claude_app" -- "$fake_claude_app_bin"
-  assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes claude-app profile" ";; Source: 60-agents/claude-app.sb"
+  assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes claude-app app profile" ";; Source: 65-apps/claude-app.sb"
   assert_policy_not_contains "$policy_agent_claude_app" "Claude.app command omits claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
   assert_command_succeeds "safehouse detects Visual Studio Code.app command path and includes vscode-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_vscode_app" -- "$fake_vscode_app_bin"
-  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes vscode-app profile" ";; Source: 60-agents/vscode-app.sb"
+  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes vscode-app app profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app policy includes VSCode preference plist literal for direct write/unlink flows" "(home-literal \"/Library/Preferences/com.microsoft.VSCode.plist\")"
-  assert_policy_not_contains "$policy_agent_vscode_app" "Visual Studio Code.app command omits claude-app profile" ";; Source: 60-agents/claude-app.sb"
+  assert_policy_not_contains "$policy_agent_vscode_app" "Visual Studio Code.app command omits claude-app app profile" ";; Source: 65-apps/claude-app.sb"
 
-  assert_command_succeeds "--enable=all-agents in execute mode restores full 60-agents inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
+  assert_command_succeeds "--enable=all-agents in execute mode restores full scoped profile inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes Claude Desktop app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes VS Code app profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes codex profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes goose profile" ";; Source: 60-agents/goose.sb"
@@ -214,7 +218,7 @@ EOF
   assert_policy_order_literal "$POLICY_DEFAULT" "toolchain modules are emitted in deterministic lexical order" ";; Source: 30-toolchains/bun.sb" ";; Source: 30-toolchains/deno.sb"
   assert_policy_order_literal "$POLICY_DEFAULT" "core integration modules are emitted in deterministic lexical order" ";; Source: 50-integrations-core/1password.sb" ";; Source: 50-integrations-core/browser-native-messaging.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic agent module order" ";; Source: 60-agents/aider.sb" ";; Source: 60-agents/amp.sb"
-  assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Claude module order" ";; Source: 60-agents/claude-app.sb" ";; Source: 60-agents/claude-code.sb"
+  assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Claude module order across agent/app layers" ";; Source: 60-agents/claude-code.sb" ";; Source: 65-apps/claude-app.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Goose module order" ";; Source: 60-agents/gemini.sb" ";; Source: 60-agents/goose.sb"
 
   section_begin "Append Profile Option"

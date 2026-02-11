@@ -1108,64 +1108,6 @@ emit_embedded_policy_template() {
 )
 
 ;; ---------------------------------------------------------------------------
-;; Agent: Claude Desktop App
-;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
-;; Source: 60-agents/claude-app.sb
-;; ---------------------------------------------------------------------------
-
-;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
-;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
-
-(allow file-read* file-write*
-    (home-subpath "/Library/Application Support/Claude")
-    (home-subpath "/Library/Logs/Claude")
-    (home-subpath "/Library/HTTPStorages/com.anthropic.claudefordesktop")
-    (home-subpath "/Library/Caches/Claude")
-    (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
-    (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
-)
-
-(allow file-read*
-    (subpath "/Applications/Claude.app")
-    (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
-)
-
-;; Claude Desktop persists app preferences via cfprefsd under its own domain.
-(allow user-preference-read user-preference-write
-    (preference-domain "com.anthropic.claudefordesktop")
-)
-
-;; Background Task Management: login item status query (SMAppService.mainApp.status).
-;; Without this, SMAppService silently returns .notFound, causing the
-;; "isStartupOnLoginEnabled failed to pass validation" Electron IPC error.
-;; File chooser/open panel dialogs use this AppKit XPC service.
-;; powerlog logger service is probed by Claude Desktop on startup.
-;; File coordination and syspolicy services are queried by AppKit/LaunchServices
-;; flows during file operations and app trust checks.
-(allow mach-lookup
-    (global-name "com.apple.backgroundtaskmanagementagent")
-    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
-    (global-name "com.apple.powerlog.plxpclogger.xpc")
-    (global-name "com.apple.FileCoordination")
-    (global-name "com.apple.security.syspolicy")
-    (global-name "com.apple.security.syspolicy.exec")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
-)
-
-;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID)
-(allow mach-lookup
-    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
-)
-
-(allow mach-register
-    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
-)
-
-;; ---------------------------------------------------------------------------
 ;; Agent: Claude Code
 ;; Claude Code CLI binary, state, config, and MCP integration paths.
 ;; Source: 60-agents/claude-code.sb
@@ -1395,10 +1337,68 @@ emit_embedded_policy_template() {
 )
 
 ;; ---------------------------------------------------------------------------
-;; Agent: Visual Studio Code App
+;; App: Claude Desktop
+;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
+;; Source: 65-apps/claude-app.sb
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Claude")
+    (home-subpath "/Library/Logs/Claude")
+    (home-subpath "/Library/HTTPStorages/com.anthropic.claudefordesktop")
+    (home-subpath "/Library/Caches/Claude")
+    (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
+    (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
+)
+
+(allow file-read*
+    (subpath "/Applications/Claude.app")
+    (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
+)
+
+;; Claude Desktop persists app preferences via cfprefsd under its own domain.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.anthropic.claudefordesktop")
+)
+
+;; Background Task Management: login item status query (SMAppService.mainApp.status).
+;; Without this, SMAppService silently returns .notFound, causing the
+;; "isStartupOnLoginEnabled failed to pass validation" Electron IPC error.
+;; File chooser/open panel dialogs use this AppKit XPC service.
+;; powerlog logger service is probed by Claude Desktop on startup.
+;; File coordination and syspolicy services are queried by AppKit/LaunchServices
+;; flows during file operations and app trust checks.
+(allow mach-lookup
+    (global-name "com.apple.backgroundtaskmanagementagent")
+    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
+    (global-name "com.apple.powerlog.plxpclogger.xpc")
+    (global-name "com.apple.FileCoordination")
+    (global-name "com.apple.security.syspolicy")
+    (global-name "com.apple.security.syspolicy.exec")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
+)
+
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID)
+(allow mach-lookup
+    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)
+
+;; ---------------------------------------------------------------------------
+;; App: Visual Studio Code
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
 ;; including DeveloperTools state and optional extension pairing storage.
-;; Source: 60-agents/vscode-app.sb
+;; Source: 65-apps/vscode-app.sb
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)

@@ -1,8 +1,8 @@
 ;; ---------------------------------------------------------------------------
-;; Agent: Visual Studio Code App
+;; App: Visual Studio Code
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
 ;; including DeveloperTools state and optional extension pairing storage.
-;; Source: 60-agents/vscode-app.sb
+;; Source: 65-apps/vscode-app.sb
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)

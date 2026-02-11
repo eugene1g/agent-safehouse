@@ -19,7 +19,7 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 
 - **Filesystem reads for system paths**  - `/usr`, `/bin`, `/opt`, `/System`, `/Library/Frameworks`, etc. Agents spawn shells, compilers, and package managers that link against system libraries. Denying these breaks everything.
 - **Full process exec/fork**  - agents orchestrate deep subprocess trees (shell > git > ssh > credential-helper). Restricting process creation is impractical.
-- **Toolchain and agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`, and `Visual Studio Code.app` loads `vscode-app`). Use `--enable=all-agents` to restore legacy behavior and load every agent profile.
+- **Toolchain and app/agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and app/agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`, and `Visual Studio Code.app` loads `vscode-app`). Use `--enable=all-agents` to restore legacy behavior and load every scoped app/agent profile.
 - **Keychain and Security framework** (always-on)  - most agents (Claude Code, Amp, etc.) store login tokens in macOS Keychain and cannot authenticate without it. Read+write access to Keychain files and Security mach services is required for credential storage, retrieval, and TLS certificate validation. This is not a feature toggle because agents fail to start without it.
 - **Cloud credential stores** (always-on)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are enabled by default for compatibility. Safehouse does **not** protect cloud credentials by default; block them with `--append-profile` denies if needed.
 - **Shell startup files**  - `~/.zshenv`, `~/.zprofile`, `/etc/zshrc`, etc. Without these, agents get a broken PATH and misconfigured environment.
@@ -175,7 +175,7 @@ safehouse aider
 # Enable Docker socket access (off by default)
 safehouse --enable=docker -- docker ps
 
-# Restore legacy behavior and include all agent profiles
+# Restore legacy behavior and include all scoped app/agent profiles
 safehouse --enable=all-agents codex
 
 # Big-hammer mode: read-only visibility across / (use cautiously)
@@ -189,10 +189,10 @@ safehouse --enable=macos-gui -- /Applications/TextEdit.app/Contents/MacOS/TextEd
 # Enable Electron integration (off by default; also enables macOS GUI integration)
 safehouse --enable=electron -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
 
-# Run Visual Studio Code sandboxed (loads the vscode-app profile)
+# Run Visual Studio Code sandboxed (loads the 65-apps/vscode-app profile)
 safehouse --enable=electron -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 
-# If VS Code may launch multiple agent CLIs from extensions, include all agent profiles
+# If VS Code may launch multiple agent CLIs from extensions, include all scoped app/agent profiles
 safehouse --enable=electron,all-agents -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 
 # VS Code as a contained "agent host": broad read visibility + scoped writes
@@ -237,7 +237,7 @@ If you want static policy files without using the wrapper scripts, use:
 - `dist/profiles/safehouse.generated.sb` (default policy)
 - `dist/profiles/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
 
-Committed `dist/profiles/*.generated.sb` artifacts are generated with `--enable=all-agents` for broad compatibility when used directly.
+Committed `dist/profiles/*.generated.sb` artifacts are generated with `--enable=all-agents` (all `60-agents` + `65-apps` profiles) for broad compatibility when used directly.
 
 Regenerate them after profile or runtime changes:
 
@@ -285,7 +285,8 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 | `40-shared/*.sb` | Shared cross-agent policy modules |
 | `50-integrations-core/*.sb` | Always-on integrations: Git, SSH, Keychain, Spotlight, AWS, GCloud, GitHub/GitLab CLI, 1Password, Browser NM |
 | `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: Docker, macOS GUI, Electron (`electron` also enables `macos-gui`) |
-| `60-agents/*.sb` | Product-specific per-agent config/state paths, selected by wrapped command basename (and known app bundles like `Claude.app` / `Visual Studio Code.app`) (`--enable=all-agents` loads all) |
+| `60-agents/*.sb` | Product-specific per-agent config/state paths selected by wrapped command basename |
+| `65-apps/*.sb` | Desktop app bundle profiles selected by known app bundles (`Claude.app`, `Visual Studio Code.app`) (`--enable=all-agents` loads all `60-agents` + `65-apps` profiles) |
 | Config/env/CLI path grants | `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
 | Appended profile(s) | Optional extra profile files appended last via `--append-profile=PATH` (repeatable) |
 
@@ -299,7 +300,7 @@ Later rules override earlier ones. CLI path grants are emitted late, so broad `-
 | `--add-dirs-ro=PATHS` | Colon-separated paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
-| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `wide-read` adds broad read-only `/` visibility) |
+| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 
@@ -334,7 +335,8 @@ When `--workdir` is omitted, safehouse selects the workdir automatically:
 - **Add credential denials:** create a custom profile file and pass it via `--append-profile` (repeatable for multiple files)
 - **Adjust network policy:** edit `profiles/20-network.sb` (commented examples for outbound-only and localhost modes)
 - **Adjust shared cross-agent rules:** edit `profiles/40-shared/`
-- **Add a new agent:** create a file in `profiles/60-agents/` following the existing pattern
+- **Add a new desktop app profile:** create a file in `profiles/65-apps/` following the existing pattern
+- **Add a new agent profile:** create a file in `profiles/60-agents/` following the existing pattern
 - **Add a new toolchain:** create a file in `profiles/30-toolchains/`
 
 ## Testing

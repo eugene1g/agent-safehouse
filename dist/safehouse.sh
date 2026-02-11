@@ -38,7 +38,6 @@ PROFILE_KEYS=(
   "profiles/60-agents/aider.sb"
   "profiles/60-agents/amp.sb"
   "profiles/60-agents/auggie.sb"
-  "profiles/60-agents/claude-app.sb"
   "profiles/60-agents/claude-code.sb"
   "profiles/60-agents/cline.sb"
   "profiles/60-agents/codex.sb"
@@ -49,7 +48,8 @@ PROFILE_KEYS=(
   "profiles/60-agents/kilo-code.sb"
   "profiles/60-agents/opencode.sb"
   "profiles/60-agents/pi.sb"
-  "profiles/60-agents/vscode-app.sb"
+  "profiles/65-apps/claude-app.sb"
+  "profiles/65-apps/vscode-app.sb"
 )
 
 embedded_profile_body() {
@@ -1213,67 +1213,6 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_amp_sb__
 )
 __SAFEHOUSE_EMBEDDED_profiles_60_agents_auggie_sb__
       ;;
-    "profiles/60-agents/claude-app.sb")
-      cat <<'__SAFEHOUSE_EMBEDDED_profiles_60_agents_claude_app_sb__'
-;; ---------------------------------------------------------------------------
-;; Agent: Claude Desktop App
-;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
-;; Source: 60-agents/claude-app.sb
-;; ---------------------------------------------------------------------------
-
-;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
-;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
-
-(allow file-read* file-write*
-    (home-subpath "/Library/Application Support/Claude")
-    (home-subpath "/Library/Logs/Claude")
-    (home-subpath "/Library/HTTPStorages/com.anthropic.claudefordesktop")
-    (home-subpath "/Library/Caches/Claude")
-    (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
-    (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
-)
-
-(allow file-read*
-    (subpath "/Applications/Claude.app")
-    (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
-)
-
-;; Claude Desktop persists app preferences via cfprefsd under its own domain.
-(allow user-preference-read user-preference-write
-    (preference-domain "com.anthropic.claudefordesktop")
-)
-
-;; Background Task Management: login item status query (SMAppService.mainApp.status).
-;; Without this, SMAppService silently returns .notFound, causing the
-;; "isStartupOnLoginEnabled failed to pass validation" Electron IPC error.
-;; File chooser/open panel dialogs use this AppKit XPC service.
-;; powerlog logger service is probed by Claude Desktop on startup.
-;; File coordination and syspolicy services are queried by AppKit/LaunchServices
-;; flows during file operations and app trust checks.
-(allow mach-lookup
-    (global-name "com.apple.backgroundtaskmanagementagent")
-    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
-    (global-name "com.apple.powerlog.plxpclogger.xpc")
-    (global-name "com.apple.FileCoordination")
-    (global-name "com.apple.security.syspolicy")
-    (global-name "com.apple.security.syspolicy.exec")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
-)
-
-;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID)
-(allow mach-lookup
-    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
-)
-
-(allow mach-register
-    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
-)
-__SAFEHOUSE_EMBEDDED_profiles_60_agents_claude_app_sb__
-      ;;
     "profiles/60-agents/claude-code.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_60_agents_claude_code_sb__'
 ;; ---------------------------------------------------------------------------
@@ -1533,13 +1472,74 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_opencode_sb__
 )
 __SAFEHOUSE_EMBEDDED_profiles_60_agents_pi_sb__
       ;;
-    "profiles/60-agents/vscode-app.sb")
-      cat <<'__SAFEHOUSE_EMBEDDED_profiles_60_agents_vscode_app_sb__'
+    "profiles/65-apps/claude-app.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_claude_app_sb__'
 ;; ---------------------------------------------------------------------------
-;; Agent: Visual Studio Code App
+;; App: Claude Desktop
+;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
+;; Source: 65-apps/claude-app.sb
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Claude")
+    (home-subpath "/Library/Logs/Claude")
+    (home-subpath "/Library/HTTPStorages/com.anthropic.claudefordesktop")
+    (home-subpath "/Library/Caches/Claude")
+    (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
+    (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
+)
+
+(allow file-read*
+    (subpath "/Applications/Claude.app")
+    (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
+)
+
+;; Claude Desktop persists app preferences via cfprefsd under its own domain.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.anthropic.claudefordesktop")
+)
+
+;; Background Task Management: login item status query (SMAppService.mainApp.status).
+;; Without this, SMAppService silently returns .notFound, causing the
+;; "isStartupOnLoginEnabled failed to pass validation" Electron IPC error.
+;; File chooser/open panel dialogs use this AppKit XPC service.
+;; powerlog logger service is probed by Claude Desktop on startup.
+;; File coordination and syspolicy services are queried by AppKit/LaunchServices
+;; flows during file operations and app trust checks.
+(allow mach-lookup
+    (global-name "com.apple.backgroundtaskmanagementagent")
+    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
+    (global-name "com.apple.powerlog.plxpclogger.xpc")
+    (global-name "com.apple.FileCoordination")
+    (global-name "com.apple.security.syspolicy")
+    (global-name "com.apple.security.syspolicy.exec")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
+)
+
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID)
+(allow mach-lookup
+    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)
+__SAFEHOUSE_EMBEDDED_profiles_65_apps_claude_app_sb__
+      ;;
+    "profiles/65-apps/vscode-app.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_vscode_app_sb__'
+;; ---------------------------------------------------------------------------
+;; App: Visual Studio Code
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
 ;; including DeveloperTools state and optional extension pairing storage.
-;; Source: 60-agents/vscode-app.sb
+;; Source: 65-apps/vscode-app.sb
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
@@ -1616,7 +1616,7 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_pi_sb__
     (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
 )
-__SAFEHOUSE_EMBEDDED_profiles_60_agents_vscode_app_sb__
+__SAFEHOUSE_EMBEDDED_profiles_65_apps_vscode_app_sb__
       ;;
     *)
       return 1
@@ -2086,11 +2086,16 @@ append_all_module_profiles() {
   local file
   local found_any=0
   local appended_any=0
-  local is_agent_dir=0
+  local is_scoped_profile_dir=0
+  local emit_no_match_note=0
 
   case "$base_dir" in
     "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
-      is_agent_dir=1
+      is_scoped_profile_dir=1
+      emit_no_match_note=1
+      ;;
+    "${PROFILES_DIR}/65-apps"|"profiles/65-apps")
+      is_scoped_profile_dir=1
       ;;
   esac
 
@@ -2098,7 +2103,7 @@ append_all_module_profiles() {
     [[ -n "$file" ]] || continue
     found_any=1
 
-    if [[ "$is_agent_dir" -eq 1 ]] && ! should_include_agent_profile_file "$file"; then
+    if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$file"; then
       continue
     fi
 
@@ -2111,17 +2116,20 @@ append_all_module_profiles() {
     exit 1
   fi
 
-  if [[ "$is_agent_dir" -eq 1 ]]; then
+  if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
     if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
       return 0
     fi
 
-    if [[ "$appended_any" -eq 0 ]]; then
-      {
-        echo ";; No command-matched agent profile selected; skipping 60-agents modules."
-        echo ";; Use --enable=all-agents to restore legacy all-agent profile behavior."
-        echo ""
-      } >> "$target"
+    if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
+      resolve_selected_agent_profiles
+      if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
+        {
+          echo ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
+          echo ";; Use --enable=all-agents to restore legacy all-profile behavior."
+          echo ""
+        } >> "$target"
+      fi
     fi
     return 0
   fi
@@ -2387,6 +2395,7 @@ build_profile() {
   append_all_module_profiles "$tmp" "${PROFILES_DIR}/50-integrations-core"
   append_optional_integration_profiles "$tmp" "${PROFILES_DIR}/55-integrations-optional"
   append_all_module_profiles "$tmp" "${PROFILES_DIR}/60-agents"
+  append_all_module_profiles "$tmp" "${PROFILES_DIR}/65-apps"
 
   # Path-grant order:
   # 1) add-dirs-ro sources merged in precedence order (config, ENV, CLI) (RO)
@@ -2649,7 +2658,7 @@ Policy scope options:
       Comma-separated optional features to enable
       Supported values: docker, macos-gui, electron, all-agents, wide-read
       Note: electron implies macos-gui
-      Note: all-agents restores legacy behavior by loading every 60-agents profile
+      Note: all-agents restores legacy behavior by loading every 60-agents and 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)
       Browser native messaging is always on (not toggleable)
 
@@ -2894,7 +2903,8 @@ append_all_module_profiles() {
   local base_dir="$2"
   local found_any=0
   local appended_any=0
-  local is_agent_dir=0
+  local is_scoped_profile_dir=0
+  local emit_no_match_note=0
   local key profile_prefix
 
   case "$base_dir" in
@@ -2909,7 +2919,12 @@ append_all_module_profiles() {
       ;;
     "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
       profile_prefix="profiles/60-agents/"
-      is_agent_dir=1
+      is_scoped_profile_dir=1
+      emit_no_match_note=1
+      ;;
+    "${PROFILES_DIR}/65-apps"|"profiles/65-apps")
+      profile_prefix="profiles/65-apps/"
+      is_scoped_profile_dir=1
       ;;
     *)
       echo "No module profiles found in: ${base_dir}" >&2
@@ -2920,7 +2935,7 @@ append_all_module_profiles() {
   for key in "${PROFILE_KEYS[@]}"; do
     [[ "$key" == "${profile_prefix}"* ]] || continue
     found_any=1
-    if [[ "$is_agent_dir" -eq 1 ]] && ! should_include_agent_profile_file "$key"; then
+    if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$key"; then
       continue
     fi
     appended_any=1
@@ -2932,17 +2947,20 @@ append_all_module_profiles() {
     exit 1
   fi
 
-  if [[ "$is_agent_dir" -eq 1 ]]; then
+  if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
     if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
       return 0
     fi
 
-    if [[ "$appended_any" -eq 0 ]]; then
-      {
-        echo ";; No command-matched agent profile selected; skipping 60-agents modules."
-        echo ";; Use --enable=all-agents to restore legacy all-agent profile behavior."
-        echo ""
-      } >> "$target"
+    if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
+      resolve_selected_agent_profiles
+      if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
+        {
+          echo ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
+          echo ";; Use --enable=all-agents to restore legacy all-profile behavior."
+          echo ""
+        } >> "$target"
+      fi
     fi
     return 0
   fi

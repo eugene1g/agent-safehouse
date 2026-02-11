@@ -54,10 +54,11 @@ Outputs the path to the generated temp policy file when no command is provided.
 5. `profiles/40-shared/*.sb` — shared cross-agent policy modules (for example shared `~/.skills`, `~/.agents`, and `~/AGENTS.md` access)
 6. `profiles/50-integrations-core/*.sb` — always-on integrations (git, SSH, keychain, 1password, browser-nm, etc.)
 7. `profiles/55-integrations-optional/*.sb` — opt-in integrations (`docker`, `macos-gui`, and `electron`) controlled by `--enable` (`electron` also enables `macos-gui`)
-8. `profiles/60-agents/*.sb` — product-specific agent profiles (Claude, Cursor, Aider, etc.)
-9. Dynamic CLI path grants (`--add-dirs-ro`, then `--add-dirs`)
-10. Selected workdir grant (read/write; omitted when `--workdir` is explicitly empty)
-11. Optional appended profile(s) from CLI `--append-profile` (loaded last so they win)
+8. `profiles/60-agents/*.sb` — product-specific agent profiles selected by wrapped command basename (Claude Code, Cursor Agent, Aider, etc.)
+9. `profiles/65-apps/*.sb` — desktop app bundle profiles selected by known app bundles (for example `Claude.app` and `Visual Studio Code.app`)
+10. Dynamic CLI path grants (`--add-dirs-ro`, then `--add-dirs`)
+11. Selected workdir grant (read/write; omitted when `--workdir` is explicitly empty)
+12. Optional appended profile(s) from CLI `--append-profile` (loaded last so they win)
 
 **Order matters**: later rules override earlier ones. Selected workdir grants come after extra path grants. Appended profiles are loaded last so their deny rules take precedence.
 

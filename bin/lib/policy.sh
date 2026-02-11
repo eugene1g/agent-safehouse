@@ -253,11 +253,16 @@ append_all_module_profiles() {
   local file
   local found_any=0
   local appended_any=0
-  local is_agent_dir=0
+  local is_scoped_profile_dir=0
+  local emit_no_match_note=0
 
   case "$base_dir" in
     "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
-      is_agent_dir=1
+      is_scoped_profile_dir=1
+      emit_no_match_note=1
+      ;;
+    "${PROFILES_DIR}/65-apps"|"profiles/65-apps")
+      is_scoped_profile_dir=1
       ;;
   esac
 
@@ -265,7 +270,7 @@ append_all_module_profiles() {
     [[ -n "$file" ]] || continue
     found_any=1
 
-    if [[ "$is_agent_dir" -eq 1 ]] && ! should_include_agent_profile_file "$file"; then
+    if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$file"; then
       continue
     fi
 
@@ -278,17 +283,20 @@ append_all_module_profiles() {
     exit 1
   fi
 
-  if [[ "$is_agent_dir" -eq 1 ]]; then
+  if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
     if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
       return 0
     fi
 
-    if [[ "$appended_any" -eq 0 ]]; then
-      {
-        echo ";; No command-matched agent profile selected; skipping 60-agents modules."
-        echo ";; Use --enable=all-agents to restore legacy all-agent profile behavior."
-        echo ""
-      } >> "$target"
+    if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
+      resolve_selected_agent_profiles
+      if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
+        {
+          echo ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
+          echo ";; Use --enable=all-agents to restore legacy all-profile behavior."
+          echo ""
+        } >> "$target"
+      fi
     fi
     return 0
   fi
@@ -554,6 +562,7 @@ build_profile() {
   append_all_module_profiles "$tmp" "${PROFILES_DIR}/50-integrations-core"
   append_optional_integration_profiles "$tmp" "${PROFILES_DIR}/55-integrations-optional"
   append_all_module_profiles "$tmp" "${PROFILES_DIR}/60-agents"
+  append_all_module_profiles "$tmp" "${PROFILES_DIR}/65-apps"
 
   # Path-grant order:
   # 1) add-dirs-ro sources merged in precedence order (config, ENV, CLI) (RO)
