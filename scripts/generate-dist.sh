@@ -284,11 +284,20 @@ append_profile() {
   local key
 
   key="$(profile_key_from_source "$source")"
-  if ! embedded_profile_body "$key" >> "$target"; then
-    echo "Missing profile module: ${source}" >&2
-    exit 1
+  if embedded_profile_body "$key" >> "$target"; then
+    echo "" >> "$target"
+    return
   fi
-  echo "" >> "$target"
+
+  # Fallback: read from disk (needed for --append-profile with external files).
+  if [[ -f "$source" ]]; then
+    cat "$source" >> "$target"
+    echo "" >> "$target"
+    return
+  fi
+
+  echo "Missing profile module: ${source}" >&2
+  exit 1
 }
 
 append_resolved_base_profile() {
