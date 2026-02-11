@@ -5,9 +5,9 @@ run_section_cli_edge_cases() {
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
-  local policy_agent_codex policy_agent_unknown policy_agent_claude_app policy_agent_all_agents
+  local policy_agent_codex policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_all_agents
   local output_space output_nested args_file workdir_config_file safehouse_env_policy safehouse_env_status
-  local fake_codex_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin
+  local fake_codex_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin kilo_cmd
   local append_profile_tilde_file
   local test_ro_dir_rel test_ro_dir_2_rel test_rw_dir_2_rel
   local resolved_test_rw_dir resolved_test_ro_dir
@@ -51,6 +51,7 @@ run_section_cli_edge_cases() {
   assert_command_succeeds "--enable=all-agents restores full 60-agents module inclusion" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Claude Code profile" ";; Source: 60-agents/claude-code.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Codex profile" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Kilo Code profile" ";; Source: 60-agents/kilo-code.sb"
 
   section_begin "Workdir Flag Parsing"
   policy_workdir_empty_eq="${TEST_CWD}/policy-workdir-empty-equals.sb"
@@ -133,6 +134,7 @@ EOF
 
   section_begin "Agent Profile Selection"
   policy_agent_codex="${TEST_CWD}/policy-agent-codex.sb"
+  policy_agent_kilo="${TEST_CWD}/policy-agent-kilo.sb"
   policy_agent_unknown="${TEST_CWD}/policy-agent-unknown.sb"
   policy_agent_claude_app="${TEST_CWD}/policy-agent-claude-app.sb"
   policy_agent_all_agents="${TEST_CWD}/policy-agent-all-agents.sb"
@@ -150,6 +152,13 @@ EOF
   assert_policy_contains "$policy_agent_codex" "codex command includes codex agent profile only" ";; Source: 60-agents/codex.sb"
   assert_policy_not_contains "$policy_agent_codex" "codex command omits unrelated claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
+  kilo_cmd="${TEST_CWD}/kilo"
+  cp /usr/bin/true "$kilo_cmd"
+
+  assert_command_succeeds "safehouse selects the matching Kilo Code profile for installed kilo/kilocode command basename" "$SAFEHOUSE" --output "$policy_agent_kilo" -- "$kilo_cmd"
+  assert_policy_contains "$policy_agent_kilo" "kilo command includes kilo-code agent profile" ";; Source: 60-agents/kilo-code.sb"
+  assert_policy_not_contains "$policy_agent_kilo" "kilo command omits unrelated codex profile" ";; Source: 60-agents/codex.sb"
+
   assert_command_succeeds "safehouse skips 60-agents modules for unknown commands by default" "$SAFEHOUSE" --output "$policy_agent_unknown" -- "$fake_unknown_bin"
   assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits codex agent profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_agent_unknown" "unknown command policy emits skip note for 60-agents layer" "No command-matched agent profile selected; skipping 60-agents modules."
@@ -161,8 +170,9 @@ EOF
   assert_command_succeeds "--enable=all-agents in execute mode restores full 60-agents inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes codex profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes kilo-code profile" ";; Source: 60-agents/kilo-code.sb"
 
-  rm -f "$fake_codex_bin" "$fake_unknown_bin" "$policy_agent_codex" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_all_agents"
+  rm -f "$fake_codex_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_all_agents"
   rm -rf "$fake_claude_app_dir"
 
   section_begin "Generator Path/Home Validation"

@@ -1,0 +1,21 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Kilo Code
+;; Kilo Code CLI binary, state, and config paths.
+;; Source: 60-agents/kilo-code.sb
+;; ---------------------------------------------------------------------------
+
+;; - npm package @kilocode/cli installs `kilocode` and `kilo` executables
+;; - ~/.local/bin is the common user-level target and fallback for npm/pnpm shims
+;; - Kilo CLI stores config, logs, sessions, and commands under ~/.kilocode
+;; - CLI reads VS Code extension global storage (for example global custom modes)
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/kilo")
+    (home-prefix "/.local/bin/kilocode")
+    (home-subpath "/.kilocode")
+)
+
+(allow file-read*
+    (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+    (data-home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+)

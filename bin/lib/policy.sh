@@ -158,6 +158,9 @@ resolve_selected_agent_profiles() {
     gemini)
       append_selected_agent_profile "gemini.sb"
       ;;
+    kilo|kilocode)
+      append_selected_agent_profile "kilo-code.sb"
+      ;;
     opencode)
       append_selected_agent_profile "opencode.sb"
       ;;

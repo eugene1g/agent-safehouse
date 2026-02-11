@@ -129,6 +129,8 @@ EOF
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes usymptomsd mach-lookup grant" "(global-name \"com.apple.usymptomsd\")"
   assert_policy_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header includes project homepage link" "# Project: https://agent-safehouse.dev"
+  assert_policy_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header includes embedded profile UTC modified timestamp" "# Embedded Profiles Last Modified (UTC): "
+  assert_policy_not_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header omits source commit hash" "# Source Commit: "
   if [[ -x "$dist_claude_launcher" ]]; then
     log_pass "dist Claude launcher output is executable"
   else

@@ -25,6 +25,7 @@ run_section_policy_behavior() {
   assert_command_succeeds "--enable=all-agents restores legacy agent-specific grants in policy mode" "$GENERATOR" --output "$policy_all_agents" --enable=all-agents
   assert_policy_contains "$policy_all_agents" "all-agents policy includes aider-install binary grant" "/.local/bin/aider-install"
   assert_policy_contains "$policy_all_agents" "all-agents policy includes opentui data grant" "/.local/share/opentui"
+  assert_policy_contains "$policy_all_agents" "all-agents policy includes kilocode binary grant" "/.local/bin/kilocode"
   rm -f "$policy_all_agents"
 
   for docker_sock in \

@@ -20,7 +20,7 @@
 ;;   Replace the next line with:
 ;;     (define HOME_DIR "/Users/alice")
 ;;   and keep DATA_HOME_DIR unchanged.
-(define HOME_DIR "/tmp/agent-safehouse-static-template/home")
+(define HOME_DIR "/private/tmp/agent-safehouse-static-template/home")
 (define DATA_HOME_DIR (string-append "/System/Volumes/Data" HOME_DIR))
 
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
@@ -1243,6 +1243,28 @@
 )
 
 ;; ---------------------------------------------------------------------------
+;; Agent: Kilo Code
+;; Kilo Code CLI binary, state, and config paths.
+;; Source: 60-agents/kilo-code.sb
+;; ---------------------------------------------------------------------------
+
+;; - npm package @kilocode/cli installs `kilocode` and `kilo` executables
+;; - ~/.local/bin is the common user-level target and fallback for npm/pnpm shims
+;; - Kilo CLI stores config, logs, sessions, and commands under ~/.kilocode
+;; - CLI reads VS Code extension global storage (for example global custom modes)
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/kilo")
+    (home-prefix "/.local/bin/kilocode")
+    (home-subpath "/.kilocode")
+)
+
+(allow file-read*
+    (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+    (data-home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+)
+
+;; ---------------------------------------------------------------------------
 ;; Agent: openCode
 ;; openCode CLI binary, state, and config paths.
 ;; Source: 60-agents/opencode.sb
@@ -1289,7 +1311,7 @@
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: /tmp/agent-safehouse-static-template/workspace
+;; Generated ancestor directory literals for selected workdir: /private/tmp/agent-safehouse-static-template/workspace
 ;;
 ;; Why file-read* (not file-read-metadata) with literal (not subpath):
 ;; Agents (notably Claude Code) call readdir() on every ancestor of the working
@@ -1300,10 +1322,11 @@
 ;; grant recursive read access to files or subdirectories under it.
 (allow file-read*
     (literal "/")
-    (literal "/tmp")
-    (literal "/tmp/agent-safehouse-static-template")
-    (literal "/tmp/agent-safehouse-static-template/workspace")
+    (literal "/private")
+    (literal "/private/tmp")
+    (literal "/private/tmp/agent-safehouse-static-template")
+    (literal "/private/tmp/agent-safehouse-static-template/workspace")
 )
 
-(allow file-read* file-write* (subpath "/tmp/agent-safehouse-static-template/workspace"))
+(allow file-read* file-write* (subpath "/private/tmp/agent-safehouse-static-template/workspace"))
 
