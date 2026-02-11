@@ -646,14 +646,30 @@ __SAFEHOUSE_EMBEDDED_profiles_40_shared_agent_common_sb__
     (regex (string-append "^" DATA_HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))  ;; Data-volume variant for APFS firmlink traversal.
 )
 
+;; 1Password Desktop settings probe (read-only)
+;; Newer op builds read settings.json here to detect Desktop integration state.
+(allow file-read*
+    (regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"))      ;; Desktop settings dir (includes settings.json).
+    (regex (string-append "^" DATA_HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$")) ;; Data-volume variant for APFS firmlink traversal.
+)
+
+;; 1Password Browser Helper probes the installed op binary path for Desktop integration.
+;; Homebrew Cask installs resolve under versioned Caskroom directories.
+(allow file-read*
+    (regex #"^/opt/homebrew/Caskroom/1password-cli(/.*)?$")                      ;; Apple Silicon Homebrew Cask path.
+    (regex #"^/System/Volumes/Data/opt/homebrew/Caskroom/1password-cli(/.*)?$") ;; Data-volume alias for APFS firmlink traversal.
+    (regex #"^/usr/local/Caskroom/1password-cli(/.*)?$")                         ;; Intel Homebrew Cask path.
+    (regex #"^/System/Volumes/Data/usr/local/Caskroom/1password-cli(/.*)?$")    ;; Data-volume alias for APFS firmlink traversal.
+)
+
 ;; 1Password SSH agent config
 (allow file-read*
     (home-subpath "/.config/1Password")  ;; ssh/agent.toml — controls which keys are offered.
 )
 
 (allow mach-lookup
-    (global-name-regex #"^([A-Z0-9]+\\.)?com\\.1password\\.")  ;; 1Password app/service IPC endpoints.
-    (global-name-regex #"^com\\.agilebits\\.")                 ;; Legacy AgileBits service names still used by some installs.
+    (global-name-regex #"^([A-Za-z0-9]+\.)?com\.1password(\..*)?$")  ;; 1Password app/service IPC endpoints (including team-prefixed browser-helper names).
+    (global-name-regex #"^com\.agilebits(\..*)?$")                    ;; Legacy AgileBits service names still used by some installs.
 )
 __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_1password_sb__
       ;;

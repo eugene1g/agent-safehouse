@@ -3,7 +3,8 @@
 run_section_integrations() {
   local private_key_candidates
   local ssh_config_path ssh_config_link_target
-  local onepassword_group_container_dir onepassword_socket_dir
+  local onepassword_group_container_dir onepassword_socket_dir onepassword_settings_file
+  local onepassword_op_candidate onepassword_op_candidates
 
   section_begin "SSH Key Protection"
   ssh_config_path="${HOME}/.ssh/config"
@@ -51,11 +52,27 @@ run_section_integrations() {
   onepassword_group_container_dir="$(find "${HOME}/Library/Group Containers" -mindepth 1 -maxdepth 1 -type d -name "*.com.1password" 2>/dev/null | head -n 1 || true)"
   if [[ -n "$onepassword_group_container_dir" ]]; then
     onepassword_socket_dir="${onepassword_group_container_dir}/t"
+    onepassword_settings_file="${onepassword_group_container_dir}/Library/Application Support/1Password/Data/settings/settings.json"
     assert_allowed_if_exists "$POLICY_DEFAULT" "read 1Password socket directory" "$onepassword_socket_dir" /bin/ls "$onepassword_socket_dir"
+    assert_allowed_if_exists "$POLICY_DEFAULT" "read 1Password desktop settings metadata" "$onepassword_settings_file" /usr/bin/stat "$onepassword_settings_file"
   else
     log_skip "read 1Password socket directory (matching Group Container not found)"
   fi
   assert_allowed_if_exists "$POLICY_DEFAULT" "access 1Password SSH agent socket symlink" "${HOME}/.1password/agent.sock" /bin/ls "${HOME}/.1password/agent.sock"
+
+  onepassword_op_candidates=0
+  for onepassword_op_candidate in \
+    /opt/homebrew/Caskroom/1password-cli/*/op \
+    /System/Volumes/Data/opt/homebrew/Caskroom/1password-cli/*/op \
+    /usr/local/Caskroom/1password-cli/*/op \
+    /System/Volumes/Data/usr/local/Caskroom/1password-cli/*/op; do
+    [[ -e "$onepassword_op_candidate" ]] || continue
+    onepassword_op_candidates=$((onepassword_op_candidates + 1))
+    assert_allowed_strict "$POLICY_DEFAULT" "read Homebrew Cask 1Password CLI binary (${onepassword_op_candidate})" /usr/bin/stat "$onepassword_op_candidate"
+  done
+  if [[ "$onepassword_op_candidates" -eq 0 ]]; then
+    log_skip "read Homebrew Cask 1Password CLI binary (no 1password-cli Cask install found)"
+  fi
 
   section_begin "macOS GUI / Electron Integration Policy Coverage"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits macOS GUI integration profile" ";; Integration: macOS GUI"

@@ -20,6 +20,10 @@ run_section_policy_behavior() {
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes Azure CLI grant" "/.azure"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes Azure Developer CLI grant" "/.azd"
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes regex 1Password socket-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t(/.*)?$"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes regex 1Password desktop settings-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes regex 1Password Homebrew Cask path grant" "/opt/homebrew/Caskroom/1password-cli(/.*)?$"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes regex 1Password Homebrew Cask data-volume path grant" "/System/Volumes/Data/opt/homebrew/Caskroom/1password-cli(/.*)?$"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes 1Password mach-lookup regex grant" "com\\.1password(\\..*)?$"
 
   policy_all_agents="${TEST_CWD}/policy-all-agents-feature-toggle.sb"
   assert_command_succeeds "--enable=all-agents restores legacy agent-specific grants in policy mode" "$GENERATOR" --output "$policy_all_agents" --enable=all-agents
