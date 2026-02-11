@@ -54,12 +54,27 @@ curl -fsSL https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/
 chmod +x ~/.local/bin/safehouse
 ```
 
+First, create an optional local appended profile (example: allow Git to read `~/.gitignore_global`):
+
+```bash
+mkdir -p ~/.config/agent-safehouse
+cat > ~/.config/agent-safehouse/local-overrides.sb <<'EOF'
+;; Local user overrides
+(allow file-read*
+  (home-literal "/.gitignore_global")
+  (data-home-literal "/.gitignore_global")
+)
+EOF
+```
+
 Then add shell functions so agent wrappers preserve argument boundaries and forward `"$@"` safely:
 
 ```bash
 # ~/.bashrc or ~/.zshrc
 # Ensure ~/.local/bin is on your PATH
-safe() { safehouse --add-dirs-ro=~/mywork "$@"; }
+SAFEHOUSE_APPEND_PROFILE="$HOME/.config/agent-safehouse/local-overrides.sb"
+
+safe() { safehouse --add-dirs-ro=~/mywork --append-profile="$SAFEHOUSE_APPEND_PROFILE" "$@"; }
 claude()   { safe claude --dangerously-skip-permissions "$@"; }
 codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
 amp()      { safe amp --dangerously-allow-all "$@"; }
@@ -73,6 +88,7 @@ pi()       { safe pi "$@"; }
 How this works:
 - `safe <agent> ...` keeps Safehouse's default workdir behavior: read/write access to the selected workdir (`git` root above CWD, otherwise CWD).
 - `--add-dirs-ro=~/mywork` adds read-only visibility across your shared workspace so agents can inspect nearby repos/reference files.
+- `--append-profile="$SAFEHOUSE_APPEND_PROFILE"` applies your local overrides (like the `~/.gitignore_global` allow rule) after generated defaults.
 - Running from inside a repo under `~/mywork` gives that repo read/write plus read-only access to sibling paths under `~/mywork`.
 
 Run the real unsandboxed binary with `command claude` (or `command codex`, etc.) when needed.

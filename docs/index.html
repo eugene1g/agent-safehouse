@@ -1342,11 +1342,12 @@
 
     <pre class="fade-in" style="margin-bottom: 16px;"><code><span class="c"># ~/.zshrc or ~/.bashrc</span>
 <span class="c"># Assumes ~/.local/bin is on your PATH</span>
+<span class="k">SAFEHOUSE_APPEND_PROFILE</span>=<span class="s">"$HOME/.config/agent-safehouse/local-overrides.sb"</span>
 
 <span class="c"># Shared convention:</span>
 <span class="c"># - Read/write: selected workdir (git root above CWD, else CWD)</span>
 <span class="c"># - Read-only:  $HOME/mywork (reference repos/docs/snippets)</span>
-<span class="k">safe</span>() { safehouse <span class="f">--add-dirs-ro=</span><span class="s">~/mywork</span> <span class="s">"$@"</span>; }
+<span class="k">safe</span>() { safehouse <span class="f">--add-dirs-ro=</span><span class="s">~/mywork</span> <span class="f">--append-profile=</span><span class="s">"$SAFEHOUSE_APPEND_PROFILE"</span> <span class="s">"$@"</span>; }
 
 <span class="c"># Sandboxed  - the default. Just type the command name.</span>
 <span class="k">claude</span>()   { <span class="k">safe</span> claude <span class="f">--dangerously-skip-permissions</span> <span class="s">"$@"</span>; }
@@ -1361,7 +1362,7 @@
 <span class="c"># command claude &lt;flags&gt;       - pass any flags directly</span>
 </code></pre>
 
-    <p style="color: var(--text-muted); line-height: 1.7;">Example: from <code class="il">~/mywork/app-a</code>, <code class="il">safe claude</code> can edit <code class="il">app-a</code> (workdir grant) and read other paths under <code class="il">~/mywork</code>. The same command run from a repo outside <code class="il">~/mywork</code> still grants that repo read/write while keeping <code class="il">~/mywork</code> read-only.</p>
+    <p style="color: var(--text-muted); line-height: 1.7;">Example: from <code class="il">~/mywork/app-a</code>, <code class="il">safe claude</code> can edit <code class="il">app-a</code> (workdir grant) and read other paths under <code class="il">~/mywork</code>. The same command run from a repo outside <code class="il">~/mywork</code> still grants that repo read/write while keeping <code class="il">~/mywork</code> read-only. Keep personal exceptions in <code class="il">~/.config/agent-safehouse/local-overrides.sb</code> and load them with <code class="il">--append-profile</code>.</p>
 
   </div>
 </section>
@@ -1417,6 +1418,20 @@
 <span class="f">(allow file-read*</span> <span class="s">(subpath "/data/shared")</span><span class="f">)</span></code></pre>
     <pre class="fade-in" style="margin-top: 10px;"><code><span class="c"># Stack personal rules onto the default policy</span>
 <span class="k">safehouse</span> <span class="f">--append-profile=</span><span class="s">deny-aws.sb</span> <span class="f">--append-profile=</span><span class="s">allow-data.sb</span> <span class="f">--</span> claude <span class="f">--dangerously-skip-permissions</span></code></pre>
+
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 10px; margin-bottom: 10px; line-height: 1.7;">Common local override: allow Git to read <code class="il">~/.gitignore_global</code> when <code class="il">core.excludesFile</code> points there.</p>
+    <pre class="fade-in" style="margin-top: 10px;"><code># Create local override file
+mkdir -p ~/.config/agent-safehouse
+cat > ~/.config/agent-safehouse/local-overrides.sb <<'EOF'
+(allow file-read*
+  (home-literal "/.gitignore_global")
+  (data-home-literal "/.gitignore_global")
+)
+EOF
+
+# ~/.zshrc or ~/.bashrc
+SAFEHOUSE_APPEND_PROFILE="$HOME/.config/agent-safehouse/local-overrides.sb"
+safe() { safehouse --add-dirs-ro=~/mywork --append-profile="$SAFEHOUSE_APPEND_PROFILE" "$@"; }</code></pre>
 
     <h3 class="fade-in" style="font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-top: 40px; margin-bottom: 6px;">Electron apps under Safehouse</h3>
     <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 14px; line-height: 1.7;">Electron/Chromium helpers try to init an internal sandbox. Under Safehouse the process tree is already inside macOS Seatbelt, so nested sandbox re-init is OS-blocked. Launch with <code class="il">--no-sandbox</code> to disable the inner sandbox while keeping the outer policy.</p>
