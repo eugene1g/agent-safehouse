@@ -20,7 +20,7 @@
 ;;   Replace the next line with:
 ;;     (define HOME_DIR "/Users/alice")
 ;;   and keep DATA_HOME_DIR unchanged.
-(define HOME_DIR "/tmp/agent-safehouse-static-template/home")
+(define HOME_DIR "/private/tmp/agent-safehouse-static-template/home")
 (define DATA_HOME_DIR (string-append "/System/Volumes/Data" HOME_DIR))
 
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
@@ -1142,7 +1142,7 @@
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: /tmp/agent-safehouse-static-template/workspace
+;; Generated ancestor directory literals for selected workdir: /private/tmp/agent-safehouse-static-template/workspace
 ;;
 ;; Why file-read* (not file-read-metadata) with literal (not subpath):
 ;; Agents (notably Claude Code) call readdir() on every ancestor of the working
@@ -1153,10 +1153,11 @@
 ;; grant recursive read access to files or subdirectories under it.
 (allow file-read*
     (literal "/")
-    (literal "/tmp")
-    (literal "/tmp/agent-safehouse-static-template")
-    (literal "/tmp/agent-safehouse-static-template/workspace")
+    (literal "/private")
+    (literal "/private/tmp")
+    (literal "/private/tmp/agent-safehouse-static-template")
+    (literal "/private/tmp/agent-safehouse-static-template/workspace")
 )
 
-(allow file-read* file-write* (subpath "/tmp/agent-safehouse-static-template/workspace"))
+(allow file-read* file-write* (subpath "/private/tmp/agent-safehouse-static-template/workspace"))
 

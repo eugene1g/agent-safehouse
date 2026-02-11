@@ -7,6 +7,7 @@ run_section_wrapper_and_cli() {
   local dist_stdout_canary dist_output_policy dist_policy_from_bin dist_policy_from_dist
   local dist_claude_launcher dist_claude_offline_launcher dist_output_dir dist_launcher_path dist_offline_launcher_path
   local dist_default_static dist_apps_static
+  local dist_append_profile_file dist_append_profile_policy dist_append_profile_marker
 
   section_begin "safehouse.sh Entry Point"
   set +e
@@ -177,8 +178,11 @@ EOF
   dist_output_policy="${TEST_CWD}/dist-output-policy.sb"
   dist_policy_from_bin="${TEST_CWD}/bin-policy-parity.sb"
   dist_policy_from_dist="${TEST_CWD}/dist-policy-parity.sb"
+  dist_append_profile_file="${TEST_CWD}/dist-append-profile.sb"
+  dist_append_profile_policy="${TEST_CWD}/dist-append-profile-policy.sb"
+  dist_append_profile_marker="#safehouse-test-id:dist-append-profile-external#"
   rm -rf "$dist_output_dir"
-  rm -f "$dist_path" "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist"
+  rm -f "$dist_path" "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_append_profile_file" "$dist_append_profile_policy"
 
   assert_command_succeeds "generate-dist script succeeds" "${REPO_ROOT}/scripts/generate-dist.sh" --output "$dist_path" --output-dir "$dist_output_dir"
   if [[ -x "$dist_path" ]]; then
@@ -236,6 +240,13 @@ EOF
     log_fail "dist safehouse --output keeps generated policy file"
   fi
 
+  cat > "$dist_append_profile_file" <<EOF
+;; ${dist_append_profile_marker}
+(deny file-read* (literal "/tmp/dist-append-profile-marker"))
+EOF
+  assert_command_succeeds "dist safehouse --append-profile appends external profile file" "$dist_path" --output "$dist_append_profile_policy" --append-profile "$dist_append_profile_file"
+  assert_policy_contains "$dist_append_profile_policy" "dist safehouse appended external profile content is present" "$dist_append_profile_marker"
+
   assert_command_exit_code 9 "dist safehouse returns wrapped command exit code" "$dist_path" -- /bin/sh -c 'exit 9'
 
   assert_command_succeeds "bin safehouse writes parity policy file" "$SAFEHOUSE" --output "$dist_policy_from_bin"
@@ -247,7 +258,7 @@ EOF
   fi
 
   rm -rf "$dist_output_dir"
-  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist"
+  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_append_profile_file" "$dist_append_profile_policy"
 }
 
 register_section run_section_wrapper_and_cli
