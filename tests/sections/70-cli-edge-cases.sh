@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_macos_gui policy_enable_electron policy_enable_all_agents policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_macos_gui policy_enable_electron policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
-  local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_all_agents
+  local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents
   local output_space output_nested args_file workdir_config_file safehouse_env_policy safehouse_env_status
-  local fake_codex_bin fake_goose_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin kilo_cmd
+  local fake_codex_bin fake_goose_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin fake_vscode_app_dir fake_vscode_app_bin kilo_cmd
   local append_profile_tilde_file
   local test_ro_dir_rel test_ro_dir_2_rel test_rw_dir_2_rel
   local resolved_test_rw_dir resolved_test_ro_dir
@@ -53,6 +53,10 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Codex profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Goose profile" ";; Source: 60-agents/goose.sb"
   assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Kilo Code profile" ";; Source: 60-agents/kilo-code.sb"
+  policy_enable_wide_read="${TEST_CWD}/policy-enable-wide-read.sb"
+  assert_command_succeeds "--enable=wide-read adds broad read-only filesystem visibility" "$GENERATOR" --output "$policy_enable_wide_read" --enable=wide-read
+  assert_policy_contains "$policy_enable_wide_read" "--enable=wide-read emits wide-read marker" "#safehouse-test-id:wide-read#"
+  assert_policy_contains "$policy_enable_wide_read" "--enable=wide-read emits recursive read grant for /" "(allow file-read* (subpath \"/\"))"
 
   section_begin "Workdir Flag Parsing"
   policy_workdir_empty_eq="${TEST_CWD}/policy-workdir-empty-equals.sb"
@@ -139,18 +143,23 @@ EOF
   policy_agent_kilo="${TEST_CWD}/policy-agent-kilo.sb"
   policy_agent_unknown="${TEST_CWD}/policy-agent-unknown.sb"
   policy_agent_claude_app="${TEST_CWD}/policy-agent-claude-app.sb"
+  policy_agent_vscode_app="${TEST_CWD}/policy-agent-vscode-app.sb"
   policy_agent_all_agents="${TEST_CWD}/policy-agent-all-agents.sb"
   fake_codex_bin="${TEST_CWD}/codex"
   fake_goose_bin="${TEST_CWD}/goose"
   fake_unknown_bin="${TEST_CWD}/not-an-agent"
   fake_claude_app_dir="${TEST_CWD}/Claude.app"
   fake_claude_app_bin="${fake_claude_app_dir}/Contents/MacOS/Claude"
+  fake_vscode_app_dir="${TEST_CWD}/Visual Studio Code.app"
+  fake_vscode_app_bin="${fake_vscode_app_dir}/Contents/MacOS/Electron"
 
   cp /usr/bin/true "$fake_codex_bin"
   cp /usr/bin/true "$fake_goose_bin"
   cp /usr/bin/true "$fake_unknown_bin"
   mkdir -p "$(dirname "$fake_claude_app_bin")"
   cp /usr/bin/true "$fake_claude_app_bin"
+  mkdir -p "$(dirname "$fake_vscode_app_bin")"
+  cp /usr/bin/true "$fake_vscode_app_bin"
 
   assert_command_succeeds "safehouse selects the matching Codex profile for codex command basename" "$SAFEHOUSE" --output "$policy_agent_codex" -- "$fake_codex_bin"
   assert_policy_contains "$policy_agent_codex" "codex command includes codex agent profile only" ";; Source: 60-agents/codex.sb"
@@ -175,14 +184,19 @@ EOF
   assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes claude-app profile" ";; Source: 60-agents/claude-app.sb"
   assert_policy_not_contains "$policy_agent_claude_app" "Claude.app command omits claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
+  assert_command_succeeds "safehouse detects Visual Studio Code.app command path and includes vscode-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_vscode_app" -- "$fake_vscode_app_bin"
+  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes vscode-app profile" ";; Source: 60-agents/vscode-app.sb"
+  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app policy includes VSCode preference plist literal for direct write/unlink flows" "(home-literal \"/Library/Preferences/com.microsoft.VSCode.plist\")"
+  assert_policy_not_contains "$policy_agent_vscode_app" "Visual Studio Code.app command omits claude-app profile" ";; Source: 60-agents/claude-app.sb"
+
   assert_command_succeeds "--enable=all-agents in execute mode restores full 60-agents inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes codex profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes goose profile" ";; Source: 60-agents/goose.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes kilo-code profile" ";; Source: 60-agents/kilo-code.sb"
 
-  rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_all_agents"
-  rm -rf "$fake_claude_app_dir"
+  rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents"
+  rm -rf "$fake_claude_app_dir" "$fake_vscode_app_dir"
 
   section_begin "Generator Path/Home Validation"
   missing_path="/tmp/safehouse-missing-path-$$"

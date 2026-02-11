@@ -65,6 +65,10 @@ run_section_integrations() {
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes CARenderServer mach-lookup grant" "(global-name \"com.apple.CARenderServer\")"
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes usymptomsd mach-lookup grant" "(global-name \"com.apple.usymptomsd\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit launchagent mach-lookup grant" "(global-name \"com.apple.inputmethodkit.launchagent\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit launcher mach-lookup grant" "(global-name \"com.apple.inputmethodkit.launcher\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit xpc endpoint mach-lookup grant" "(global-name \"com.apple.inputmethodkit.getxpcendpoint\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes Sidecar relay mach-lookup grant" "(global-name \"com.apple.sidecar-relay\")"
   assert_policy_not_contains "$POLICY_MACOS_GUI" "--enable=macos-gui does not include electron integration profile" "#safehouse-test-id:electron-integration#"
 
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron integration marker" "#safehouse-test-id:electron-integration#"
@@ -80,6 +84,8 @@ run_section_integrations() {
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies CARenderServer mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.CARenderServer\")"
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies usymptomsd mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.usymptomsd\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies inputmethodkit launchagent mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.inputmethodkit.launchagent\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies Sidecar relay mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.sidecar-relay\")"
 
   section_begin "Keychain Access"
   assert_allowed_if_exists "$POLICY_DEFAULT" "security find-certificate" "security" /usr/bin/security find-certificate -a

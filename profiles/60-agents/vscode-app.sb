@@ -1,0 +1,81 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Visual Studio Code App
+;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
+;; including DeveloperTools state and optional extension pairing storage.
+;; Source: 60-agents/vscode-app.sb
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
+
+(allow file-read* file-write*
+    ;; Stable
+    (home-subpath "/Library/Application Support/Code")
+    (home-subpath "/Library/Logs/Code")
+    (home-subpath "/Library/HTTPStorages/com.microsoft.VSCode")
+    (home-subpath "/Library/Caches/com.microsoft.VSCode")
+    (home-subpath "/Library/Caches/com.microsoft.VSCode.ShipIt")
+    (home-subpath "/Library/Saved Application State/com.microsoft.VSCode.savedState")
+    (home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
+    (data-home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
+    (home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
+    (data-home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
+    (home-subpath "/.vscode")
+
+    ;; Direct plist writes/unlink probes used during some Electron preference sync flows.
+    (home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
+    (data-home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
+    (home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
+    (data-home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
+
+    ;; Insiders
+    (home-subpath "/Library/Application Support/Code - Insiders")
+    (home-subpath "/Library/Logs/Code - Insiders")
+    (home-subpath "/Library/HTTPStorages/com.microsoft.VSCodeInsiders")
+    (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders")
+    (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
+    (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
+    (home-subpath "/.vscode-insiders")
+)
+
+(allow file-read*
+    ;; Common install locations
+    (subpath "/Applications/Visual Studio Code.app")
+    (subpath "/Applications/Visual Studio Code - Insiders.app")
+)
+
+;; VS Code persists app preferences via cfprefsd under these domains.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.microsoft.VSCode")
+    (preference-domain "com.microsoft.VSCodeInsiders")
+)
+
+;; Background Task Management: login item status query (SMAppService.mainApp.status).
+;; File chooser/open panel dialogs use this AppKit XPC service.
+;; powerlog logger service is probed by Electron on startup.
+;; File coordination and syspolicy services are queried by AppKit/LaunchServices
+;; flows during file operations and app trust checks.
+(allow mach-lookup
+    (global-name "com.apple.backgroundtaskmanagementagent")
+    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
+    (global-name "com.apple.powerlog.plxpclogger.xpc")
+    (global-name "com.apple.FileCoordination")
+    (global-name "com.apple.security.syspolicy")
+    (global-name "com.apple.security.syspolicy.exec")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
+)
+
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle IDs)
+(allow mach-lookup
+    (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
+)
