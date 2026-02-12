@@ -2,8 +2,10 @@
 
 run_section_cli_edge_cases() {
   local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
-  local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config missing_path home_not_dir
+  local policy_dedup_paths
+  local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config policy_workdir_config_ignored policy_workdir_config_env_trust missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
+  local policy_explain explain_output_file
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
   local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents
   local output_space output_nested args_file workdir_config_file safehouse_env_policy safehouse_env_status
@@ -37,6 +39,7 @@ run_section_cli_edge_cases() {
   policy_enable_browser_native_messaging="${TEST_CWD}/policy-enable-browser-native-messaging.sb"
   assert_command_succeeds "--enable docker parses as separate argument form" "$GENERATOR" --output "$policy_enable_arg" --enable docker
   assert_policy_contains "$policy_enable_arg" "--enable docker includes docker grants" "/var/run/docker.sock"
+  assert_policy_contains "$policy_enable_arg" "--enable docker preamble reports explicit optional integration inclusion" "Optional integrations explicitly enabled: docker"
   assert_policy_not_contains "$policy_enable_arg" "--enable docker does not include browser native messaging grants unless explicitly enabled" "/NativeMessagingHosts"
   assert_command_succeeds "--enable kubectl parses as separate argument form" "$GENERATOR" --output "$policy_enable_kubectl" --enable kubectl
   assert_policy_contains "$policy_enable_kubectl" "--enable kubectl includes kubectl integration profile marker" "#safehouse-test-id:kubectl-integration#"
@@ -103,17 +106,42 @@ run_section_cli_edge_cases() {
     rm -f "$safehouse_env_policy"
   fi
 
+  section_begin "Path Grant Deduplication"
+  policy_dedup_paths="${TEST_CWD}/policy-dedup-paths.sb"
+  assert_command_succeeds "duplicate --add-dirs and --add-dirs-ro entries are deduplicated" "$GENERATOR" --workdir="" --output "$policy_dedup_paths" --add-dirs-ro="${TEST_RO_DIR}:${TEST_RO_DIR}" --add-dirs="${TEST_RW_DIR}:${TEST_RW_DIR}"
+  local ro_grant_count rw_grant_count
+  ro_grant_count="$(grep -F -c "(subpath \"${TEST_RO_DIR}\")" "$policy_dedup_paths" || true)"
+  rw_grant_count="$(grep -F -c "file-read* file-write* (subpath \"${resolved_test_rw_dir}\")" "$policy_dedup_paths" || true)"
+  if [[ "$ro_grant_count" -eq 1 ]]; then
+    log_pass "duplicate read-only grants collapse to one emitted rule"
+  else
+    log_fail "duplicate read-only grants collapse to one emitted rule"
+  fi
+  if [[ "$rw_grant_count" -eq 1 ]]; then
+    log_pass "duplicate read/write grants collapse to one emitted rule"
+  else
+    log_fail "duplicate read/write grants collapse to one emitted rule"
+  fi
+
   section_begin "Workdir Config File"
   policy_workdir_config="${TEST_CWD}/policy-workdir-config.sb"
+  policy_workdir_config_ignored="${TEST_CWD}/policy-workdir-config-ignored.sb"
+  policy_workdir_config_env_trust="${TEST_CWD}/policy-workdir-config-env-trust.sb"
   workdir_config_file="${TEST_CWD}/.safehouse"
   cat > "$workdir_config_file" <<EOF
 # SAFEHOUSE config loaded from selected workdir
 add-dirs-ro=${TEST_RO_DIR_2}
 add-dirs=${TEST_RW_DIR_2}
 EOF
-  assert_command_succeeds "workdir config file adds --add-dirs-ro/--add-dirs equivalents" /bin/sh -c "cd '${TEST_CWD}' && '${GENERATOR}' --output '${policy_workdir_config}'"
-  assert_policy_contains "$policy_workdir_config" "workdir config file emits read-only grant" "(subpath \"${TEST_RO_DIR_2}\")"
-  assert_policy_contains "$policy_workdir_config" "workdir config file emits read/write grant" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
+  assert_command_succeeds "workdir config file is ignored by default" /bin/sh -c "cd '${TEST_CWD}' && '${GENERATOR}' --output '${policy_workdir_config_ignored}'"
+  assert_policy_not_contains "$policy_workdir_config_ignored" "workdir config file is ignored by default for read-only grants" "(subpath \"${TEST_RO_DIR_2}\")"
+  assert_policy_not_contains "$policy_workdir_config_ignored" "workdir config file is ignored by default for read/write grants" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
+  assert_command_succeeds "workdir config file loads when --trust-workdir-config is set" /bin/sh -c "cd '${TEST_CWD}' && '${GENERATOR}' --trust-workdir-config --output '${policy_workdir_config}'"
+  assert_policy_contains "$policy_workdir_config" "trusted workdir config file emits read-only grant" "(subpath \"${TEST_RO_DIR_2}\")"
+  assert_policy_contains "$policy_workdir_config" "trusted workdir config file emits read/write grant" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
+  assert_command_succeeds "SAFEHOUSE_TRUST_WORKDIR_CONFIG=1 loads workdir config file" /bin/sh -c "cd '${TEST_CWD}' && SAFEHOUSE_TRUST_WORKDIR_CONFIG=1 '${GENERATOR}' --output '${policy_workdir_config_env_trust}'"
+  assert_policy_contains "$policy_workdir_config_env_trust" "SAFEHOUSE_TRUST_WORKDIR_CONFIG trusted workdir config file emits read-only grant" "(subpath \"${TEST_RO_DIR_2}\")"
+  assert_policy_contains "$policy_workdir_config_env_trust" "SAFEHOUSE_TRUST_WORKDIR_CONFIG trusted workdir config file emits read/write grant" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
   rm -f "$workdir_config_file"
 
   section_begin "Tilde Path Expansion"
@@ -131,7 +159,7 @@ EOF
 add-dirs-ro=~/${test_ro_dir_2_rel}
 add-dirs=~/${test_rw_dir_2_rel}
 EOF
-  assert_command_succeeds "workdir config add-dirs values expand ~ and ~/..." /bin/sh -c "cd '${TEST_CWD}' && '${GENERATOR}' --output '${policy_tilde_config}'"
+  assert_command_succeeds "trusted workdir config add-dirs values expand ~ and ~/..." /bin/sh -c "cd '${TEST_CWD}' && '${GENERATOR}' --trust-workdir-config --output '${policy_tilde_config}'"
   assert_policy_contains "$policy_tilde_config" "workdir config add-dirs-ro with ~ expands to HOME path" "(subpath \"${TEST_RO_DIR_2}\")"
   assert_policy_contains "$policy_tilde_config" "workdir config add-dirs with ~ expands to HOME path" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
   rm -f "$workdir_config_file"
@@ -146,6 +174,41 @@ EOF
   assert_command_succeeds "--append-profile expands ~ and ~/..." "$GENERATOR" --output "$policy_tilde_append_profile" --append-profile="~/.safehouse-append-tilde-$$.sb"
   assert_policy_contains "$policy_tilde_append_profile" "--append-profile with ~ appends expanded file" "#safehouse-test-id:append-profile-tilde#"
   rm -f "$append_profile_tilde_file"
+
+  section_begin "Explain Output"
+  policy_explain="${TEST_CWD}/policy-explain.sb"
+  explain_output_file="${TEST_CWD}/policy-explain-output.txt"
+  rm -f "$explain_output_file"
+  set +e
+  /bin/sh -c "cd '${TEST_CWD}' && '${GENERATOR}' --explain --workdir='${TEST_RW_DIR}' --output '${policy_explain}' --add-dirs-ro='${TEST_RO_DIR}' --add-dirs='${TEST_RW_DIR_2}' 2>'${explain_output_file}' >/dev/null"
+  local explain_status=$?
+  set -e
+  if [[ "$explain_status" -eq 0 ]]; then
+    log_pass "--explain succeeds for policy generation"
+  else
+    log_fail "--explain succeeds for policy generation"
+  fi
+  if [[ -f "$explain_output_file" ]] && grep -Fq "safehouse explain:" "$explain_output_file"; then
+    log_pass "--explain emits summary header"
+  else
+    log_fail "--explain emits summary header"
+  fi
+  if [[ -f "$explain_output_file" ]] && grep -Fq "effective workdir: ${resolved_test_rw_dir} (source: --workdir)" "$explain_output_file"; then
+    log_pass "--explain reports effective workdir and source"
+  else
+    log_fail "--explain reports effective workdir and source"
+  fi
+  if [[ -f "$explain_output_file" ]] && grep -Fq "add-dirs-ro (normalized): ${TEST_RO_DIR}" "$explain_output_file"; then
+    log_pass "--explain reports normalized read-only grants"
+  else
+    log_fail "--explain reports normalized read-only grants"
+  fi
+  if [[ -f "$explain_output_file" ]] && grep -Fq "add-dirs (normalized): ${TEST_RW_DIR_2}" "$explain_output_file"; then
+    log_pass "--explain reports normalized read/write grants"
+  else
+    log_fail "--explain reports normalized read/write grants"
+  fi
+  rm -f "$policy_explain" "$explain_output_file"
 
   section_begin "Scoped Profile Selection"
   policy_agent_codex="${TEST_CWD}/policy-agent-codex.sb"
@@ -189,18 +252,22 @@ EOF
 
   assert_command_succeeds "safehouse skips scoped app/agent modules for unknown commands by default" "$SAFEHOUSE" --output "$policy_agent_unknown" -- "$fake_unknown_bin"
   assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits codex agent profile" ";; Source: 60-agents/codex.sb"
+  assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits macOS GUI desktop workflow grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
   assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits keychain integration (no profile requirement selected)" ";; Integration: Keychain"
   assert_policy_contains "$policy_agent_unknown" "unknown command policy emits skip note for scoped profile layers" "No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
 
   assert_command_succeeds "safehouse detects Claude.app command path and includes claude-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_claude_app" -- "$fake_claude_app_bin"
   assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes claude-app app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes macOS GUI desktop workflow grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
   assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects keychain integration from profile metadata" ";; Integration: Keychain"
   assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects macOS GUI integration from profile metadata" ";; Integration: macOS GUI"
   assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects electron integration from profile metadata" "#safehouse-test-id:electron-integration#"
+  assert_policy_contains "$policy_agent_claude_app" "Claude.app preamble reports implicit optional integrations from profile requirements" "Optional integrations implicitly injected: macos-gui electron"
   assert_policy_not_contains "$policy_agent_claude_app" "Claude.app command omits claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
   assert_command_succeeds "safehouse detects Visual Studio Code.app command path and includes vscode-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_vscode_app" -- "$fake_vscode_app_bin"
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes vscode-app app profile" ";; Source: 65-apps/vscode-app.sb"
+  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes macOS GUI desktop workflow grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects keychain integration from profile metadata" ";; Integration: Keychain"
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects macOS GUI integration from profile metadata" ";; Integration: macOS GUI"
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects electron integration from profile metadata" "#safehouse-test-id:electron-integration#"
@@ -209,6 +276,7 @@ EOF
 
   assert_command_succeeds "--enable=all-agents in execute mode restores full scoped profile inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes Claude Desktop app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes macOS GUI desktop workflow grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes VS Code app profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes codex profile" ";; Source: 60-agents/codex.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
@@ -291,13 +359,17 @@ EOF
   fi
 
   section_begin "App Bundle Auto-Detection"
-  local fake_app_dir fake_app_policy fake_app_no_match_policy resolved_fake_app_dir
+  local fake_app_dir fake_app_policy fake_app_no_match_policy fake_app_path_lookup_policy resolved_fake_app_dir fake_app_cmd
   fake_app_dir="${TEST_CWD}/FakeApp.app"
   mkdir -p "${fake_app_dir}/Contents/MacOS"
   cp /usr/bin/true "${fake_app_dir}/Contents/MacOS/fake-binary"
   resolved_fake_app_dir="$(cd "$fake_app_dir" && pwd -P)"
   fake_app_policy="${TEST_CWD}/fake-app-policy.sb"
   fake_app_no_match_policy="${TEST_CWD}/fake-app-no-match-policy.sb"
+  fake_app_path_lookup_policy="${TEST_CWD}/fake-app-path-lookup-policy.sb"
+  fake_app_cmd="${TEST_CWD}/fake-app-cmd"
+  cp /usr/bin/true "$fake_app_cmd"
+  ln -sf "${fake_app_dir}/Contents/MacOS/fake-binary" "$fake_app_cmd"
 
   assert_command_succeeds "safehouse with .app bundle command exits zero" "$SAFEHOUSE" --output "$fake_app_policy" -- "${fake_app_dir}/Contents/MacOS/fake-binary"
 
@@ -315,7 +387,14 @@ EOF
     log_fail "safehouse non-.app command produced a valid output policy"
   fi
 
-  rm -f "$fake_app_policy" "$fake_app_no_match_policy"
+  assert_command_succeeds "safehouse resolves bare command via PATH for .app bundle detection" /bin/sh -c "cd '${TEST_CWD}' && PATH='${TEST_CWD}:${PATH}' '${SAFEHOUSE}' --output '${fake_app_path_lookup_policy}' -- fake-app-cmd"
+  if [[ -n "${fake_app_path_lookup_policy:-}" && -f "$fake_app_path_lookup_policy" ]]; then
+    assert_policy_contains "$fake_app_path_lookup_policy" "safehouse bare-command app detection grants read-only app bundle access" "(subpath \"${resolved_fake_app_dir}\")"
+  else
+    log_fail "safehouse bare-command app detection produced a valid output policy"
+  fi
+
+  rm -f "$fake_app_policy" "$fake_app_no_match_policy" "$fake_app_path_lookup_policy" "$fake_app_cmd"
   rm -rf "$fake_app_dir"
 
   section_begin "safehouse Argument Passthrough"

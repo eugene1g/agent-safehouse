@@ -19,6 +19,20 @@ preflight_runtime() {
 detect_app_bundle() {
   local cmd_path="$1"
   local check_path="$cmd_path"
+  local resolved_cmd=""
+
+  [[ -n "$check_path" ]] || return 1
+
+  if [[ "$check_path" != */* ]]; then
+    resolved_cmd="$(type -P -- "$check_path" 2>/dev/null || true)"
+    if [[ -n "$resolved_cmd" ]]; then
+      check_path="$resolved_cmd"
+    fi
+  fi
+
+  if [[ -e "$check_path" ]]; then
+    check_path="$(normalize_abs_path "$check_path")"
+  fi
 
   while [[ "$check_path" != "/" && "$check_path" != "." && -n "$check_path" ]]; do
     if [[ "$check_path" == *.app ]]; then
@@ -140,11 +154,13 @@ resolve_default_workdir() {
   if command -v git >/dev/null 2>&1; then
     git_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
     if [[ -n "$git_root" && -d "$git_root" ]]; then
+      effective_workdir_source="auto-git-root"
       normalize_abs_path "$git_root"
       return
     fi
   fi
 
+  effective_workdir_source="auto-cwd"
   printf '%s\n' "$cwd"
 }
 

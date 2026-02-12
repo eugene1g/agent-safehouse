@@ -19,12 +19,16 @@ run_section_wrapper_and_cli() {
   set -e
   if [[ "$no_command_status" -eq 0 && -n "${no_command_policy:-}" && -f "$no_command_policy" ]]; then
     log_pass "safehouse.sh with no command generates policy and exits zero"
+    assert_policy_contains "$no_command_policy" "runtime policy includes project preamble banner" ";; Agent Safehouse Policy (generated file)"
+    assert_policy_contains "$no_command_policy" "runtime policy includes GitHub project URL" ";; GitHub: https://github.com/eugene1g/agent-safehouse"
+    assert_policy_contains "$no_command_policy" "runtime policy includes sandbox log helper example" ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
     rm -f "$no_command_policy"
   else
     log_fail "safehouse.sh with no command generates policy and exits zero"
   fi
 
   config_file="${TEST_CWD}/.safehouse"
+  local trusted_config_policy
   cat > "$config_file" <<EOF
 add-dirs-ro=${TEST_RO_DIR_2}
 add-dirs=${TEST_RW_DIR_2}
@@ -34,12 +38,25 @@ EOF
   local config_status=$?
   set -e
   if [[ "$config_status" -eq 0 && -n "${config_policy:-}" && -f "$config_policy" ]]; then
-    log_pass "safehouse.sh auto-loads .safehouse config from selected workdir"
-    assert_policy_contains "$config_policy" "safehouse.sh .safehouse emits read-only grant" "(subpath \"${TEST_RO_DIR_2}\")"
-    assert_policy_contains "$config_policy" "safehouse.sh .safehouse emits read/write grant" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
+    log_pass "safehouse.sh ignores .safehouse config by default"
+    assert_policy_not_contains "$config_policy" "safehouse.sh default mode does not load untrusted .safehouse read-only grants" "(subpath \"${TEST_RO_DIR_2}\")"
+    assert_policy_not_contains "$config_policy" "safehouse.sh default mode does not load untrusted .safehouse read/write grants" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
     rm -f "$config_policy"
   else
-    log_fail "safehouse.sh auto-loads .safehouse config from selected workdir"
+    log_fail "safehouse.sh ignores .safehouse config by default"
+  fi
+
+  set +e
+  trusted_config_policy="$(cd "$TEST_CWD" && "$SAFEHOUSE" --trust-workdir-config 2>/dev/null)"
+  local trusted_config_status=$?
+  set -e
+  if [[ "$trusted_config_status" -eq 0 && -n "${trusted_config_policy:-}" && -f "$trusted_config_policy" ]]; then
+    log_pass "safehouse.sh loads .safehouse config when explicitly trusted"
+    assert_policy_contains "$trusted_config_policy" "safehouse.sh trusted .safehouse emits read-only grant" "(subpath \"${TEST_RO_DIR_2}\")"
+    assert_policy_contains "$trusted_config_policy" "safehouse.sh trusted .safehouse emits read/write grant" "file-read* file-write* (subpath \"${TEST_RW_DIR_2}\")"
+    rm -f "$trusted_config_policy"
+  else
+    log_fail "safehouse.sh loads .safehouse config when explicitly trusted"
   fi
   rm -f "$config_file"
 
@@ -119,12 +136,16 @@ EOF
   assert_policy_contains "${REPO_ROOT}/profiles/00-base.sb" "base profile exposes explicit HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file contains sandbox header" "(version 1)"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file includes project banner" ";; Project: https://agent-safehouse.dev"
+  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file includes GitHub project URL" ";; GitHub: https://github.com/eugene1g/agent-safehouse"
+  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file includes sandbox log helper example" ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file uses deterministic template HOME" "/tmp/agent-safehouse-static-template/home"
   assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file resolves HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"
   assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy omits legacy agent common profile path" ";; Source: 60-agents/__common.sb"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file contains sandbox header" "(version 1)"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file includes project banner" ";; Project: https://agent-safehouse.dev"
+  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file includes GitHub project URL" ";; GitHub: https://github.com/eugene1g/agent-safehouse"
+  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file includes sandbox log helper example" ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file uses deterministic template HOME" "/tmp/agent-safehouse-static-template/home"
   assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file resolves HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"

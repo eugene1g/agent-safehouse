@@ -165,12 +165,12 @@ SAFEHOUSE_WORKDIR=/tmp/scratch safehouse claude --dangerously-skip-permissions
 # Disable automatic workdir grants (use only explicit --add-dirs/--add-dirs-ro)
 safehouse --workdir= --add-dirs-ro=/repos/shared-lib --add-dirs=/tmp/scratch -- aider
 
-# Load add-dirs/add-dirs-ro from <workdir>/.safehouse
+# Load add-dirs/add-dirs-ro from trusted <workdir>/.safehouse
 cat > .safehouse <<'EOF'
 add-dirs-ro=/repos/shared-lib
 add-dirs=/tmp/scratch
 EOF
-safehouse aider
+safehouse --trust-workdir-config aider
 
 # Enable Docker socket access (off by default)
 safehouse --enable=docker -- docker ps
@@ -205,6 +205,9 @@ safehouse --workdir=~/server --enable=electron,all-agents,wide-read -- "/Applica
 # Inspect the generated policy without running anything
 safehouse
 safehouse --stdout
+
+# Explain effective workdir/config/grants/profile selection
+safehouse --explain --stdout
 ```
 
 ### Electron apps under Safehouse
@@ -249,7 +252,7 @@ Regenerate them after profile or runtime changes:
 ./scripts/generate-dist.sh
 ```
 
-The static generator uses deterministic template paths under `/private/tmp/agent-safehouse-static-template` for `HOME` and invocation workdir so commits do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
+The static generator uses deterministic template paths under `/tmp/agent-safehouse-static-template` for `HOME` and invocation workdir so commits do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
 
 ## Single-File Distribution
 
@@ -287,11 +290,11 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 | `20-network.sb` | Network policy (fully open) |
 | `30-toolchains/*.sb` | Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent policy modules |
-| `50-integrations-core/*.sb` | Always-on integrations: `git` and `scm-clis` |
+| `50-integrations-core/*.sb` | Always-on core integrations: `container-runtime-default-deny`, `git`, and `scm-clis` |
 | `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging` (`electron` also enables `macos-gui`; keychain is auto-injected for profiles that declare `$$require=55-integrations-optional/keychain.sb$$`) |
 | `60-agents/*.sb` | Product-specific per-agent config/state paths selected by wrapped command basename |
 | `65-apps/*.sb` | Desktop app bundle profiles selected by known app bundles (`Claude.app`, `Visual Studio Code.app`) (`--enable=all-agents` loads all `60-agents` + `65-apps` profiles) |
-| Config/env/CLI path grants | `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
+| Config/env/CLI path grants | Trusted `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`; loaded only with `--trust-workdir-config` or `SAFEHOUSE_TRUST_WORKDIR_CONFIG`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
 | Appended profile(s) | Optional extra profile files appended last via `--append-profile=PATH` (repeatable) |
 
 SBPL rule interactions are matcher-dependent. Safehouse tests currently verify that broad late grants (for example `--add-dirs` and `--enable=wide-read`) can reopen earlier read-denies, while some deny+allow literal/subpath combinations still remain denied. Put must-not-read paths in appended profiles (`--append-profile`) if you want them to remain blocked. Cloud credential stores are opt-in via `--enable=cloud-credentials`.
@@ -303,10 +306,12 @@ SBPL rule interactions are matcher-dependent. Safehouse tests currently verify t
 | `--add-dirs=PATHS` | Colon-separated paths to grant read/write |
 | `--add-dirs-ro=PATHS` | Colon-separated paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
+| `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
 | `--enable=FEATURES` | Enable optional features: `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
+| `--explain` | Print effective workdir, grant, and profile-selection summary to stderr |
 
 All flags accept both `--flag=value` and `--flag value` forms. For path-based flags/config values, `~` and `~/...` are supported.
 
@@ -319,14 +324,16 @@ Environment variables:
 - `SAFEHOUSE_ADD_DIRS_RO`  - Colon-separated paths to grant read-only
 - `SAFEHOUSE_ADD_DIRS`  - Colon-separated paths to grant read/write
 - `SAFEHOUSE_WORKDIR`  - Workdir override (`SAFEHOUSE_WORKDIR=` disables automatic workdir grants)
+- `SAFEHOUSE_TRUST_WORKDIR_CONFIG`  - Trust and load `<workdir>/.safehouse` (`1/0`, `true/false`, `yes/no`, `on/off`)
 
 Optional workdir config file:
 - `<workdir>/.safehouse`
 - Supported keys: `add-dirs-ro=PATHS`, `add-dirs=PATHS`
-- Treat `<workdir>/.safehouse` as trusted input. Do not run Safehouse against untrusted repos that can edit this file.
+- Ignored by default; load it only with `--trust-workdir-config` or `SAFEHOUSE_TRUST_WORKDIR_CONFIG=1`.
+- Treat `<workdir>/.safehouse` as trusted input when enabling it.
 
 Path grant merge order is:
-1. `<workdir>/.safehouse`
+1. Trusted `<workdir>/.safehouse` (only when trust is enabled)
 2. `SAFEHOUSE_ADD_DIRS_RO` / `SAFEHOUSE_ADD_DIRS`
 3. CLI `--add-dirs-ro` / `--add-dirs`
 

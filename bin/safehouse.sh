@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
 PROFILES_DIR="${ROOT_DIR}/profiles"
 HOME_DIR_TEMPLATE_TOKEN="__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
+safehouse_project_name="Agent Safehouse"
+safehouse_project_url="https://agent-safehouse.dev"
+safehouse_project_github_url="https://github.com/eugene1g/agent-safehouse"
 
 home_dir="${HOME:-}"
 enable_csv_list=""
@@ -49,18 +52,31 @@ workdir_env_value=""
 workdir_env_set=0
 invocation_cwd="$(pwd -P)"
 effective_workdir=""
+effective_workdir_source=""
 workdir_config_filename=".safehouse"
 workdir_config_path=""
+workdir_config_loaded=0
+workdir_config_found=0
+workdir_config_ignored_untrusted=0
+trust_workdir_config=0
+trust_workdir_config_flag_set=0
+trust_workdir_config_env_value=""
+trust_workdir_config_env_set=0
+trust_workdir_config_source="default"
 invoked_command_path=""
 invoked_command_basename=""
 invoked_command_app_bundle=""
 selected_agent_profile_basenames=()
+selected_agent_profile_reasons=()
 selected_agent_profiles_resolved=0
 keychain_requirement_token="55-integrations-optional/keychain.sb"
 macos_gui_requirement_token="55-integrations-optional/macos-gui.sb"
 electron_requirement_token="55-integrations-optional/electron.sb"
 selected_profiles_require_keychain=0
 selected_profiles_require_keychain_resolved=0
+optional_integrations_explicit_included=()
+optional_integrations_implicit_included=()
+optional_integrations_not_included=()
 
 readonly_paths=()
 rw_paths=()
@@ -68,10 +84,16 @@ readonly_count=0
 rw_count=0
 
 stdout_policy=0
+explain_mode=0
 
 if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
   workdir_env_set=1
   workdir_env_value="${SAFEHOUSE_WORKDIR}"
+fi
+
+if [[ "${SAFEHOUSE_TRUST_WORKDIR_CONFIG+x}" == "x" ]]; then
+  trust_workdir_config_env_set=1
+  trust_workdir_config_env_value="${SAFEHOUSE_TRUST_WORKDIR_CONFIG}"
 fi
 
 # shellcheck source=bin/lib/common.sh

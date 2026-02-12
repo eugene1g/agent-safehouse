@@ -52,6 +52,10 @@ Policy scope options:
       Main directory to grant read/write access
       Empty string disables automatic workdir grants
 
+  --trust-workdir-config
+  --trust-workdir-config=BOOL
+      Trust and load <workdir>/.safehouse (default: disabled)
+
   --append-profile PATH
   --append-profile=PATH
       Append an additional sandbox profile file after generated rules
@@ -64,6 +68,9 @@ Policy scope options:
 Output options:
   --stdout
       Print policy text to stdout (do not execute command)
+
+  --explain
+      Print effective workdir/grants/profile selection summary to stderr
 
 General:
   -h, --help
@@ -79,8 +86,11 @@ Environment:
   SAFEHOUSE_WORKDIR
       Workdir override (same behavior as --workdir, including empty string)
 
+  SAFEHOUSE_TRUST_WORKDIR_CONFIG
+      Trust and load <workdir>/.safehouse (1/0, true/false, yes/no, on/off)
+
 Config file:
-  <workdir>/.safehouse (optional, auto-loaded if present)
+  <workdir>/.safehouse (optional, loaded only when trusted)
       Supports keys:
         add-dirs-ro=PATHS
         add-dirs=PATHS
@@ -115,6 +125,14 @@ main() {
         ;;
       --stdout)
         stdout_policy=1
+        shift
+        ;;
+      --explain)
+        policy_args+=("$1")
+        shift
+        ;;
+      --trust-workdir-config|--trust-workdir-config=*)
+        policy_args+=("$1")
         shift
         ;;
       --)
@@ -159,6 +177,7 @@ main() {
   invoked_command_basename=""
   invoked_command_app_bundle=""
   selected_agent_profile_basenames=()
+  selected_agent_profile_reasons=()
   selected_agent_profiles_resolved=0
   if [[ "${#command_args[@]}" -gt 0 ]]; then
     invoked_command_path="${command_args[0]}"
@@ -181,6 +200,7 @@ main() {
   fi
 
   if [[ "$stdout_policy" -eq 1 ]]; then
+    emit_explain_policy_outcome "$policy_path" "policy-stdout"
     cat "$policy_path"
     if [[ "$keep_policy_file" -ne 1 ]]; then
       rm -f "$policy_path"
@@ -189,9 +209,12 @@ main() {
   fi
 
   if [[ "${#command_args[@]}" -eq 0 ]]; then
+    emit_explain_policy_outcome "$policy_path" "policy-path"
     printf '%s\n' "$policy_path"
     exit 0
   fi
+
+  emit_explain_policy_outcome "$policy_path" "execute"
 
   set +e
   sandbox-exec -f "$policy_path" -- "${command_args[@]}"

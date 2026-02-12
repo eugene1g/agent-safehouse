@@ -627,8 +627,9 @@
       <div class="eyebrow">Interactive wizard</div>
       <h1>Build your own Safehouse policy</h1>
       <p class="intro">
-        This page assembles policies from real <code>profiles/*.sb</code> modules in Safehouse’s generation order. Choose your
-        agents, stack, integrations, and filesystem grants, then export a ready-to-run <code>.sb</code> file.
+        This page assembles policies from real <code>profiles/*.sb</code> modules in strict CLI parity order. Toolchains and core
+        integrations are always-on (like the CLI), optional integrations mirror <code>--enable</code>, and <code>$$require=...$$</code>
+        metadata auto-injects dependent integrations.
         <a href="https://github.com/eugene1g/agent-safehouse/tree/main/profiles" target="_blank" rel="noopener noreferrer">View policy modules on GitHub</a>.
       </p>
 
@@ -646,10 +647,11 @@
 
         <section class="step">
           <span class="step-number">2</span>
-          <h2>Your coding stack</h2>
+          <h2>Toolchains</h2>
+          <p class="hint">In strict parity mode, all toolchain profiles are always included.</p>
           <div class="bulk">
-            <button id="toolchains-all" type="button">Select all</button>
-            <button id="toolchains-none" type="button">Clear all</button>
+            <button id="toolchains-all" type="button" disabled>Always included</button>
+            <button id="toolchains-none" type="button" disabled>Always included</button>
           </div>
           <div id="toolchains-grid" class="grid"></div>
         </section>
@@ -657,8 +659,9 @@
         <section class="step">
           <span class="step-number">3</span>
           <h2>Things you want your agents to access</h2>
+          <p class="hint">Core integrations are always included. Optional integrations mirror <code>--enable</code>; dependency profiles are auto-injected via <code>$$require=...$$</code>.</p>
 
-          <p class="group-title">Always-on core integrations</p>
+          <p class="group-title">Always-on core integrations (always included)</p>
           <div id="integrations-default-grid" class="grid"></div>
 
           <p class="group-title">Optional integrations</p>
@@ -738,6 +741,28 @@
 
       var BASE_MODULES = ['profiles/00-base.sb', 'profiles/10-system-runtime.sb', 'profiles/20-network.sb'];
       var SHARED_MODULES = ['profiles/40-shared/agent-common.sb'];
+      var CORE_INTEGRATION_MODULES = [
+        'profiles/50-integrations-core/container-runtime-default-deny.sb',
+        'profiles/50-integrations-core/git.sb',
+        'profiles/50-integrations-core/scm-clis.sb'
+      ];
+      var OPTIONAL_INTEGRATION_MODULES = [
+        'profiles/55-integrations-optional/1password.sb',
+        'profiles/55-integrations-optional/browser-native-messaging.sb',
+        'profiles/55-integrations-optional/cleanshot.sb',
+        'profiles/55-integrations-optional/cloud-credentials.sb',
+        'profiles/55-integrations-optional/docker.sb',
+        'profiles/55-integrations-optional/electron.sb',
+        'profiles/55-integrations-optional/keychain.sb',
+        'profiles/55-integrations-optional/kubectl.sb',
+        'profiles/55-integrations-optional/macos-gui.sb',
+        'profiles/55-integrations-optional/spotlight.sb',
+        'profiles/55-integrations-optional/ssh.sb'
+      ];
+      var OPTIONAL_INTEGRATION_BY_TOKEN = {};
+      OPTIONAL_INTEGRATION_MODULES.forEach(function (p) {
+        OPTIONAL_INTEGRATION_BY_TOKEN[p.toLowerCase()] = p;
+      });
 
       var AGENTS = [
         { key: 'claude-code', label: 'Claude Code', profile: 'claude-code.sb', command: 'claude --dangerously-skip-permissions', logo: 'https://github.com/anthropics.png?size=256', on: true },
@@ -761,8 +786,8 @@
         { key: 'go', label: 'Go', profile: 'go.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg', on: true },
         { key: 'java', label: 'Java', profile: 'java.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg', on: true },
         { key: 'node', label: 'Node.js', profile: 'node.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg', on: true },
-        { key: 'perl', label: 'Perl', profile: 'perl.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/perl/perl-original.svg', on: false },
-        { key: 'php', label: 'PHP', profile: 'php.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-original.svg', on: false },
+        { key: 'perl', label: 'Perl', profile: 'perl.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/perl/perl-original.svg', on: true },
+        { key: 'php', label: 'PHP', profile: 'php.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-original.svg', on: true },
         { key: 'python', label: 'Python', profile: 'python.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg', on: true },
         { key: 'ruby', label: 'Ruby', profile: 'ruby.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/ruby/ruby-original.svg', on: true },
         { key: 'runtime-managers', label: 'Runtime managers', profile: 'runtime-managers.sb', logo: 'https://github.com/asdf-vm.png?size=96', on: true },
@@ -770,18 +795,20 @@
       ];
 
       var INTEGRATIONS = [
-        { key: 'git', label: 'Git', path: 'profiles/50-integrations-core/git.sb', group: 'default', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg', on: true },
-        { key: 'scm-clis', label: 'SCM CLIs', path: 'profiles/50-integrations-core/scm-clis.sb', group: 'default', logo: 'https://github.com/github.png?size=96', on: true },
+        { key: 'container-runtime-default-deny', label: 'Container runtime deny', path: 'profiles/50-integrations-core/container-runtime-default-deny.sb', group: 'default', glyph: '⛔', on: true, locked: true },
+        { key: 'git', label: 'Git', path: 'profiles/50-integrations-core/git.sb', group: 'default', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg', on: true, locked: true },
+        { key: 'scm-clis', label: 'SCM CLIs', path: 'profiles/50-integrations-core/scm-clis.sb', group: 'default', logo: 'https://github.com/github.png?size=96', on: true, locked: true },
         { key: '1password', label: '1Password', path: 'profiles/55-integrations-optional/1password.sb', group: 'extra', feature: '1password', logo: 'https://github.com/1Password.png?size=96', on: false },
         { key: 'browser-native-messaging', label: 'Browser native messaging', path: 'profiles/55-integrations-optional/browser-native-messaging.sb', group: 'extra', feature: 'browser-native-messaging', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/chrome/chrome-original.svg', on: false },
         { key: 'cleanshot', label: 'CleanShot', path: 'profiles/55-integrations-optional/cleanshot.sb', group: 'extra', feature: 'cleanshot', glyph: '📸', on: false },
         { key: 'cloud-credentials', label: 'Cloud credentials', path: 'profiles/55-integrations-optional/cloud-credentials.sb', group: 'extra', feature: 'cloud-credentials', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg', on: false },
         { key: 'docker', label: 'Docker', path: 'profiles/55-integrations-optional/docker.sb', group: 'extra', feature: 'docker', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg', on: false },
         { key: 'electron', label: 'Electron', path: 'profiles/55-integrations-optional/electron.sb', group: 'extra', feature: 'electron', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/electron/electron-original.svg', on: false },
-        { key: 'keychain', label: 'Keychain', path: 'profiles/55-integrations-optional/keychain.sb', group: 'extra', glyph: '🔐', on: false },
+        { key: 'kubectl', label: 'kubectl', path: 'profiles/55-integrations-optional/kubectl.sb', group: 'extra', feature: 'kubectl', glyph: '☸', on: false },
         { key: 'macos-gui', label: 'macOS GUI', path: 'profiles/55-integrations-optional/macos-gui.sb', group: 'extra', feature: 'macosGui', glyph: '', on: false },
         { key: 'spotlight', label: 'Spotlight', path: 'profiles/55-integrations-optional/spotlight.sb', group: 'extra', feature: 'spotlight', glyph: '🔎', on: false },
         { key: 'ssh', label: 'SSH', path: 'profiles/55-integrations-optional/ssh.sb', group: 'extra', feature: 'ssh', glyph: '>_', on: false },
+        { key: 'all-agents', label: 'All agents/apps', group: 'extra', feature: 'all-agents', glyph: '∞', on: false },
         { key: 'wide-read', label: 'Wide read', group: 'extra', feature: 'wideRead', glyph: '👁', on: false }
       ];
 
@@ -793,7 +820,8 @@
       var ORD = {
         toolchains: TOOLCHAINS.map(function (x) { return x.profile; }).slice().sort(),
         agents: AGENTS.map(function (x) { return x.profile; }).slice().sort(),
-        apps: APPS.map(function (x) { return x.profile; }).slice().sort()
+        apps: APPS.map(function (x) { return x.profile; }).slice().sort(),
+        optionalIntegrations: OPTIONAL_INTEGRATION_MODULES.slice()
       };
 
       var cache = {};
@@ -914,13 +942,9 @@
       function emitIntPreamble(s) {
         var l = [];
 
-        if (s.disabledDefaultIntegrationLabels.length) {
-          l.push(';; Builder note: default-enabled integrations disabled by user: ' + s.disabledDefaultIntegrationLabels.join(', '));
-          l.push('');
-        }
-
         var offOpt = [];
         if (!s.docker) offOpt.push('docker');
+        if (!s.kubectl) offOpt.push('kubectl');
         if (!s.macosGui) offOpt.push('macos-gui');
         if (!s.electron) offOpt.push('electron');
         if (!s.ssh) offOpt.push('ssh');
@@ -931,14 +955,70 @@
         if (!s.browserNativeMessaging) offOpt.push('browser-native-messaging');
 
         if (offOpt.length) {
-          l.push(';; Optional integrations not enabled: ' + offOpt.join(' '));
-          l.push(';; Note: electron implies macos-gui when enabled.');
+          l.push(';; Opt-in integrations not enabled: ' + offOpt.join(' '));
+          l.push(';; Use --enable=<feature> (comma-separated) to include them.');
+          l.push(';; Note: --enable=electron also enables macos-gui.');
+          l.push(';; Note: selected app/agent profiles can auto-inject integration modules via $$require=<integration-profile-path>$$ metadata.');
           l.push('');
         }
 
         l.push(';; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.');
         l.push('');
         return l.join('\n');
+      }
+
+      async function extractRequiredIntegrationPathsFromModule(path) {
+        var text = await getProfile(path);
+        var req = [];
+        var re = /\$\$require=([^$]+)\$\$/g;
+        var m;
+
+        while ((m = re.exec(text)) !== null) {
+          String(m[1] || '').split(',').forEach(function (rawToken) {
+            var token = String(rawToken || '').trim().toLowerCase();
+            if (!token) return;
+            if (OPTIONAL_INTEGRATION_BY_TOKEN[token]) {
+              req.push(OPTIONAL_INTEGRATION_BY_TOKEN[token]);
+            }
+          });
+        }
+
+        return uniq(req);
+      }
+
+      async function resolveOptionalIntegrationPaths(explicitOptionalPaths, selectedProfilePaths) {
+        var included = {};
+        var queue = [];
+        var scanned = {};
+
+        function enqueueOptional(path) {
+          if (!path) return;
+          if (!OPTIONAL_INTEGRATION_BY_TOKEN[String(path).toLowerCase()]) return;
+          if (included[path]) return;
+          included[path] = true;
+          queue.push(path);
+        }
+
+        explicitOptionalPaths.forEach(enqueueOptional);
+
+        var profileScanQueue = selectedProfilePaths.slice();
+        while (profileScanQueue.length) {
+          var profilePath = profileScanQueue.shift();
+          if (!profilePath || scanned[profilePath]) continue;
+          scanned[profilePath] = true;
+          var profileRequires = await extractRequiredIntegrationPathsFromModule(profilePath);
+          profileRequires.forEach(enqueueOptional);
+        }
+
+        while (queue.length) {
+          var optionalPath = queue.shift();
+          if (!optionalPath || scanned[optionalPath]) continue;
+          scanned[optionalPath] = true;
+          var optionalRequires = await extractRequiredIntegrationPathsFromModule(optionalPath);
+          optionalRequires.forEach(enqueueOptional);
+        }
+
+        return ordered('', Object.keys(included), ORD.optionalIntegrations);
       }
 
       function buildUrl(base, p) {
@@ -999,7 +1079,6 @@
         if (work) assertAbs(work, 'Workdir');
 
         var selAgents = selected(AGENTS, 'agent-');
-        var selTools = selected(TOOLCHAINS, 'toolchain-');
         var selApps = selected(APPS, 'app-');
         var selInts = selected(INTEGRATIONS, 'integration-');
 
@@ -1009,30 +1088,23 @@
         var electron = !!byKey['electron'];
         var macosGui = !!byKey['macos-gui'] || electron;
         var docker = !!byKey['docker'];
+        var kubectl = !!byKey['kubectl'];
         var ssh = !!byKey['ssh'];
         var spotlight = !!byKey['spotlight'];
         var cleanshot = !!byKey['cleanshot'];
         var onepassword = !!byKey['1password'];
         var cloudCredentials = !!byKey['cloud-credentials'];
         var browserNativeMessaging = !!byKey['browser-native-messaging'];
-        var keychain = !!byKey['keychain'];
+        var allAgents = !!byKey['all-agents'];
         var wideRead = !!byKey['wide-read'];
 
         if (electron) {
           byKey['macos-gui'] = true;
         }
 
-        var selectedIntegrationModulePaths = selInts
-          .filter(function (i) { return i.path; })
+        var explicitOptionalIntegrationPaths = selInts
+          .filter(function (i) { return i.group === 'extra' && i.path; })
           .map(function (i) { return i.path; });
-
-        if (electron && selectedIntegrationModulePaths.indexOf('profiles/55-integrations-optional/macos-gui.sb') === -1) {
-          selectedIntegrationModulePaths.push('profiles/55-integrations-optional/macos-gui.sb');
-        }
-
-        var disabledDefault = INTEGRATIONS
-          .filter(function (i) { return i.group === 'default' && !byKey[i.key]; })
-          .map(function (i) { return i.label; });
 
         return {
           home: home,
@@ -1042,17 +1114,17 @@
           append: String(el.append.value || '').trim(),
 
           agents: selAgents,
-          tools: selTools,
+          tools: TOOLCHAINS.slice(),
           apps: selApps,
 
-          agentProfiles: uniq(selAgents.map(function (a) { return a.profile; })),
-          toolProfiles: uniq(selTools.map(function (t) { return t.profile; })),
-          appProfiles: uniq(selApps.map(function (a) { return a.profile; })),
+          agentProfiles: allAgents ? ORD.agents.slice() : uniq(selAgents.map(function (a) { return a.profile; })),
+          toolProfiles: ORD.toolchains.slice(),
+          appProfiles: allAgents ? ORD.apps.slice() : uniq(selApps.map(function (a) { return a.profile; })),
 
-          selectedIntegrationModulePaths: uniq(selectedIntegrationModulePaths),
-          disabledDefaultIntegrationLabels: disabledDefault,
+          explicitOptionalIntegrationPaths: uniq(explicitOptionalIntegrationPaths),
 
           docker: docker,
+          kubectl: kubectl,
           electron: electron,
           macosGui: macosGui,
           ssh: ssh,
@@ -1061,7 +1133,7 @@
           onepassword: onepassword,
           cloudCredentials: cloudCredentials,
           browserNativeMessaging: browserNativeMessaging,
-          keychain: keychain,
+          allAgents: allAgents,
           wideRead: wideRead
         };
       }
@@ -1084,6 +1156,7 @@
 
         var feats = [];
         if (s.docker) feats.push('docker');
+        if (s.kubectl) feats.push('kubectl');
         if (s.electron) feats.push('electron');
         if (!s.electron && s.macosGui) feats.push('macos-gui');
         if (s.ssh) feats.push('ssh');
@@ -1092,6 +1165,7 @@
         if (s.onepassword) feats.push('1password');
         if (s.cloudCredentials) feats.push('cloud-credentials');
         if (s.browserNativeMessaging) feats.push('browser-native-messaging');
+        if (s.allAgents) feats.push('all-agents');
         if (s.wideRead) feats.push('wide-read');
 
         var flags = [];
@@ -1102,17 +1176,7 @@
 
         l.push('safehouse ' + (flags.length ? flags.join(' ') + ' ' : '') + '--stdout -- <agent-command>');
         l.push('# safehouse CLI auto-selects 60-agents/65-apps by command basename.');
-
-        if (s.toolProfiles.length !== TOOLCHAINS.length) {
-          l.push('# Note: wizard can narrow toolchains; CLI includes all toolchains by default.');
-        }
-
-        if (s.disabledDefaultIntegrationLabels.length) {
-          l.push('# Note: disabled default integrations are specific to this static policy output.');
-        }
-        if (s.keychain) {
-          l.push('# Note: keychain is selectable in the builder policy; safehouse CLI injects keychain automatically for keychain-dependent agent/app profiles.');
-        }
+        l.push('# Integration dependencies from $$require metadata are auto-injected (for example keychain, macos-gui via electron).');
 
         return l.join('\n');
       }
@@ -1121,13 +1185,14 @@
         var toolPaths = ordered('profiles/30-toolchains/', s.toolProfiles, ORD.toolchains);
         var agentPaths = ordered('profiles/60-agents/', s.agentProfiles, ORD.agents);
         var appPaths = ordered('profiles/65-apps/', s.appProfiles, ORD.apps);
-
-        var integrationPaths = s.selectedIntegrationModulePaths.slice().sort();
+        var selectedProfilePaths = agentPaths.concat(appPaths);
+        var integrationPaths = await resolveOptionalIntegrationPaths(s.explicitOptionalIntegrationPaths, selectedProfilePaths);
 
         var fetches = uniq(
           BASE_MODULES
             .concat(toolPaths)
             .concat(SHARED_MODULES)
+            .concat(CORE_INTEGRATION_MODULES)
             .concat(integrationPaths)
             .concat(agentPaths)
             .concat(appPaths)
@@ -1154,15 +1219,13 @@
         add(BASE_MODULES[1], false);
         add(BASE_MODULES[2], false);
 
-        if (toolPaths.length) toolPaths.forEach(function (p) { add(p, false); });
-        else {
-          parts.push(';; No toolchain modules selected in wizard (profiles/30-toolchains skipped).');
-          parts.push('');
-        }
+        toolPaths.forEach(function (p) { add(p, false); });
 
         SHARED_MODULES.forEach(function (p) { add(p, false); });
 
         parts.push(emitIntPreamble(s));
+
+        CORE_INTEGRATION_MODULES.forEach(function (p) { add(p, false); });
 
         integrationPaths.forEach(function (p) { add(p, false); });
 
@@ -1318,12 +1381,12 @@
             key: t.key,
             label: t.label,
             logo: t.logo
-          }, 'toolchain-', !!t.on, false));
+          }, 'toolchain-', !!t.on, true));
         });
 
         INTEGRATIONS.forEach(function (i) {
           var targetGrid = i.group === 'default' ? el.integrationsDefaultGrid : el.integrationsExtraGrid;
-          targetGrid.appendChild(makeCard(i, 'integration-', !!i.on, false));
+          targetGrid.appendChild(makeCard(i, 'integration-', !!i.on, !!i.locked));
         });
 
         APPS.forEach(function (a) {

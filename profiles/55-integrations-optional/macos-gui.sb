@@ -101,7 +101,13 @@
     ;; AppKit and UI framework services
     (global-name "com.apple.ViewBridgeAuxiliary")
     (global-name "com.apple.appkit.restoration_storage")
+    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
+    (global-name "com.apple.backgroundtaskmanagementagent")
     (global-name "com.apple.pbs.fetch_services")
+    (global-name "com.apple.powerlog.plxpclogger.xpc")
+    (global-name "com.apple.FileCoordination")
+    (global-name "com.apple.security.syspolicy")
+    (global-name "com.apple.security.syspolicy.exec")
     (global-name "com.apple.uiintelligencesupport.agent")
     (global-name "com.apple.controlcenter.statusitems")
     (global-name "com.apple.sidecar-relay")            ;; Sidecar/AirPlay display menu probing in AppKit.
@@ -141,6 +147,11 @@
     (local-name "com.apple.axserver")
     (local-name "com.apple.tsm.portname")
     (local-name "com.apple.coredrag")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
 )
 
 ;; -- IOKit (power management, HID input, storage) ------------------------------

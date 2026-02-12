@@ -126,6 +126,13 @@ run_section_integrations() {
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit launcher mach-lookup grant" "(global-name \"com.apple.inputmethodkit.launcher\")"
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit xpc endpoint mach-lookup grant" "(global-name \"com.apple.inputmethodkit.getxpcendpoint\")"
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes Sidecar relay mach-lookup grant" "(global-name \"com.apple.sidecar-relay\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes background task management mach-lookup grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes open/save panel service mach-lookup grant" "(global-name \"com.apple.appkit.xpc.openAndSavePanelService\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes powerlog mach-lookup grant" "(global-name \"com.apple.powerlog.plxpclogger.xpc\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes FileCoordination mach-lookup grant" "(global-name \"com.apple.FileCoordination\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes syspolicy mach-lookup grant" "(global-name \"com.apple.security.syspolicy\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes syspolicy.exec mach-lookup grant" "(global-name \"com.apple.security.syspolicy.exec\")"
+  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes HFSIOC_SET_HOTFILE_STATE fsctl grant" "(fsctl-command (_IO \"h\" 47))"
   assert_policy_not_contains "$POLICY_MACOS_GUI" "--enable=macos-gui does not include electron integration profile" "#safehouse-test-id:electron-integration#"
 
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron integration marker" "#safehouse-test-id:electron-integration#"
@@ -143,6 +150,8 @@ run_section_integrations() {
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies usymptomsd mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.usymptomsd\")"
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies inputmethodkit launchagent mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.inputmethodkit.launchagent\")"
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies Sidecar relay mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.sidecar-relay\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies background task management mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
+  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies HFSIOC_SET_HOTFILE_STATE fsctl grant via macOS GUI profile" "(fsctl-command (_IO \"h\" 47))"
 
   section_begin "Keychain Access"
   policy_keychain_agent="${TEST_CWD}/policy-agent-keychain-codex.sb"

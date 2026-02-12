@@ -47,19 +47,10 @@
     (preference-domain "com.microsoft.VSCodeInsiders")
 )
 
-;; Background Task Management: login item status query (SMAppService.mainApp.status).
-;; File chooser/open panel dialogs use this AppKit XPC service.
-;; powerlog logger service is probed by Electron on startup.
-;; File coordination and syspolicy services are queried by AppKit/LaunchServices
-;; flows during file operations and app trust checks.
-;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle IDs).
+;; Shared AppKit/Mach/fsctl allowances are provided by:
+;;   55-integrations-optional/macos-gui.sb
+;; This profile adds only app-specific MachPortRendezvousServer IPC grants.
 (allow mach-lookup
-    (global-name "com.apple.backgroundtaskmanagementagent")
-    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
-    (global-name "com.apple.powerlog.plxpclogger.xpc")
-    (global-name "com.apple.FileCoordination")
-    (global-name "com.apple.security.syspolicy")
-    (global-name "com.apple.security.syspolicy.exec")
     (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
 )
@@ -67,9 +58,4 @@
 (allow mach-register
     (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
 )
