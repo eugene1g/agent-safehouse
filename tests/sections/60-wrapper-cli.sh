@@ -11,6 +11,9 @@ run_section_wrapper_and_cli() {
   local dist_default_static dist_apps_static
   local dist_fake_bin_dir dist_fake_codex_bin dist_fake_claude_app_dir dist_fake_claude_app_bin
   local dist_append_profile_file dist_append_profile_policy dist_append_profile_marker
+  local invalid_cli_spec invalid_cli_arg invalid_cli_pass_message invalid_cli_fail_message
+  local static_policy_spec static_policy_path static_policy_label
+  local launcher_spec launcher_path launcher_label launcher_marker
 
   section_begin "safehouse.sh Entry Point"
   set +e
@@ -93,63 +96,44 @@ EOF
   fi
 
   section_begin "Policy CLI Validation"
-  if "$GENERATOR" --add-dirs 2>/dev/null; then
-    log_fail "--add-dirs with no value should fail"
-  else
-    log_pass "--add-dirs with no value exits non-zero"
-  fi
-  if "$GENERATOR" --add-dirs-ro 2>/dev/null; then
-    log_fail "--add-dirs-ro with no value should fail"
-  else
-    log_pass "--add-dirs-ro with no value exits non-zero"
-  fi
-  if "$GENERATOR" --workdir 2>/dev/null; then
-    log_fail "--workdir with no value should fail"
-  else
-    log_pass "--workdir with no value exits non-zero"
-  fi
-  if "$GENERATOR" --append-profile 2>/dev/null; then
-    log_fail "--append-profile with no value should fail"
-  else
-    log_pass "--append-profile with no value exits non-zero"
-  fi
-  if "$GENERATOR" --output 2>/dev/null; then
-    log_fail "--output with no value should fail"
-  else
-    log_pass "--output with no value exits non-zero"
-  fi
-  if "$GENERATOR" --bogus-flag 2>/dev/null; then
-    log_fail "unknown flag should fail"
-  else
-    log_pass "unknown flag exits non-zero"
-  fi
-  if "$GENERATOR" --enable=bogus 2>/dev/null; then
-    log_fail "unknown --enable feature should fail"
-  else
-    log_pass "unknown --enable feature exits non-zero"
-  fi
+  for invalid_cli_spec in \
+    "--add-dirs:::--add-dirs with no value exits non-zero:::--add-dirs with no value should fail" \
+    "--add-dirs-ro:::--add-dirs-ro with no value exits non-zero:::--add-dirs-ro with no value should fail" \
+    "--workdir:::--workdir with no value exits non-zero:::--workdir with no value should fail" \
+    "--append-profile:::--append-profile with no value exits non-zero:::--append-profile with no value should fail" \
+    "--output:::--output with no value exits non-zero:::--output with no value should fail" \
+    "--bogus-flag:::unknown flag exits non-zero:::unknown flag should fail" \
+    "--enable=bogus:::unknown --enable feature exits non-zero:::unknown --enable feature should fail"; do
+    invalid_cli_arg="${invalid_cli_spec%%:::*}"
+    invalid_cli_pass_message="${invalid_cli_spec#*:::}"
+    invalid_cli_fail_message="${invalid_cli_pass_message#*:::}"
+    invalid_cli_pass_message="${invalid_cli_pass_message%%:::*}"
+    if "$GENERATOR" "$invalid_cli_arg" 2>/dev/null; then
+      log_fail "$invalid_cli_fail_message"
+    else
+      log_pass "$invalid_cli_pass_message"
+    fi
+  done
 
   section_begin "Dist Artifact Generator Script"
   dist_claude_launcher="${REPO_ROOT}/dist/Claude.app.sandboxed.command"
   dist_claude_offline_launcher="${REPO_ROOT}/dist/Claude.app.sandboxed-offline.command"
   assert_command_succeeds "generate-dist script regenerates committed dist artifacts" "${REPO_ROOT}/scripts/generate-dist.sh"
   assert_policy_contains "${REPO_ROOT}/profiles/00-base.sb" "base profile exposes explicit HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file contains sandbox header" "(version 1)"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file includes project banner" ";; Project: https://agent-safehouse.dev"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file includes GitHub project URL" ";; GitHub: https://github.com/eugene1g/agent-safehouse"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file includes sandbox log helper example" ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file uses deterministic template HOME" "/tmp/agent-safehouse-static-template/home"
-  assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy file resolves HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"
-  assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy omits legacy agent common profile path" ";; Source: 60-agents/__common.sb"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file contains sandbox header" "(version 1)"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file includes project banner" ";; Project: https://agent-safehouse.dev"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file includes GitHub project URL" ";; GitHub: https://github.com/eugene1g/agent-safehouse"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file includes sandbox log helper example" ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file uses deterministic template HOME" "/tmp/agent-safehouse-static-template/home"
-  assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy file resolves HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
-  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"
-  assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy omits legacy agent common profile path" ";; Source: 60-agents/__common.sb"
+  for static_policy_spec in \
+    "${REPO_ROOT}/dist/profiles/safehouse.generated.sb:::default static policy file" \
+    "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb:::apps static policy file"; do
+    static_policy_path="${static_policy_spec%%:::*}"
+    static_policy_label="${static_policy_spec#*:::}"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} contains sandbox header" "(version 1)"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} includes project banner" ";; Project: https://agent-safehouse.dev"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} includes GitHub project URL" ";; GitHub: https://github.com/eugene1g/agent-safehouse"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} includes sandbox log helper example" ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} uses deterministic template HOME" "/tmp/agent-safehouse-static-template/home"
+    assert_policy_not_contains "$static_policy_path" "${static_policy_label} resolves HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"
+    assert_policy_not_contains "$static_policy_path" "${static_policy_label} omits legacy agent common profile path" ";; Source: 60-agents/__common.sb"
+  done
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes usymptomsd mach-lookup grant" "(global-name \"com.apple.usymptomsd\")"
@@ -166,32 +150,48 @@ EOF
   else
     log_fail "dist Claude offline launcher output is executable"
   fi
+  for launcher_spec in \
+    "${dist_claude_launcher}:::dist Claude launcher" \
+    "${dist_claude_offline_launcher}:::dist Claude offline launcher"; do
+    launcher_path="${launcher_spec%%:::*}"
+    launcher_label="${launcher_spec#*:::}"
+    for launcher_marker in \
+      "# Purpose: Launch Claude Desktop sandboxed to this file's directory." \
+      "Help: \${project_url}" \
+      "sandbox-exec -f \"\$policy_path\" -- \"\$claude_desktop_binary\" --no-sandbox \"\$@\""; do
+      assert_policy_contains "$launcher_path" "${launcher_label} includes required marker (${launcher_marker})" "$launcher_marker"
+    done
+    assert_policy_not_contains "$launcher_path" "${launcher_label} omits source commit hash" "# Source Commit: "
+  done
+
   assert_policy_contains "$dist_claude_launcher" "dist Claude launcher resolves workdir from script location" "launcher_workdir=\"\$(cd \"\$(dirname \"\${BASH_SOURCE[0]}\")\" && pwd -P)\""
   assert_policy_contains "$dist_claude_launcher" "dist Claude launcher targets Claude Desktop binary" "claude_desktop_binary=\"/Applications/Claude.app/Contents/MacOS/Claude\""
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher header explains purpose" "# Purpose: Launch Claude Desktop sandboxed to this file's directory."
   assert_policy_contains "$dist_claude_launcher" "dist Claude launcher header includes project homepage link" "# Project: https://agent-safehouse.dev"
-  assert_policy_not_contains "$dist_claude_launcher" "dist Claude launcher header omits source commit hash" "# Source Commit: "
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher defaults to remote apps policy URL" "default_policy_url=\"https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/profiles/safehouse-for-apps.generated.sb\""
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher fetches remote policy via curl" "curl -fsSL --connect-timeout 10 --retry 2 --retry-delay 1 \"\$url\" -o \"\$output_path\""
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher fetches remote policy via wget alternative" "wget -q -O \"\$output_path\" \"\$url\""
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher validates fetched policy shape" "policy_template_looks_valid()"
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher errors when remote policy download fails" "Failed to download sandbox policy from \${remote_policy_url}"
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher suggests SAFEHOUSE_CLAUDE_POLICY_URL override" "SAFEHOUSE_CLAUDE_POLICY_URL"
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher points users to project website on policy errors" "Help: \${project_url}"
+  for launcher_marker in \
+    "default_policy_url=\"https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/profiles/safehouse-for-apps.generated.sb\"" \
+    "curl -fsSL --connect-timeout 10 --retry 2 --retry-delay 1 \"\$url\" -o \"\$output_path\"" \
+    "wget -q -O \"\$output_path\" \"\$url\"" \
+    "policy_template_looks_valid()" \
+    "Failed to download sandbox policy from \${remote_policy_url}" \
+    "SAFEHOUSE_CLAUDE_POLICY_URL" \
+    "policy_path=\"\$(mktemp \"/tmp/claude-safehouse-policy.XXXXXX\")\""; do
+    assert_policy_contains "$dist_claude_launcher" "dist Claude launcher includes required online marker (${launcher_marker})" "$launcher_marker"
+  done
   assert_policy_not_contains "$dist_claude_launcher" "dist Claude launcher omits embedded fallback template" "emit_fallback_policy_template"
   assert_policy_not_contains "$dist_claude_launcher" "dist Claude launcher omits embedded electron policy payload" "(global-name \"com.apple.powerlog.plxpclogger.xpc\")"
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher uses mktemp with trailing X pattern" "policy_path=\"\$(mktemp \"/tmp/claude-safehouse-policy.XXXXXX\")\""
-  assert_policy_contains "$dist_claude_launcher" "dist Claude launcher invokes sandbox-exec directly" "sandbox-exec -f \"\$policy_path\" -- \"\$claude_desktop_binary\" --no-sandbox \"\$@\""
-  assert_policy_contains "$dist_claude_offline_launcher" "dist Claude offline launcher header explains purpose" "# Purpose: Launch Claude Desktop sandboxed to this file's directory."
-  assert_policy_contains "$dist_claude_offline_launcher" "dist Claude offline launcher identifies offline mode" "Uses an embedded apps policy (no runtime download required)."
-  assert_policy_not_contains "$dist_claude_offline_launcher" "dist Claude offline launcher header omits source commit hash" "# Source Commit: "
-  assert_policy_contains "$dist_claude_offline_launcher" "dist Claude offline launcher embeds apps policy template" "emit_embedded_policy_template()"
-  assert_policy_contains "$dist_claude_offline_launcher" "dist Claude offline launcher includes embedded powerlog XPC grant" "(global-name \"com.apple.powerlog.plxpclogger.xpc\")"
-  assert_policy_contains "$dist_claude_offline_launcher" "dist Claude offline launcher points users to project website on errors" "Help: \${project_url}"
-  assert_policy_not_contains "$dist_claude_offline_launcher" "dist Claude offline launcher does not fetch policy via curl" "curl -fsSL --connect-timeout 10 --retry 2 --retry-delay 1"
-  assert_policy_not_contains "$dist_claude_offline_launcher" "dist Claude offline launcher does not fetch policy via wget" "wget -q -O \"\$output_path\" \"\$url\""
-  assert_policy_not_contains "$dist_claude_offline_launcher" "dist Claude offline launcher does not use SAFEHOUSE_CLAUDE_POLICY_URL" "SAFEHOUSE_CLAUDE_POLICY_URL"
-  assert_policy_contains "$dist_claude_offline_launcher" "dist Claude offline launcher invokes sandbox-exec directly" "sandbox-exec -f \"\$policy_path\" -- \"\$claude_desktop_binary\" --no-sandbox \"\$@\""
+
+  for launcher_marker in \
+    "Uses an embedded apps policy (no runtime download required)." \
+    "emit_embedded_policy_template()" \
+    "(global-name \"com.apple.powerlog.plxpclogger.xpc\")"; do
+    assert_policy_contains "$dist_claude_offline_launcher" "dist Claude offline launcher includes required offline marker (${launcher_marker})" "$launcher_marker"
+  done
+  for launcher_marker in \
+    "curl -fsSL --connect-timeout 10 --retry 2 --retry-delay 1" \
+    "wget -q -O \"\$output_path\" \"\$url\"" \
+    "SAFEHOUSE_CLAUDE_POLICY_URL"; do
+    assert_policy_not_contains "$dist_claude_offline_launcher" "dist Claude offline launcher omits online-only marker (${launcher_marker})" "$launcher_marker"
+  done
 
   section_begin "Dist Binary Generator Script"
   dist_path="${TEST_CWD}/safehouse-dist.sh"
@@ -298,10 +298,12 @@ EOF
 
   assert_command_succeeds "bin safehouse writes command-scoped Codex parity policy file in --stdout mode" "$SAFEHOUSE" --stdout --output "$dist_policy_from_bin_codex" -- "$dist_fake_codex_bin"
   assert_command_succeeds "dist safehouse writes command-scoped Codex parity policy file in --stdout mode" "$dist_path" --stdout --output "$dist_policy_from_dist_codex" -- "$dist_fake_codex_bin"
-  assert_policy_contains "$dist_policy_from_bin_codex" "bin Codex policy includes codex agent profile marker" ";; Source: 60-agents/codex.sb"
-  assert_policy_contains "$dist_policy_from_bin_codex" "bin Codex policy auto-injects keychain integration marker" ";; Integration: Keychain"
-  assert_policy_contains "$dist_policy_from_dist_codex" "dist Codex policy includes codex agent profile marker" ";; Source: 60-agents/codex.sb"
-  assert_policy_contains "$dist_policy_from_dist_codex" "dist Codex policy auto-injects keychain integration marker" ";; Integration: Keychain"
+  for launcher_marker in \
+    ";; Source: 60-agents/codex.sb" \
+    ";; Integration: Keychain"; do
+    assert_policy_contains "$dist_policy_from_bin_codex" "bin Codex policy includes expected marker (${launcher_marker})" "$launcher_marker"
+    assert_policy_contains "$dist_policy_from_dist_codex" "dist Codex policy includes expected marker (${launcher_marker})" "$launcher_marker"
+  done
   if cmp -s "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex"; then
     log_pass "dist Codex command-scoped policy output matches bin/safehouse.sh byte-for-byte"
   else
@@ -310,14 +312,14 @@ EOF
 
   assert_command_succeeds "bin safehouse writes command-scoped Claude.app parity policy file in --stdout mode" "$SAFEHOUSE" --stdout --output "$dist_policy_from_bin_claude_app" -- "$dist_fake_claude_app_bin"
   assert_command_succeeds "dist safehouse writes command-scoped Claude.app parity policy file in --stdout mode" "$dist_path" --stdout --output "$dist_policy_from_dist_claude_app" -- "$dist_fake_claude_app_bin"
-  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy includes app profile marker" ";; Source: 65-apps/claude-app.sb"
-  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy auto-injects keychain integration marker" ";; Integration: Keychain"
-  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy auto-injects macOS GUI integration marker" ";; Integration: macOS GUI"
-  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy auto-injects electron integration marker" "#safehouse-test-id:electron-integration#"
-  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy includes app profile marker" ";; Source: 65-apps/claude-app.sb"
-  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy auto-injects keychain integration marker" ";; Integration: Keychain"
-  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy auto-injects macOS GUI integration marker" ";; Integration: macOS GUI"
-  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy auto-injects electron integration marker" "#safehouse-test-id:electron-integration#"
+  for launcher_marker in \
+    ";; Source: 65-apps/claude-app.sb" \
+    ";; Integration: Keychain" \
+    ";; Integration: macOS GUI" \
+    "#safehouse-test-id:electron-integration#"; do
+    assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy includes expected marker (${launcher_marker})" "$launcher_marker"
+    assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy includes expected marker (${launcher_marker})" "$launcher_marker"
+  done
   if cmp -s "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app"; then
     log_pass "dist Claude.app command-scoped policy output matches bin/safehouse.sh byte-for-byte"
   else

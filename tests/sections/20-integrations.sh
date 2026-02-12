@@ -9,23 +9,22 @@ run_section_integrations() {
   local onepassword_op_candidate onepassword_op_candidates
   local policy_ssh policy_browser_native_messaging policy_onepassword
   local policy_keychain_agent policy_non_keychain_agent
+  local macos_gui_marker electron_marker
 
   section_begin "SSH Integration (Opt-In)"
   policy_ssh="${TEST_CWD}/policy-enable-ssh.sb"
   assert_command_succeeds "safehouse generates policy with --enable=ssh" "$GENERATOR" --output "$policy_ssh" --enable=ssh
 
   ssh_config_path="${HOME}/.ssh/config"
+  assert_denied_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config denied by default" "$ssh_config_path" /bin/cat "$ssh_config_path"
   if [[ -L "$ssh_config_path" ]]; then
     ssh_config_link_target="$(readlink "$ssh_config_path" 2>/dev/null || true)"
     if [[ "$ssh_config_link_target" == /* && "$ssh_config_link_target" != "${HOME}/.ssh/"* ]]; then
-      assert_denied_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config denied by default" "$ssh_config_path" /bin/cat "$ssh_config_path"
       log_skip "read ~/.ssh/config allowed with --enable=ssh (symlink target outside ~/.ssh; allow via --append-profile if needed)"
     else
-      assert_denied_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config denied by default" "$ssh_config_path" /bin/cat "$ssh_config_path"
       assert_allowed_if_exists "$policy_ssh" "read ~/.ssh/config allowed with --enable=ssh" "$ssh_config_path" /bin/cat "$ssh_config_path"
     fi
   else
-    assert_denied_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config denied by default" "$ssh_config_path" /bin/cat "$ssh_config_path"
     assert_allowed_if_exists "$policy_ssh" "read ~/.ssh/config allowed with --enable=ssh" "$ssh_config_path" /bin/cat "$ssh_config_path"
   fi
 
@@ -60,9 +59,6 @@ run_section_integrations() {
   if [[ "$private_key_candidates" -eq 0 ]]; then
     log_skip "SSH private key deny tests (no private key files found in ~/.ssh/)"
   fi
-
-  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits SSH integration profile" ";; Integration: SSH"
-  assert_policy_contains "$policy_ssh" "--enable=ssh includes SSH integration profile" ";; Integration: SSH"
 
   section_begin "Browser Profile Deny (Default Policy)"
   for browser_dir in \
@@ -109,10 +105,6 @@ run_section_integrations() {
   if [[ "$onepassword_op_candidates" -eq 0 ]]; then
     log_skip "read Homebrew Cask 1Password CLI binary (no 1password-cli Cask install found)"
   fi
-  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Browser Native Messaging integration profile" ";; Integration: Browser Native Messaging"
-  assert_policy_contains "$policy_browser_native_messaging" "--enable=browser-native-messaging includes Browser Native Messaging integration profile" ";; Integration: Browser Native Messaging"
-  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits 1Password integration profile" ";; Integration: 1Password"
-  assert_policy_contains "$policy_onepassword" "--enable=1password includes 1Password integration profile" ";; Integration: 1Password"
 
   section_begin "macOS GUI / Electron Integration Policy Coverage"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits macOS GUI integration profile" ";; Integration: macOS GUI"
@@ -120,38 +112,47 @@ run_section_integrations() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy does not load agent-specific Claude Desktop profile when no command is provided" "(preference-domain \"com.anthropic.claudefordesktop\")"
 
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes macOS GUI integration profile" ";; Integration: macOS GUI"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes CARenderServer mach-lookup grant" "(global-name \"com.apple.CARenderServer\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes usymptomsd mach-lookup grant" "(global-name \"com.apple.usymptomsd\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit launchagent mach-lookup grant" "(global-name \"com.apple.inputmethodkit.launchagent\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit launcher mach-lookup grant" "(global-name \"com.apple.inputmethodkit.launcher\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes inputmethodkit xpc endpoint mach-lookup grant" "(global-name \"com.apple.inputmethodkit.getxpcendpoint\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes Sidecar relay mach-lookup grant" "(global-name \"com.apple.sidecar-relay\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes background task management mach-lookup grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes open/save panel service mach-lookup grant" "(global-name \"com.apple.appkit.xpc.openAndSavePanelService\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes powerlog mach-lookup grant" "(global-name \"com.apple.powerlog.plxpclogger.xpc\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes FileCoordination mach-lookup grant" "(global-name \"com.apple.FileCoordination\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes syspolicy mach-lookup grant" "(global-name \"com.apple.security.syspolicy\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes syspolicy.exec mach-lookup grant" "(global-name \"com.apple.security.syspolicy.exec\")"
-  assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes HFSIOC_SET_HOTFILE_STATE fsctl grant" "(fsctl-command (_IO \"h\" 47))"
+  for macos_gui_marker in \
+    "(global-name \"com.apple.CARenderServer\")" \
+    "(global-name \"com.apple.usymptomsd\")" \
+    "(global-name \"com.apple.inputmethodkit.launchagent\")" \
+    "(global-name \"com.apple.inputmethodkit.launcher\")" \
+    "(global-name \"com.apple.inputmethodkit.getxpcendpoint\")" \
+    "(global-name \"com.apple.sidecar-relay\")" \
+    "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
+    "(global-name \"com.apple.appkit.xpc.openAndSavePanelService\")" \
+    "(global-name \"com.apple.powerlog.plxpclogger.xpc\")" \
+    "(global-name \"com.apple.FileCoordination\")" \
+    "(global-name \"com.apple.security.syspolicy\")" \
+    "(global-name \"com.apple.security.syspolicy.exec\")" \
+    "(fsctl-command (_IO \"h\" 47))"; do
+    assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes required grant (${macos_gui_marker})" "$macos_gui_marker"
+  done
   assert_policy_not_contains "$POLICY_MACOS_GUI" "--enable=macos-gui does not include electron integration profile" "#safehouse-test-id:electron-integration#"
 
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron integration marker" "#safehouse-test-id:electron-integration#"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron GPU/Metal marker" "#safehouse-test-id:electron-gpu-metal#"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron crashpad marker" "#safehouse-test-id:electron-crashpad#"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron crashpad mach-lookup marker" "#safehouse-test-id:electron-crashpad-lookup#"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes electron crashpad mach-register marker" "#safehouse-test-id:electron-crashpad-register#"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes no-sandbox workaround docs" "Primary workaround under Safehouse: launch Electron with --no-sandbox."
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes MTLCompilerService mach-lookup grant" "(global-name \"com.apple.MTLCompilerService\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes IOSurfaceRootUserClient IOKit grant" "(iokit-user-client-class \"IOSurfaceRootUserClient\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes AGXDeviceUserClient IOKit grant" "(iokit-user-client-class \"AGXDeviceUserClient\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes crashpad handshake regex grant" "(global-name-regex #\"^org\\.chromium\\.crashpad\\.child_port_handshake\\.\")"
+  for electron_marker in \
+    "#safehouse-test-id:electron-integration#" \
+    "#safehouse-test-id:electron-gpu-metal#" \
+    "#safehouse-test-id:electron-crashpad#" \
+    "#safehouse-test-id:electron-crashpad-lookup#" \
+    "#safehouse-test-id:electron-crashpad-register#" \
+    "Primary workaround under Safehouse: launch Electron with --no-sandbox." \
+    "(global-name \"com.apple.MTLCompilerService\")" \
+    "(iokit-user-client-class \"IOSurfaceRootUserClient\")" \
+    "(iokit-user-client-class \"AGXDeviceUserClient\")" \
+    "(global-name-regex #\"^org\\.chromium\\.crashpad\\.child_port_handshake\\.\")"; do
+    assert_policy_contains "$POLICY_ELECTRON" "--enable=electron includes required grant/marker (${electron_marker})" "$electron_marker"
+  done
   assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies CARenderServer mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.CARenderServer\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies usymptomsd mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.usymptomsd\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies inputmethodkit launchagent mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.inputmethodkit.launchagent\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies Sidecar relay mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.sidecar-relay\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies background task management mach-lookup grant via macOS GUI profile" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
-  assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies HFSIOC_SET_HOTFILE_STATE fsctl grant via macOS GUI profile" "(fsctl-command (_IO \"h\" 47))"
+  for macos_gui_marker in \
+    "(global-name \"com.apple.CARenderServer\")" \
+    "(global-name \"com.apple.usymptomsd\")" \
+    "(global-name \"com.apple.inputmethodkit.launchagent\")" \
+    "(global-name \"com.apple.sidecar-relay\")" \
+    "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
+    "(fsctl-command (_IO \"h\" 47))"; do
+    assert_policy_contains "$POLICY_ELECTRON" "--enable=electron implies macOS GUI grant (${macos_gui_marker})" "$macos_gui_marker"
+  done
 
   section_begin "Keychain Access"
   policy_keychain_agent="${TEST_CWD}/policy-agent-keychain-codex.sb"

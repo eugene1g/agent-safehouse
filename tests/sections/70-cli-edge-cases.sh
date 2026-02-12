@@ -14,6 +14,7 @@ run_section_cli_edge_cases() {
   local test_ro_dir_rel test_ro_dir_2_rel test_rw_dir_2_rel
   local resolved_test_rw_dir resolved_test_ro_dir
   local marker_dynamic marker_workdir marker_container_runtime_socket_deny marker_append_profile_one marker_append_profile_two
+  local policy_marker
 
   marker_dynamic="#safehouse-test-id:dynamic-cli-grants#"
   marker_workdir="#safehouse-test-id:workdir-grant#"
@@ -60,12 +61,15 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_electron" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
   policy_enable_all_agents="${TEST_CWD}/policy-enable-all-agents.sb"
   assert_command_succeeds "--enable=all-agents restores full scoped profile inclusion (60-agents + 65-apps)" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
-  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Claude Desktop app profile" ";; Source: 65-apps/claude-app.sb"
-  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes VS Code app profile" ";; Source: 65-apps/vscode-app.sb"
-  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Claude Code profile" ";; Source: 60-agents/claude-code.sb"
-  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Codex profile" ";; Source: 60-agents/codex.sb"
-  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Goose profile" ";; Source: 60-agents/goose.sb"
-  assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes Kilo Code profile" ";; Source: 60-agents/kilo-code.sb"
+  for policy_marker in \
+    ";; Source: 65-apps/claude-app.sb" \
+    ";; Source: 65-apps/vscode-app.sb" \
+    ";; Source: 60-agents/claude-code.sb" \
+    ";; Source: 60-agents/codex.sb" \
+    ";; Source: 60-agents/goose.sb" \
+    ";; Source: 60-agents/kilo-code.sb"; do
+    assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes expected marker (${policy_marker})" "$policy_marker"
+  done
   policy_enable_wide_read="${TEST_CWD}/policy-enable-wide-read.sb"
   assert_command_succeeds "--enable=wide-read adds broad read-only filesystem visibility" "$GENERATOR" --output "$policy_enable_wide_read" --enable=wide-read
   assert_policy_contains "$policy_enable_wide_read" "--enable=wide-read emits wide-read marker" "#safehouse-test-id:wide-read#"
@@ -110,8 +114,8 @@ run_section_cli_edge_cases() {
   policy_dedup_paths="${TEST_CWD}/policy-dedup-paths.sb"
   assert_command_succeeds "duplicate --add-dirs and --add-dirs-ro entries are deduplicated" "$GENERATOR" --workdir="" --output "$policy_dedup_paths" --add-dirs-ro="${TEST_RO_DIR}:${TEST_RO_DIR}" --add-dirs="${TEST_RW_DIR}:${TEST_RW_DIR}"
   local ro_grant_count rw_grant_count
-  ro_grant_count="$(grep -F -c "(subpath \"${TEST_RO_DIR}\")" "$policy_dedup_paths" || true)"
-  rw_grant_count="$(grep -F -c "file-read* file-write* (subpath \"${resolved_test_rw_dir}\")" "$policy_dedup_paths" || true)"
+  ro_grant_count="$(rg -F -c "(subpath \"${TEST_RO_DIR}\")" "$policy_dedup_paths" || true)"
+  rw_grant_count="$(rg -F -c "file-read* file-write* (subpath \"${resolved_test_rw_dir}\")" "$policy_dedup_paths" || true)"
   if [[ "$ro_grant_count" -eq 1 ]]; then
     log_pass "duplicate read-only grants collapse to one emitted rule"
   else
@@ -257,34 +261,43 @@ EOF
   assert_policy_contains "$policy_agent_unknown" "unknown command policy emits skip note for scoped profile layers" "No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
 
   assert_command_succeeds "safehouse detects Claude.app command path and includes claude-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_claude_app" -- "$fake_claude_app_bin"
-  assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes claude-app app profile" ";; Source: 65-apps/claude-app.sb"
-  assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes macOS GUI desktop workflow grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
-  assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects keychain integration from profile metadata" ";; Integration: Keychain"
-  assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects macOS GUI integration from profile metadata" ";; Integration: macOS GUI"
-  assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects electron integration from profile metadata" "#safehouse-test-id:electron-integration#"
+  for policy_marker in \
+    ";; Source: 65-apps/claude-app.sb" \
+    "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
+    ";; Integration: Keychain" \
+    ";; Integration: macOS GUI" \
+    "#safehouse-test-id:electron-integration#"; do
+    assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes expected marker (${policy_marker})" "$policy_marker"
+  done
   assert_policy_contains "$policy_agent_claude_app" "Claude.app preamble reports implicit optional integrations from profile requirements" "Optional integrations implicitly injected: macos-gui electron"
   assert_policy_not_contains "$policy_agent_claude_app" "Claude.app command omits claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
   assert_command_succeeds "safehouse detects Visual Studio Code.app command path and includes vscode-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_vscode_app" -- "$fake_vscode_app_bin"
-  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes vscode-app app profile" ";; Source: 65-apps/vscode-app.sb"
-  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes macOS GUI desktop workflow grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
-  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects keychain integration from profile metadata" ";; Integration: Keychain"
-  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects macOS GUI integration from profile metadata" ";; Integration: macOS GUI"
-  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects electron integration from profile metadata" "#safehouse-test-id:electron-integration#"
+  for policy_marker in \
+    ";; Source: 65-apps/vscode-app.sb" \
+    "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
+    ";; Integration: Keychain" \
+    ";; Integration: macOS GUI" \
+    "#safehouse-test-id:electron-integration#"; do
+    assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes expected marker (${policy_marker})" "$policy_marker"
+  done
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app policy includes VSCode preference plist literal for direct write/unlink flows" "(home-literal \"/Library/Preferences/com.microsoft.VSCode.plist\")"
   assert_policy_not_contains "$policy_agent_vscode_app" "Visual Studio Code.app command omits claude-app app profile" ";; Source: 65-apps/claude-app.sb"
 
   assert_command_succeeds "--enable=all-agents in execute mode restores full scoped profile inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes Claude Desktop app profile" ";; Source: 65-apps/claude-app.sb"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes macOS GUI desktop workflow grant" "(global-name \"com.apple.backgroundtaskmanagementagent\")"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes VS Code app profile" ";; Source: 65-apps/vscode-app.sb"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes codex profile" ";; Source: 60-agents/codex.sb"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes goose profile" ";; Source: 60-agents/goose.sb"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes kilo-code profile" ";; Source: 60-agents/kilo-code.sb"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes keychain integration when required profiles are loaded" ";; Integration: Keychain"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes macOS GUI integration when required profiles are loaded" ";; Integration: macOS GUI"
-  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes electron integration when required profiles are loaded" "#safehouse-test-id:electron-integration#"
+  for policy_marker in \
+    ";; Source: 65-apps/claude-app.sb" \
+    "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
+    ";; Source: 65-apps/vscode-app.sb" \
+    ";; Source: 60-agents/codex.sb" \
+    ";; Source: 60-agents/claude-code.sb" \
+    ";; Source: 60-agents/goose.sb" \
+    ";; Source: 60-agents/kilo-code.sb" \
+    ";; Integration: Keychain" \
+    ";; Integration: macOS GUI" \
+    "#safehouse-test-id:electron-integration#"; do
+    assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes expected marker (${policy_marker})" "$policy_marker"
+  done
 
   rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents"
   rm -rf "$fake_claude_app_dir" "$fake_vscode_app_dir"
@@ -352,7 +365,7 @@ EOF
   fi
   printf 'sentinel-old\n' > "$output_nested"
   assert_command_succeeds "--output overwrites existing policy file" "$GENERATOR" --output "$output_nested"
-  if grep -Fq "sentinel-old" "$output_nested"; then
+  if rg -Fq "sentinel-old" "$output_nested"; then
     log_fail "--output overwrite replaces previous file contents"
   else
     log_pass "--output overwrite replaces previous file contents"
