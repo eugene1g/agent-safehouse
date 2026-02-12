@@ -466,13 +466,11 @@ profile_declares_requirement() {
 selected_profiles_require_integration() {
   local integration="$1"
   local integration_normalized selected_profile profile_path profile_key
-  local keychain_requirement_normalized
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
-  keychain_requirement_normalized="$(to_lowercase "$keychain_requirement_token")"
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
     [[ "$selected_profiles_require_keychain" -eq 1 ]]
     return
   fi
@@ -490,22 +488,24 @@ selected_profiles_require_integration() {
     done
   else
     resolve_selected_agent_profiles
-    for selected_profile in "${selected_agent_profile_basenames[@]-}"; do
-      profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
+    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
+      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
+        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
 
-      profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
-    done
+        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
+      done
+    fi
   fi
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"
     selected_profiles_require_keychain_resolved=1
   fi
@@ -516,18 +516,20 @@ selected_profiles_require_integration() {
 append_profile() {
   local target="$1"
   local source="$2"
-  local key
+  local key content
 
   key="$(profile_key_from_source "$source")"
-  if embedded_profile_body "$key" >> "$target"; then
-    echo "" >> "$target"
+  if content="$(embedded_profile_body "$key" 2>/dev/null)"; then
+    append_policy_chunk "$content"
+    append_policy_chunk ""
     return
   fi
 
   # Fallback: read from disk (needed for --append-profile with external files).
   if [[ -f "$source" ]]; then
-    cat "$source" >> "$target"
-    echo "" >> "$target"
+    content="$(<"$source")"
+    append_policy_chunk "$content"
+    append_policy_chunk ""
     return
   fi
 
@@ -539,12 +541,11 @@ append_resolved_base_profile() {
   local target="$1"
   local source="$2"
   local escaped_home key resolved_base
+  local first_line rest
 
   escaped_home="$(escape_for_sb "$home_dir")"
   key="$(profile_key_from_source "$source")"
-  resolved_base="$(mktemp "${TMPDIR:-/tmp}/safehouse-base-resolved.XXXXXX")"
-
-  if ! embedded_profile_body "$key" | awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
+  if ! resolved_base="$(embedded_profile_body "$key" | awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
     BEGIN { replaced = 0 }
     {
       line = $0
@@ -559,20 +560,24 @@ append_resolved_base_profile() {
         exit 64
       }
     }
-  ' > "$resolved_base"; then
-    rm -f "$resolved_base"
+  ')"; then
     echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
     echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
     exit 1
   fi
 
-  head -n 1 "$resolved_base" >> "$target"
-  echo "" >> "$target"
-  emit_policy_origin_preamble "$target"
-  tail -n +2 "$resolved_base" >> "$target"
-  echo "" >> "$target"
+  first_line="${resolved_base%%$'\n'*}"
+  if [[ "$resolved_base" == *$'\n'* ]]; then
+    rest="${resolved_base#*$'\n'}"
+  else
+    rest=""
+  fi
 
-  rm -f "$resolved_base"
+  append_policy_chunk "$first_line"
+  append_policy_chunk ""
+  emit_policy_origin_preamble "$target"
+  append_policy_chunk "$rest"
+  append_policy_chunk ""
 }
 
 append_all_module_profiles() {
@@ -633,11 +638,9 @@ append_all_module_profiles() {
     if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
       resolve_selected_agent_profiles
       if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
-        {
-          echo ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-          echo ";; Use --enable=all-agents to restore legacy all-profile behavior."
-          echo ""
-        } >> "$target"
+        append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
+        append_policy_chunk ";; Use --enable=all-agents to restore legacy all-profile behavior."
+        append_policy_chunk ""
       fi
     fi
     return 0
@@ -664,12 +667,14 @@ append_optional_integration_profiles() {
       ;;
   esac
 
+  ensure_optional_integrations_classified
+
   for key in "${PROFILE_KEYS[@]}"; do
     [[ "$key" == "profiles/55-integrations-optional/"* ]] || continue
     found_any=1
 
-    base_name="$(basename "$key")"
-    should_include_optional_integration_profile "$base_name" || continue
+    base_name="${key##*/}"
+    optional_integration_classified_included "$base_name" || continue
 
     append_profile "$target" "$key"
   done

@@ -2275,13 +2275,15 @@ should_include_agent_profile_file() {
   fi
 
   resolve_selected_agent_profiles
-  base_name="$(basename "$file_path")"
+  base_name="${file_path##*/}"
 
-  for selected_profile in "${selected_agent_profile_basenames[@]-}"; do
-    if [[ "$selected_profile" == "$base_name" ]]; then
-      return 0
-    fi
-  done
+  if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
+    for selected_profile in "${selected_agent_profile_basenames[@]}"; do
+      if [[ "$selected_profile" == "$base_name" ]]; then
+        return 0
+      fi
+    done
+  fi
 
   return 1
 }
@@ -2321,13 +2323,11 @@ profile_declares_requirement() {
 selected_profiles_require_integration() {
   local integration="$1"
   local integration_normalized selected_profile profile_path file
-  local keychain_requirement_normalized
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
-  keychain_requirement_normalized="$(to_lowercase "$keychain_requirement_token")"
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
     [[ "$selected_profiles_require_keychain" -eq 1 ]]
     return
   fi
@@ -2342,22 +2342,24 @@ selected_profiles_require_integration() {
     done < <(find "${PROFILES_DIR}/60-agents" "${PROFILES_DIR}/65-apps" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
   else
     resolve_selected_agent_profiles
-    for selected_profile in "${selected_agent_profile_basenames[@]-}"; do
-      profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
+    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
+      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
+        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
 
-      profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
-    done
+        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
+      done
+    fi
   fi
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"
     selected_profiles_require_keychain_resolved=1
   fi
@@ -2366,52 +2368,58 @@ selected_profiles_require_integration() {
 }
 
 # Policy assembly and rule emission.
+policy_chunks=()
+optional_integrations_classified=0
+
+append_policy_chunk() {
+	local chunk="$1"
+	policy_chunks+=("$chunk")
+}
 
 append_profile() {
-  local target="$1"
-  local source="$2"
-  if [[ ! -f "$source" ]]; then
-    echo "Missing profile module: ${source}" >&2
-    exit 1
-  fi
-  cat "$source" >> "$target"
-  echo "" >> "$target"
+	local target="$1"
+	local source="$2"
+	local content
+	if [[ ! -f "$source" ]]; then
+		echo "Missing profile module: ${source}" >&2
+		exit 1
+	fi
+	content="$(<"$source")"
+	append_policy_chunk "$content"
+	append_policy_chunk ""
 }
 
 emit_policy_origin_preamble() {
   local target="$1"
 
-  cat >> "$target" <<EOF
-;; ---------------------------------------------------------------------------
-;; ${safehouse_project_name} Policy (generated file)
-;; Project: ${safehouse_project_url}
-;; GitHub: ${safehouse_project_github_url}
-;; Contribute: ${safehouse_project_github_url}
-;;
-;; Debug sandbox denials (examples):
-;;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS "Sandbox:" AND eventMessage CONTAINS "deny("'
-;;   /usr/bin/log stream --style compact --info --debug --predicate '(processID == 0) AND (senderImagePath CONTAINS "/Sandbox")'
-;; ---------------------------------------------------------------------------
-
-EOF
+  append_policy_chunk ";; ---------------------------------------------------------------------------"
+  append_policy_chunk ";; ${safehouse_project_name} Policy (generated file)"
+  append_policy_chunk ";; Project: ${safehouse_project_url}"
+  append_policy_chunk ";; GitHub: ${safehouse_project_github_url}"
+  append_policy_chunk ";; Contribute: ${safehouse_project_github_url}"
+  append_policy_chunk ";;"
+  append_policy_chunk ";; Debug sandbox denials (examples):"
+  append_policy_chunk ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
+  append_policy_chunk ";;   /usr/bin/log stream --style compact --info --debug --predicate '(processID == 0) AND (senderImagePath CONTAINS \"/Sandbox\")'"
+  append_policy_chunk ";; ---------------------------------------------------------------------------"
+  append_policy_chunk ""
 }
 
 append_resolved_base_profile() {
-  local target="$1"
-  local source="$2"
-  local escaped_home
-  local resolved_base
-  escaped_home="$(escape_for_sb "$home_dir")"
+	local target="$1"
+	local source="$2"
+	local escaped_home
+	local resolved_base
+	local first_line rest
+	escaped_home="$(escape_for_sb "$home_dir")"
 
-  if [[ ! -f "$source" ]]; then
-    echo "Missing profile module: ${source}" >&2
-    exit 1
-  fi
+	if [[ ! -f "$source" ]]; then
+		echo "Missing profile module: ${source}" >&2
+		exit 1
+	fi
 
-  resolved_base="$(mktemp "${TMPDIR:-/tmp}/safehouse-base-resolved.XXXXXX")"
-
-  # HOME_DIR in 00-base.sb uses a literal replacement token; inline HOME here.
-  awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
+	# HOME_DIR in 00-base.sb uses a literal replacement token; inline HOME here.
+	if ! resolved_base="$(awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
     BEGIN { replaced = 0 }
     {
       line = $0
@@ -2426,488 +2434,524 @@ append_resolved_base_profile() {
         exit 64
       }
     }
-  ' "$source" > "$resolved_base" || {
-    rm -f "$resolved_base"
-    echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
-    echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
-    exit 1
-  }
+  ' "$source")"; then
+		echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
+		echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
+		exit 1
+	fi
 
-  head -n 1 "$resolved_base" >> "$target"
-  echo "" >> "$target"
-  emit_policy_origin_preamble "$target"
-  tail -n +2 "$resolved_base" >> "$target"
-  echo "" >> "$target"
+	first_line="${resolved_base%%$'\n'*}"
+	if [[ "$resolved_base" == *$'\n'* ]]; then
+		rest="${resolved_base#*$'\n'}"
+	else
+		rest=""
+	fi
 
-  rm -f "$resolved_base"
+	append_policy_chunk "$first_line"
+	append_policy_chunk ""
+	emit_policy_origin_preamble "$target"
+	append_policy_chunk "$rest"
+	append_policy_chunk ""
 }
 
 append_all_module_profiles() {
-  local target="$1"
-  local base_dir="$2"
-  local file
-  local found_any=0
-  local appended_any=0
-  local is_scoped_profile_dir=0
-  local emit_no_match_note=0
+	local target="$1"
+	local base_dir="$2"
+	local file
+	local found_any=0
+	local appended_any=0
+	local is_scoped_profile_dir=0
+	local emit_no_match_note=0
 
-  case "$base_dir" in
-    "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
-      is_scoped_profile_dir=1
-      emit_no_match_note=1
-      ;;
-    "${PROFILES_DIR}/65-apps"|"profiles/65-apps")
-      is_scoped_profile_dir=1
-      ;;
-  esac
+	case "$base_dir" in
+	"${PROFILES_DIR}/60-agents" | "profiles/60-agents")
+		is_scoped_profile_dir=1
+		emit_no_match_note=1
+		;;
+	"${PROFILES_DIR}/65-apps" | "profiles/65-apps")
+		is_scoped_profile_dir=1
+		;;
+	esac
 
-  while IFS= read -r file; do
-    [[ -n "$file" ]] || continue
-    found_any=1
+	while IFS= read -r file; do
+		[[ -n "$file" ]] || continue
+		found_any=1
 
-    if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$file"; then
-      continue
-    fi
+		if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$file"; then
+			continue
+		fi
 
-    appended_any=1
-    append_profile "$target" "$file"
-  done < <(find "$base_dir" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
+		appended_any=1
+		append_profile "$target" "$file"
+	done < <(find "$base_dir" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
 
-  if [[ "$found_any" -eq 0 ]]; then
-    echo "No module profiles found in: ${base_dir}" >&2
-    exit 1
-  fi
+	if [[ "$found_any" -eq 0 ]]; then
+		echo "No module profiles found in: ${base_dir}" >&2
+		exit 1
+	fi
 
-  if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
-    if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-      return 0
-    fi
+	if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
+		if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+			return 0
+		fi
 
-    if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
-      resolve_selected_agent_profiles
-      if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
-        {
-          echo ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-          echo ";; Use --enable=all-agents to restore legacy all-profile behavior."
-          echo ""
-        } >> "$target"
-      fi
-    fi
-    return 0
-  fi
+		if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
+			resolve_selected_agent_profiles
+			if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
+				append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
+				append_policy_chunk ";; Use --enable=all-agents to restore legacy all-profile behavior."
+				append_policy_chunk ""
+			fi
+		fi
+		return 0
+	fi
 
-  if [[ "$appended_any" -eq 0 ]]; then
-    echo "No module profiles selected in: ${base_dir}" >&2
-    exit 1
-  fi
+	if [[ "$appended_any" -eq 0 ]]; then
+		echo "No module profiles selected in: ${base_dir}" >&2
+		exit 1
+	fi
 }
 
 should_include_optional_integration_profile() {
-  local profile_basename="$1"
-  local feature integration_token
+	local profile_basename="$1"
+	local feature integration_token
 
-  integration_token="55-integrations-optional/${profile_basename}"
+	integration_token="55-integrations-optional/${profile_basename}"
 
-  case "$profile_basename" in
-    keychain.sb)
-      selected_profiles_require_integration "$integration_token" \
-        || optional_enabled_integrations_require_integration "$integration_token"
-      return
-      ;;
-  esac
+	case "$profile_basename" in
+	keychain.sb)
+		selected_profiles_require_integration "$integration_token" ||
+			optional_enabled_integrations_require_integration "$integration_token"
+		return
+		;;
+	esac
 
-  feature="$(optional_integration_feature_from_profile_basename "$profile_basename")" || {
-    echo "Unknown optional integration profile: ${profile_basename}" >&2
-    exit 1
-  }
+	feature="$(optional_integration_feature_from_profile_basename "$profile_basename")" || {
+		echo "Unknown optional integration profile: ${profile_basename}" >&2
+		exit 1
+	}
 
-  optional_integration_feature_enabled "$feature" \
-    || selected_profiles_require_integration "$integration_token" \
-    || optional_enabled_integrations_require_integration "$integration_token"
+	optional_integration_feature_enabled "$feature" ||
+		selected_profiles_require_integration "$integration_token" ||
+		optional_enabled_integrations_require_integration "$integration_token"
 }
 
 classify_optional_integrations() {
-  local feature profile_basename
+	local feature profile_basename
 
-  optional_integrations_explicit_included=()
-  optional_integrations_implicit_included=()
-  optional_integrations_not_included=()
+	optional_integrations_explicit_included=()
+	optional_integrations_implicit_included=()
+	optional_integrations_not_included=()
+	optional_integrations_classified=0
 
-  for feature in "${optional_integration_features[@]-}"; do
-    profile_basename="${feature}.sb"
-    if should_include_optional_integration_profile "$profile_basename"; then
-      if optional_integration_feature_enabled "$feature"; then
-        optional_integrations_explicit_included+=("$feature")
-      else
-        optional_integrations_implicit_included+=("$feature")
-      fi
-    else
-      optional_integrations_not_included+=("$feature")
-    fi
-  done
+	for feature in "${optional_integration_features[@]-}"; do
+		profile_basename="${feature}.sb"
+		if should_include_optional_integration_profile "$profile_basename"; then
+			if optional_integration_feature_enabled "$feature"; then
+				optional_integrations_explicit_included+=("$feature")
+			else
+				optional_integrations_implicit_included+=("$feature")
+			fi
+		else
+			optional_integrations_not_included+=("$feature")
+		fi
+	done
+
+	optional_integrations_classified=1
+}
+
+ensure_optional_integrations_classified() {
+	if [[ "$optional_integrations_classified" -eq 1 ]]; then
+		return 0
+	fi
+	classify_optional_integrations
+}
+
+optional_integration_classified_included() {
+	local profile_basename="$1"
+	local feature
+	local integration_token
+
+	case "$profile_basename" in
+	keychain.sb)
+		integration_token="55-integrations-optional/${profile_basename}"
+		selected_profiles_require_integration "$integration_token" ||
+			optional_enabled_integrations_require_integration "$integration_token"
+		return
+		;;
+	esac
+
+	feature="$(optional_integration_feature_from_profile_basename "$profile_basename")" || {
+		echo "Unknown optional integration profile: ${profile_basename}" >&2
+		exit 1
+	}
+
+	array_contains_exact "$feature" "${optional_integrations_explicit_included[@]-}" ||
+		array_contains_exact "$feature" "${optional_integrations_implicit_included[@]-}"
 }
 
 emit_integration_preamble() {
   local target="$1"
   local keychain_status="not included"
 
-  classify_optional_integrations
+	ensure_optional_integrations_classified
 
-  if should_include_optional_integration_profile "keychain.sb"; then
+  if optional_integration_classified_included "keychain.sb"; then
     keychain_status="included"
   fi
 
-  echo ";; Optional integrations explicitly enabled: $(join_by_space "${optional_integrations_explicit_included[@]-}")" >> "$target"
-  echo ";; Optional integrations implicitly injected: $(join_by_space "${optional_integrations_implicit_included[@]-}")" >> "$target"
-  echo ";; Optional integrations not included: $(join_by_space "${optional_integrations_not_included[@]-}")" >> "$target"
-  echo ";; Keychain integration (auto-injected from profile requirements): ${keychain_status}" >> "$target"
-  echo ";; Use --enable=<feature> (comma-separated) to include optional integrations explicitly." >> "$target"
-  echo ";; Note: selected app/agent profiles and enabled integrations can inject dependencies via \$\$require=<integration-profile-path>\$\$ metadata." >> "$target"
-  echo ";; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox." >> "$target"
-  echo "" >> "$target"
+  append_policy_chunk ";; Optional integrations explicitly enabled: $(join_by_space "${optional_integrations_explicit_included[@]-}")"
+  append_policy_chunk ";; Optional integrations implicitly injected: $(join_by_space "${optional_integrations_implicit_included[@]-}")"
+  append_policy_chunk ";; Optional integrations not included: $(join_by_space "${optional_integrations_not_included[@]-}")"
+  append_policy_chunk ";; Keychain integration (auto-injected from profile requirements): ${keychain_status}"
+  append_policy_chunk ";; Use --enable=<feature> (comma-separated) to include optional integrations explicitly."
+  append_policy_chunk ";; Note: selected app/agent profiles and enabled integrations can inject dependencies via \$\$require=<integration-profile-path>\$\$ metadata."
+  append_policy_chunk ";; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox."
+  append_policy_chunk ""
 }
 
 append_optional_integration_profiles() {
-  local target="$1"
-  local base_dir="$2"
-  local file
-  local found_any=0
+	local target="$1"
+	local base_dir="$2"
+	local file
+	local base_name
+	local found_any=0
 
-  while IFS= read -r file; do
-    [[ -n "$file" ]] || continue
-    found_any=1
+	ensure_optional_integrations_classified
 
-    local base_name
-    base_name="$(basename "$file")"
-    should_include_optional_integration_profile "$base_name" || continue
+	while IFS= read -r file; do
+		[[ -n "$file" ]] || continue
+		found_any=1
 
-    append_profile "$target" "$file"
-  done < <(find "$base_dir" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
+		base_name="${file##*/}"
+		optional_integration_classified_included "$base_name" || continue
 
-  if [[ "$found_any" -eq 0 ]]; then
-    echo "No optional integration profiles found in: ${base_dir}" >&2
-    exit 1
-  fi
+		append_profile "$target" "$file"
+	done < <(find "$base_dir" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
+
+	if [[ "$found_any" -eq 0 ]]; then
+		echo "No optional integration profiles found in: ${base_dir}" >&2
+		exit 1
+	fi
 }
 
 emit_path_ancestor_literals() {
-  local path="$1"
-  local label="$2"
+	local path="$1"
+	local label="$2"
+	local chunk
+	local trimmed cur IFS part escaped_cur
+	local -a parts=()
 
-  {
-    echo ";; Generated ancestor directory literals for ${label}: ${path}"
-    echo ";;"
-    echo ";; Why file-read* (not file-read-metadata) with literal (not subpath):"
-    echo ";; Agents (notably Claude Code) call readdir() on every ancestor of the working"
-    echo ";; directory during startup. If only file-read-metadata (stat) is granted, the"
-    echo ";; agent cannot list directory contents, which causes it to blank PATH and break."
-    echo ";; Using 'literal' (not 'subpath') keeps this safe: it grants read access to the"
-    echo ";; directory entry itself (i.e. listing its immediate children), but does NOT"
-    echo ";; grant recursive read access to files or subdirectories under it."
-    echo "(allow file-read*"
-    echo "    (literal \"/\")"
+	chunk=";; Generated ancestor directory literals for ${label}: ${path}"
+	chunk+=$'\n;;'
+	chunk+=$'\n;; Why file-read* (not file-read-metadata) with literal (not subpath):'
+	chunk+=$'\n;; Agents (notably Claude Code) call readdir() on every ancestor of the working'
+	chunk+=$'\n;; directory during startup. If only file-read-metadata (stat) is granted, the'
+	chunk+=$'\n;; agent cannot list directory contents, which causes it to blank PATH and break.'
+	chunk+=$'\n;; Using '\''literal'\'' (not '\''subpath'\'') keeps this safe: it grants read access to the'
+	chunk+=$'\n;; directory entry itself (i.e. listing its immediate children), but does NOT'
+	chunk+=$'\n;; grant recursive read access to files or subdirectories under it.'
+	chunk+=$'\n(allow file-read*'
+	chunk+=$'\n    (literal "/")'
 
-    local trimmed cur IFS part escaped_cur
-    local -a parts=()
-    trimmed="${path#/}"
-    if [[ -n "$trimmed" ]]; then
-      cur=""
-      IFS='/'
-      read -r -a parts <<< "$trimmed"
-      for part in "${parts[@]}"; do
-        [[ -z "$part" ]] && continue
-        cur+="/${part}"
-        escaped_cur="$(escape_for_sb "$cur")"
-        echo "    (literal \"${escaped_cur}\")"
-      done
-    fi
+	trimmed="${path#/}"
+	if [[ -n "$trimmed" ]]; then
+		cur=""
+		IFS='/'
+		read -r -a parts <<<"$trimmed"
+		for part in "${parts[@]}"; do
+			[[ -z "$part" ]] && continue
+			cur+="/${part}"
+			escaped_cur="$(escape_for_sb "$cur")"
+			chunk+="$(printf '\n    (literal "%s")' "$escaped_cur")"
+		done
+	fi
 
-    echo ")"
-    echo ""
-  }
+	chunk+=$'\n)\n'
+	append_policy_chunk "$chunk"
 }
 
 emit_extra_access_rules() {
-  local target="$1"
-  local path escaped
+	local target="$1"
+	local path escaped
 
-  if [[ "$readonly_count" -eq 0 && "$rw_count" -eq 0 ]]; then
-    return
-  fi
+	if [[ "$readonly_count" -eq 0 && "$rw_count" -eq 0 ]]; then
+		return
+	fi
 
-  {
-    echo ";; #safehouse-test-id:dynamic-cli-grants# Additional dynamic path grants from config/env/CLI."
-    echo ";; NOTE: appended profile denies (--append-profile) may still block sensitive paths."
-    echo ";; Emission order here is: add-dirs-ro sources first, then add-dirs sources."
-    echo ""
-  } >> "$target"
+	append_policy_chunk ";; #safehouse-test-id:dynamic-cli-grants# Additional dynamic path grants from config/env/CLI."
+	append_policy_chunk ";; NOTE: appended profile denies (--append-profile) may still block sensitive paths."
+	append_policy_chunk ";; Emission order here is: add-dirs-ro sources first, then add-dirs sources."
+	append_policy_chunk ""
 
-  if [[ "$readonly_count" -gt 0 ]]; then
-    # Emit read-only extras first.
-    for path in "${readonly_paths[@]}"; do
-      emit_path_ancestor_literals "$path" "extra read-only path" >> "$target"
-      escaped="$(escape_for_sb "$path")"
-      if [[ -d "$path" ]]; then
-        echo "(allow file-read* (subpath \"${escaped}\"))" >> "$target"
-      else
-        echo "(allow file-read* (literal \"${escaped}\"))" >> "$target"
-      fi
-      echo "" >> "$target"
-    done
-  fi
+	if [[ "$readonly_count" -gt 0 ]]; then
+		# Emit read-only extras first.
+		for path in "${readonly_paths[@]}"; do
+			emit_path_ancestor_literals "$path" "extra read-only path"
+			escaped="$(escape_for_sb "$path")"
+			if [[ -d "$path" ]]; then
+				append_policy_chunk "(allow file-read* (subpath \"${escaped}\"))"
+			else
+				append_policy_chunk "(allow file-read* (literal \"${escaped}\"))"
+			fi
+			append_policy_chunk ""
+		done
+	fi
 
-  if [[ "$rw_count" -gt 0 ]]; then
-    # Emit read/write extras after read-only extras.
-    for path in "${rw_paths[@]}"; do
-      emit_path_ancestor_literals "$path" "extra read/write path" >> "$target"
-      escaped="$(escape_for_sb "$path")"
-      if [[ -d "$path" ]]; then
-        echo "(allow file-read* file-write* (subpath \"${escaped}\"))" >> "$target"
-      else
-        echo "(allow file-read* file-write* (literal \"${escaped}\"))" >> "$target"
-      fi
-      echo "" >> "$target"
-    done
-  fi
+	if [[ "$rw_count" -gt 0 ]]; then
+		# Emit read/write extras after read-only extras.
+		for path in "${rw_paths[@]}"; do
+			emit_path_ancestor_literals "$path" "extra read/write path"
+			escaped="$(escape_for_sb "$path")"
+			if [[ -d "$path" ]]; then
+				append_policy_chunk "(allow file-read* file-write* (subpath \"${escaped}\"))"
+			else
+				append_policy_chunk "(allow file-read* file-write* (literal \"${escaped}\"))"
+			fi
+			append_policy_chunk ""
+		done
+	fi
 }
 
 emit_wide_read_access() {
-  local target="$1"
+	local target="$1"
 
-  if [[ "$enable_wide_read_access" -ne 1 ]]; then
-    return 0
-  fi
+	if [[ "$enable_wide_read_access" -ne 1 ]]; then
+		return 0
+	fi
 
-  {
-    echo ";; #safehouse-test-id:wide-read# Broad read-only visibility across the full filesystem."
-    echo ";; Added by --enable=wide-read. This emits a recursive read grant on /."
-    echo ";; WARNING: because this rule is emitted late, it can override earlier deny file-read* rules."
-    echo ";; Use --append-profile deny rules if you must keep specific paths unreadable."
-    echo "(allow file-read* (subpath \"/\"))"
-    echo ""
-  } >> "$target"
+	append_policy_chunk ";; #safehouse-test-id:wide-read# Broad read-only visibility across the full filesystem."
+	append_policy_chunk ";; Added by --enable=wide-read. This emits a recursive read grant on /."
+	append_policy_chunk ";; WARNING: because this rule is emitted late, it can override earlier deny file-read* rules."
+	append_policy_chunk ";; Use --append-profile deny rules if you must keep specific paths unreadable."
+	append_policy_chunk "(allow file-read* (subpath \"/\"))"
+	append_policy_chunk ""
 }
 
 emit_workdir_access() {
-  local target="$1"
-  local path="$2"
-  local escaped
+	local target="$1"
+	local path="$2"
+	local escaped
 
-  if [[ -z "$path" ]]; then
-    return 0
-  fi
+	if [[ -z "$path" ]]; then
+		return 0
+	fi
 
-  {
-    echo ";; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir."
-  } >> "$target"
+	append_policy_chunk ";; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir."
 
-  emit_path_ancestor_literals "$path" "selected workdir" >> "$target"
-  escaped="$(escape_for_sb "$path")"
-  if [[ -d "$path" ]]; then
-    echo "(allow file-read* file-write* (subpath \"${escaped}\"))" >> "$target"
-  else
-    echo "(allow file-read* file-write* (literal \"${escaped}\"))" >> "$target"
-  fi
-  echo "" >> "$target"
+	emit_path_ancestor_literals "$path" "selected workdir"
+	escaped="$(escape_for_sb "$path")"
+	if [[ -d "$path" ]]; then
+		append_policy_chunk "(allow file-read* file-write* (subpath \"${escaped}\"))"
+	else
+		append_policy_chunk "(allow file-read* file-write* (literal \"${escaped}\"))"
+	fi
+	append_policy_chunk ""
 }
 
 array_contains_exact() {
-  local needle="$1"
-  shift
+	local needle="$1"
+	shift
 
-  local value
-  for value in "$@"; do
-    if [[ "$value" == "$needle" ]]; then
-      return 0
-    fi
-  done
+	local value
+	for value in "$@"; do
+		if [[ "$value" == "$needle" ]]; then
+			return 0
+		fi
+	done
 
-  return 1
+	return 1
 }
 
 append_colon_paths() {
-  local path_list="$1"
-  local mode="$2"
-  local IFS=':'
-  local part trimmed expanded resolved
-  local -a parts=()
+	local path_list="$1"
+	local mode="$2"
+	local IFS=':'
+	local part trimmed expanded resolved
+	local -a parts=()
 
-  read -r -a parts <<< "$path_list"
-  for part in "${parts[@]}"; do
-    trimmed="$(trim_whitespace "$part")"
-    [[ -n "$trimmed" ]] || continue
+	read -r -a parts <<<"$path_list"
+	for part in "${parts[@]}"; do
+		trimmed="$(trim_whitespace "$part")"
+		[[ -n "$trimmed" ]] || continue
 
-    expanded="$(expand_tilde "$trimmed")"
+		expanded="$(expand_tilde "$trimmed")"
 
-    if [[ ! -e "$expanded" ]]; then
-      echo "Path does not exist: ${trimmed}" >&2
-      exit 1
-    fi
+		if [[ ! -e "$expanded" ]]; then
+			echo "Path does not exist: ${trimmed}" >&2
+			exit 1
+		fi
 
-    resolved="$(normalize_abs_path "$expanded")"
-    if [[ "$mode" == "readonly" ]]; then
-      if array_contains_exact "$resolved" "${readonly_paths[@]-}"; then
-        continue
-      fi
-      readonly_paths+=("$resolved")
-      readonly_count=$((readonly_count + 1))
-    else
-      if array_contains_exact "$resolved" "${rw_paths[@]-}"; then
-        continue
-      fi
-      rw_paths+=("$resolved")
-      rw_count=$((rw_count + 1))
-    fi
-  done
+		resolved="$(normalize_abs_path "$expanded")"
+		if [[ "$mode" == "readonly" ]]; then
+			if array_contains_exact "$resolved" "${readonly_paths[@]-}"; then
+				continue
+			fi
+			readonly_paths+=("$resolved")
+			readonly_count=$((readonly_count + 1))
+		else
+			if array_contains_exact "$resolved" "${rw_paths[@]-}"; then
+				continue
+			fi
+			rw_paths+=("$resolved")
+			rw_count=$((rw_count + 1))
+		fi
+	done
 }
 
 append_cli_profiles() {
-  local target="$1"
-  local source
+	local target="$1"
+	local source
 
-  [[ "${#append_profile_paths[@]}" -gt 0 ]] || return 0
+	[[ "${#append_profile_paths[@]}" -gt 0 ]] || return 0
 
-  for source in "${append_profile_paths[@]}"; do
-    {
-      echo ";; #safehouse-test-id:append-profile# Appended profile from --append-profile: ${source}"
-      echo ""
-    } >> "$target"
-    append_profile "$target" "$source"
-  done
+	for source in "${append_profile_paths[@]}"; do
+		append_policy_chunk ";; #safehouse-test-id:append-profile# Appended profile from --append-profile: ${source}"
+		append_policy_chunk ""
+		append_profile "$target" "$source"
+	done
 }
 
 emit_explain_summary() {
-  local idx reason profile
-  local workdir_status config_status keychain_status
+	local idx reason profile
+	local workdir_status config_status keychain_status
 
-  [[ "$explain_mode" -eq 1 ]] || return 0
+	[[ "$explain_mode" -eq 1 ]] || return 0
 
-  resolve_selected_agent_profiles
-  classify_optional_integrations
+	resolve_selected_agent_profiles
+	ensure_optional_integrations_classified
 
-  if [[ -n "$effective_workdir" ]]; then
-    workdir_status="${effective_workdir}"
-  else
-    workdir_status="(disabled)"
-  fi
+	if [[ -n "$effective_workdir" ]]; then
+		workdir_status="${effective_workdir}"
+	else
+		workdir_status="(disabled)"
+	fi
 
-  if should_include_optional_integration_profile "keychain.sb"; then
-    keychain_status="included"
-  else
-    keychain_status="not included"
-  fi
+	if optional_integration_classified_included "keychain.sb"; then
+		keychain_status="included"
+	else
+		keychain_status="not included"
+	fi
 
-  if [[ -z "$effective_workdir" ]]; then
-    config_status="skipped (workdir disabled)"
-  elif [[ "$workdir_config_loaded" -eq 1 ]]; then
-    config_status="loaded from ${workdir_config_path}"
-  elif [[ "$workdir_config_ignored_untrusted" -eq 1 ]]; then
-    config_status="ignored (untrusted): ${workdir_config_path}"
-  elif [[ "$workdir_config_found" -eq 1 ]]; then
-    config_status="found but not loaded: ${workdir_config_path}"
-  else
-    config_status="not found at ${workdir_config_path}"
-  fi
+	if [[ -z "$effective_workdir" ]]; then
+		config_status="skipped (workdir disabled)"
+	elif [[ "$workdir_config_loaded" -eq 1 ]]; then
+		config_status="loaded from ${workdir_config_path}"
+	elif [[ "$workdir_config_ignored_untrusted" -eq 1 ]]; then
+		config_status="ignored (untrusted): ${workdir_config_path}"
+	elif [[ "$workdir_config_found" -eq 1 ]]; then
+		config_status="found but not loaded: ${workdir_config_path}"
+	else
+		config_status="not found at ${workdir_config_path}"
+	fi
 
-  {
-    echo "safehouse explain:"
-    echo "  effective workdir: ${workdir_status} (source: ${effective_workdir_source:-unknown})"
-    echo "  workdir config trust: $([[ "$trust_workdir_config" -eq 1 ]] && echo "enabled" || echo "disabled") (source: ${trust_workdir_config_source})"
-    echo "  workdir config: ${config_status}"
-    echo "  add-dirs-ro (normalized): $(join_by_space "${readonly_paths[@]-}")"
-    echo "  add-dirs (normalized): $(join_by_space "${rw_paths[@]-}")"
-    echo "  optional integrations explicitly enabled: $(join_by_space "${optional_integrations_explicit_included[@]-}")"
-    echo "  optional integrations implicitly injected: $(join_by_space "${optional_integrations_implicit_included[@]-}")"
-    echo "  optional integrations not included: $(join_by_space "${optional_integrations_not_included[@]-}")"
-    echo "  keychain integration: ${keychain_status}"
-    if [[ -n "${invoked_command_path:-}" ]]; then
-      echo "  invoked command: ${invoked_command_path}"
-    fi
-    if [[ -n "${invoked_command_app_bundle:-}" ]]; then
-      echo "  detected app bundle: ${invoked_command_app_bundle}"
-    fi
-    if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-      echo "  selected scoped profiles: all (via --enable=all-agents)"
-    elif [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
-      echo "  selected scoped profiles: (none)"
-    else
-      for idx in "${!selected_agent_profile_basenames[@]}"; do
-        profile="${selected_agent_profile_basenames[$idx]}"
-        reason="${selected_agent_profile_reasons[$idx]:-selected}"
-        echo "  selected scoped profile: ${profile} (${reason})"
-      done
-    fi
-  } >&2
+	{
+		echo "safehouse explain:"
+		echo "  effective workdir: ${workdir_status} (source: ${effective_workdir_source:-unknown})"
+		echo "  workdir config trust: $([[ "$trust_workdir_config" -eq 1 ]] && echo "enabled" || echo "disabled") (source: ${trust_workdir_config_source})"
+		echo "  workdir config: ${config_status}"
+		echo "  add-dirs-ro (normalized): $(join_by_space "${readonly_paths[@]-}")"
+		echo "  add-dirs (normalized): $(join_by_space "${rw_paths[@]-}")"
+		echo "  optional integrations explicitly enabled: $(join_by_space "${optional_integrations_explicit_included[@]-}")"
+		echo "  optional integrations implicitly injected: $(join_by_space "${optional_integrations_implicit_included[@]-}")"
+		echo "  optional integrations not included: $(join_by_space "${optional_integrations_not_included[@]-}")"
+		echo "  keychain integration: ${keychain_status}"
+		if [[ -n "${invoked_command_path:-}" ]]; then
+			echo "  invoked command: ${invoked_command_path}"
+		fi
+		if [[ -n "${invoked_command_app_bundle:-}" ]]; then
+			echo "  detected app bundle: ${invoked_command_app_bundle}"
+		fi
+		if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+			echo "  selected scoped profiles: all (via --enable=all-agents)"
+		elif [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
+			echo "  selected scoped profiles: (none)"
+		else
+			for idx in "${!selected_agent_profile_basenames[@]}"; do
+				profile="${selected_agent_profile_basenames[$idx]}"
+				reason="${selected_agent_profile_reasons[$idx]:-selected}"
+				echo "  selected scoped profile: ${profile} (${reason})"
+			done
+		fi
+	} >&2
 }
 
 emit_explain_policy_outcome() {
-  local policy_path="$1"
-  local mode_label="$2"
+	local policy_path="$1"
+	local mode_label="$2"
 
-  [[ "$explain_mode" -eq 1 ]] || return 0
-  {
-    echo "  policy file: ${policy_path}"
-    echo "  run mode: ${mode_label}"
-  } >&2
+	[[ "$explain_mode" -eq 1 ]] || return 0
+	{
+		echo "  policy file: ${policy_path}"
+		echo "  run mode: ${mode_label}"
+	} >&2
 }
 
 build_profile() {
-  local tmp
+	local tmp
+	local -a policy_chunks=()
 
-  if [[ -n "$output_path" ]]; then
-    mkdir -p "$(dirname "$output_path")"
-    tmp="$(mktemp "${output_path}.XXXXXX")"
-  else
-    local tmp_dir
-    tmp_dir="${TMPDIR:-/tmp}"
-    if [[ ! -d "$tmp_dir" ]]; then
-      tmp_dir="/tmp"
-    fi
-    tmp="$(mktemp "${tmp_dir%/}/agent-sandbox-policy.XXXXXX")"
-  fi
+	if [[ -n "$output_path" ]]; then
+		mkdir -p "$(dirname "$output_path")"
+		tmp="$(mktemp "${output_path}.XXXXXX")"
+	else
+		local tmp_dir
+		tmp_dir="${TMPDIR:-/tmp}"
+		if [[ ! -d "$tmp_dir" ]]; then
+			tmp_dir="/tmp"
+		fi
+		tmp="$(mktemp "${tmp_dir%/}/agent-sandbox-policy.XXXXXX")"
+	fi
 
-  (
-    trap 'rm -f "$tmp"' EXIT
+	(
+		trap 'rm -f "$tmp"' EXIT
 
-    append_resolved_base_profile "$tmp" "${PROFILES_DIR}/00-base.sb"
-    append_profile "$tmp" "${PROFILES_DIR}/10-system-runtime.sb"
-    append_profile "$tmp" "${PROFILES_DIR}/20-network.sb"
+		append_resolved_base_profile "$tmp" "${PROFILES_DIR}/00-base.sb"
+		append_profile "$tmp" "${PROFILES_DIR}/10-system-runtime.sb"
+		append_profile "$tmp" "${PROFILES_DIR}/20-network.sb"
 
-    append_all_module_profiles "$tmp" "${PROFILES_DIR}/30-toolchains"
-    append_all_module_profiles "$tmp" "${PROFILES_DIR}/40-shared"
-    emit_integration_preamble "$tmp"
-    append_all_module_profiles "$tmp" "${PROFILES_DIR}/50-integrations-core"
-    append_optional_integration_profiles "$tmp" "${PROFILES_DIR}/55-integrations-optional"
-    append_all_module_profiles "$tmp" "${PROFILES_DIR}/60-agents"
-    append_all_module_profiles "$tmp" "${PROFILES_DIR}/65-apps"
+		append_all_module_profiles "$tmp" "${PROFILES_DIR}/30-toolchains"
+		append_all_module_profiles "$tmp" "${PROFILES_DIR}/40-shared"
+		emit_integration_preamble "$tmp"
+		append_all_module_profiles "$tmp" "${PROFILES_DIR}/50-integrations-core"
+		append_optional_integration_profiles "$tmp" "${PROFILES_DIR}/55-integrations-optional"
+		append_all_module_profiles "$tmp" "${PROFILES_DIR}/60-agents"
+		append_all_module_profiles "$tmp" "${PROFILES_DIR}/65-apps"
 
-    # Path-grant order:
-    # 1) add-dirs-ro sources merged in precedence order (config, ENV, CLI) (RO)
-    # 2) add-dirs sources merged in precedence order (config, ENV, CLI) (RW)
-    # 3) optional --enable=wide-read grant (RO, recursive /)
-    # 4) selected workdir (RW; omitted when disabled via --workdir= or SAFEHOUSE_WORKDIR=)
-    # 5) appended profile(s) from --append-profile (final extension point)
-    # Keep the selected workdir grant late among grants so it can take precedence over
-    # add-dirs/add-dirs-ro if order matters. --append-profile rules are appended last.
-    emit_extra_access_rules "$tmp"
-    emit_wide_read_access "$tmp"
-    emit_workdir_access "$tmp" "$effective_workdir"
-    append_cli_profiles "$tmp"
+		# Path-grant order:
+		# 1) add-dirs-ro sources merged in precedence order (config, ENV, CLI) (RO)
+		# 2) add-dirs sources merged in precedence order (config, ENV, CLI) (RW)
+		# 3) optional --enable=wide-read grant (RO, recursive /)
+		# 4) selected workdir (RW; omitted when disabled via --workdir= or SAFEHOUSE_WORKDIR=)
+		# 5) appended profile(s) from --append-profile (final extension point)
+		# Keep the selected workdir grant late among grants so it can take precedence over
+		# add-dirs/add-dirs-ro if order matters. --append-profile rules are appended last.
+		emit_extra_access_rules "$tmp"
+		emit_wide_read_access "$tmp"
+		emit_workdir_access "$tmp" "$effective_workdir"
+		append_cli_profiles "$tmp"
 
-    if [[ -n "$output_path" ]]; then
-      mv "$tmp" "$output_path"
-      trap - EXIT
-      printf '%s\n' "$output_path"
-    else
-      trap - EXIT
-      printf '%s\n' "$tmp"
-    fi
-  )
+		printf '%s\n' "${policy_chunks[@]}" >"$tmp"
+
+		if [[ -n "$output_path" ]]; then
+			mv "$tmp" "$output_path"
+			trap - EXIT
+			printf '%s\n' "$output_path"
+		else
+			trap - EXIT
+			printf '%s\n' "$tmp"
+		fi
+	)
 }
 
 # Top-level policy generation flow.
 
 generate_policy_file() {
+  optional_integrations_classified=0
+  optional_integrations_explicit_included=()
+  optional_integrations_implicit_included=()
+  optional_integrations_not_included=()
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --enable)
@@ -3471,13 +3515,11 @@ profile_declares_requirement() {
 selected_profiles_require_integration() {
   local integration="$1"
   local integration_normalized selected_profile profile_path profile_key
-  local keychain_requirement_normalized
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
-  keychain_requirement_normalized="$(to_lowercase "$keychain_requirement_token")"
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
     [[ "$selected_profiles_require_keychain" -eq 1 ]]
     return
   fi
@@ -3495,22 +3537,24 @@ selected_profiles_require_integration() {
     done
   else
     resolve_selected_agent_profiles
-    for selected_profile in "${selected_agent_profile_basenames[@]-}"; do
-      profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
+    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
+      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
+        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
 
-      profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
-    done
+        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
+      done
+    fi
   fi
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"
     selected_profiles_require_keychain_resolved=1
   fi
@@ -3521,18 +3565,20 @@ selected_profiles_require_integration() {
 append_profile() {
   local target="$1"
   local source="$2"
-  local key
+  local key content
 
   key="$(profile_key_from_source "$source")"
-  if embedded_profile_body "$key" >> "$target"; then
-    echo "" >> "$target"
+  if content="$(embedded_profile_body "$key" 2>/dev/null)"; then
+    append_policy_chunk "$content"
+    append_policy_chunk ""
     return
   fi
 
   # Fallback: read from disk (needed for --append-profile with external files).
   if [[ -f "$source" ]]; then
-    cat "$source" >> "$target"
-    echo "" >> "$target"
+    content="$(<"$source")"
+    append_policy_chunk "$content"
+    append_policy_chunk ""
     return
   fi
 
@@ -3544,12 +3590,11 @@ append_resolved_base_profile() {
   local target="$1"
   local source="$2"
   local escaped_home key resolved_base
+  local first_line rest
 
   escaped_home="$(escape_for_sb "$home_dir")"
   key="$(profile_key_from_source "$source")"
-  resolved_base="$(mktemp "${TMPDIR:-/tmp}/safehouse-base-resolved.XXXXXX")"
-
-  if ! embedded_profile_body "$key" | awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
+  if ! resolved_base="$(embedded_profile_body "$key" | awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
     BEGIN { replaced = 0 }
     {
       line = $0
@@ -3564,20 +3609,24 @@ append_resolved_base_profile() {
         exit 64
       }
     }
-  ' > "$resolved_base"; then
-    rm -f "$resolved_base"
+  ')"; then
     echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
     echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
     exit 1
   fi
 
-  head -n 1 "$resolved_base" >> "$target"
-  echo "" >> "$target"
-  emit_policy_origin_preamble "$target"
-  tail -n +2 "$resolved_base" >> "$target"
-  echo "" >> "$target"
+  first_line="${resolved_base%%$'\n'*}"
+  if [[ "$resolved_base" == *$'\n'* ]]; then
+    rest="${resolved_base#*$'\n'}"
+  else
+    rest=""
+  fi
 
-  rm -f "$resolved_base"
+  append_policy_chunk "$first_line"
+  append_policy_chunk ""
+  emit_policy_origin_preamble "$target"
+  append_policy_chunk "$rest"
+  append_policy_chunk ""
 }
 
 append_all_module_profiles() {
@@ -3638,11 +3687,9 @@ append_all_module_profiles() {
     if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
       resolve_selected_agent_profiles
       if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
-        {
-          echo ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-          echo ";; Use --enable=all-agents to restore legacy all-profile behavior."
-          echo ""
-        } >> "$target"
+        append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
+        append_policy_chunk ";; Use --enable=all-agents to restore legacy all-profile behavior."
+        append_policy_chunk ""
       fi
     fi
     return 0
@@ -3669,12 +3716,14 @@ append_optional_integration_profiles() {
       ;;
   esac
 
+  ensure_optional_integrations_classified
+
   for key in "${PROFILE_KEYS[@]}"; do
     [[ "$key" == "profiles/55-integrations-optional/"* ]] || continue
     found_any=1
 
-    base_name="$(basename "$key")"
-    should_include_optional_integration_profile "$base_name" || continue
+    base_name="${key##*/}"
+    optional_integration_classified_included "$base_name" || continue
 
     append_profile "$target" "$key"
   done

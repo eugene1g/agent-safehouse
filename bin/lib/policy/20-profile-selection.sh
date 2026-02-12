@@ -102,13 +102,15 @@ should_include_agent_profile_file() {
   fi
 
   resolve_selected_agent_profiles
-  base_name="$(basename "$file_path")"
+  base_name="${file_path##*/}"
 
-  for selected_profile in "${selected_agent_profile_basenames[@]-}"; do
-    if [[ "$selected_profile" == "$base_name" ]]; then
-      return 0
-    fi
-  done
+  if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
+    for selected_profile in "${selected_agent_profile_basenames[@]}"; do
+      if [[ "$selected_profile" == "$base_name" ]]; then
+        return 0
+      fi
+    done
+  fi
 
   return 1
 }
@@ -148,13 +150,11 @@ profile_declares_requirement() {
 selected_profiles_require_integration() {
   local integration="$1"
   local integration_normalized selected_profile profile_path file
-  local keychain_requirement_normalized
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
-  keychain_requirement_normalized="$(to_lowercase "$keychain_requirement_token")"
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
     [[ "$selected_profiles_require_keychain" -eq 1 ]]
     return
   fi
@@ -169,22 +169,24 @@ selected_profiles_require_integration() {
     done < <(find "${PROFILES_DIR}/60-agents" "${PROFILES_DIR}/65-apps" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
   else
     resolve_selected_agent_profiles
-    for selected_profile in "${selected_agent_profile_basenames[@]-}"; do
-      profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
+    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
+      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
+        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
 
-      profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
-    done
+        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
+        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+          requires_integration=1
+          break
+        fi
+      done
+    fi
   fi
 
-  if [[ "$integration_normalized" == "$keychain_requirement_normalized" ]]; then
+  if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"
     selected_profiles_require_keychain_resolved=1
   fi

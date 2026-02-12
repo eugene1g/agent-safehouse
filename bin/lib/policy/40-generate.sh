@@ -1,6 +1,11 @@
 # Top-level policy generation flow.
 
 generate_policy_file() {
+  optional_integrations_classified=0
+  optional_integrations_explicit_included=()
+  optional_integrations_implicit_included=()
+  optional_integrations_not_included=()
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --enable)
