@@ -1,0 +1,6 @@
+---
+layout: home
+
+hero:
+  name: " "
+---

@@ -2,3 +2,6 @@
 *.sb.tmp
 agent-sandbox-policy.*
 .aider*
+node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/dist/

@@ -516,12 +516,18 @@ Given that this is a closed-source agent with **full filesystem, network, and pr
 
 **Required Inputs:**
 
+<!-- markdownlint-disable -->
+<div v-pre>
+
 | Input | Source |
 |-------|--------|
 | `augment_session_auth` | `${{ secrets.AUGMENT_SESSION_AUTH }}` |
 | `github_token` | `${{ secrets.GITHUB_TOKEN }}` |
 | `pull_number` | `${{ github.event.pull_request.number }}` |
 | `repo_name` | `${{ github.repository }}` |
+
+</div>
+<!-- markdownlint-enable -->
 
 **Required Permissions:**
 ```yaml
