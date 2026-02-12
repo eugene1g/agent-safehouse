@@ -114,8 +114,8 @@ run_section_cli_edge_cases() {
   policy_dedup_paths="${TEST_CWD}/policy-dedup-paths.sb"
   assert_command_succeeds "duplicate --add-dirs and --add-dirs-ro entries are deduplicated" "$GENERATOR" --workdir="" --output "$policy_dedup_paths" --add-dirs-ro="${TEST_RO_DIR}:${TEST_RO_DIR}" --add-dirs="${TEST_RW_DIR}:${TEST_RW_DIR}"
   local ro_grant_count rw_grant_count
-  ro_grant_count="$(rg -F -c "(subpath \"${TEST_RO_DIR}\")" "$policy_dedup_paths" || true)"
-  rw_grant_count="$(rg -F -c "file-read* file-write* (subpath \"${resolved_test_rw_dir}\")" "$policy_dedup_paths" || true)"
+  ro_grant_count="$(grep -F -c "(subpath \"${TEST_RO_DIR}\")" "$policy_dedup_paths" || true)"
+  rw_grant_count="$(grep -F -c "file-read* file-write* (subpath \"${resolved_test_rw_dir}\")" "$policy_dedup_paths" || true)"
   if [[ "$ro_grant_count" -eq 1 ]]; then
     log_pass "duplicate read-only grants collapse to one emitted rule"
   else
@@ -365,7 +365,7 @@ EOF
   fi
   printf 'sentinel-old\n' > "$output_nested"
   assert_command_succeeds "--output overwrites existing policy file" "$GENERATOR" --output "$output_nested"
-  if rg -Fq "sentinel-old" "$output_nested"; then
+  if grep -Fq "sentinel-old" "$output_nested"; then
     log_fail "--output overwrite replaces previous file contents"
   else
     log_pass "--output overwrite replaces previous file contents"

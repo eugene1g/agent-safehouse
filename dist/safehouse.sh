@@ -1691,6 +1691,8 @@ safehouse_project_github_url="https://github.com/eugene1g/agent-safehouse"
 
 home_dir="${HOME:-}"
 enable_csv_list=""
+# shellcheck disable=SC2034 # enable_*_integration vars are read/written via indirect references (${!var_name})
+{
 enable_docker_integration=0
 enable_kubectl_integration=0
 enable_macos_gui_integration=0
@@ -1701,6 +1703,7 @@ enable_cleanshot_integration=0
 enable_onepassword_integration=0
 enable_cloud_credentials_integration=0
 enable_browser_native_messaging_integration=0
+}
 optional_integration_features=(
   docker
   kubectl
@@ -1750,8 +1753,6 @@ selected_agent_profile_basenames=()
 selected_agent_profile_reasons=()
 selected_agent_profiles_resolved=0
 keychain_requirement_token="55-integrations-optional/keychain.sb"
-macos_gui_requirement_token="55-integrations-optional/macos-gui.sb"
-electron_requirement_token="55-integrations-optional/electron.sb"
 selected_profiles_require_keychain=0
 selected_profiles_require_keychain_resolved=0
 optional_integrations_explicit_included=()
