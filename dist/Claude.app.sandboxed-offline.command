@@ -221,6 +221,7 @@ emit_embedded_policy_template() {
     (global-name "com.apple.FSEvents")                                ;; File event stream access used by watchers.
     (global-name "com.apple.SystemConfiguration.configd")             ;; System network/config queries for resolver bootstrap.
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")    ;; Node/c-ares DNS bootstrap XPC dependency.
+    (global-name "com.apple.trustd.agent")                            ;; Baseline trust evaluation service for CFNetwork/URLSession HTTPS.
     (global-name "com.apple.diagnosticd")                             ;; Unified logging diagnosticd backend used by many system frameworks.
     (global-name "com.apple.analyticsd")                              ;; Analytics subsystem queried during runtime initializations.
     (global-name "com.apple.dnssd.service")                           ;; DNS-SD (Bonjour) service used for DNS resolution by ssh, curl, etc.
@@ -614,6 +615,7 @@ emit_embedded_policy_template() {
 ;; Opt-in integrations not enabled: docker ssh spotlight cleanshot 1password cloud-credentials browser-native-messaging
 ;; Use --enable=<feature> (comma-separated) to include them.
 ;; Note: --enable=electron also enables macos-gui.
+;; Note: selected app/agent profiles can auto-inject integration modules via $$require=<integration-profile-path>$$ metadata.
 
 ;; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.
 
@@ -695,6 +697,45 @@ emit_embedded_policy_template() {
 ;; #safehouse-test-id:electron-crashpad-register#
 (allow mach-register
     (global-name-regex #"^org\.chromium\.crashpad\.child_port_handshake\.")
+)
+
+;; ---------------------------------------------------------------------------
+;; Integration: Keychain
+;; macOS Keychain and Security framework for agent authentication/credential storage.
+;; Source: 55-integrations-optional/keychain.sb
+;; ---------------------------------------------------------------------------
+
+;; Auto-injected when a selected app/agent profile declares $$require=55-integrations-optional/keychain.sb$$.
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.
+    (home-literal "/Library/Preferences/com.apple.security.plist")   ;; User security preferences read by some auth flows.
+)
+
+(allow file-read*
+    (literal "/Library/Preferences/com.apple.security.plist")  ;; Security preferences read by security CLI.
+    (literal "/Library/Keychains/System.keychain")             ;; System keychain read for security CLI operations.
+    (subpath "/private/var/db/mds")                            ;; MDS message store; hosts se_SecurityMessages used by securityd IPC.
+)
+
+(allow file-read-metadata
+    (home-literal "/Library")                                  ;; Restrict home traversal to the Library root only.
+    (home-literal "/Library/Keychains")                        ;; User keychain directory metadata for login/session lookups.
+    (literal "/Library")                                       ;; System Library traversal for system keychain access.
+    (literal "/Library/Keychains")                             ;; System keychain directory metadata.
+)
+
+(allow mach-lookup
+    (global-name "com.apple.SecurityServer")                   ;; Keychain operations depend on SecurityServer IPC.
+    (global-name "com.apple.security.agent")                   ;; Login prompts/token unlock dialogs route through this service.
+    (global-name "com.apple.securityd.xpc")                    ;; securityd backend needed for certificate/key queries.
+    (global-name "com.apple.security.authhost")                ;; Auth host service for interactive credential flows.
+    (global-name "com.apple.secd")                             ;; Secure enclave/credential mediation used by macOS security APIs.
+    (global-name "com.apple.trustd")                           ;; Additional trustd backend used by some keychain/security flows.
+)
+
+(allow ipc-posix-shm-read-data ipc-posix-shm-write-create ipc-posix-shm-write-data
+    (ipc-posix-name "com.apple.AppleDatabaseChanged")          ;; Keychain database change notifications via shared memory.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -915,6 +956,7 @@ emit_embedded_policy_template() {
 ;; Agent: Claude Code
 ;; Claude Code CLI binary, state, config, and MCP integration paths.
 ;; Source: 60-agents/claude-code.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - installer-managed binary path: ~/.local/bin/claude (symlink target under ~/.local/share/claude/versions/*)
@@ -933,12 +975,6 @@ emit_embedded_policy_template() {
     (home-literal "/.mcp.json")
 )
 
-;; Keychain write access: Claude Code stores API keys in macOS Keychain via security CLI.
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 (allow file-read*
     (home-prefix "/.claude.json.")
     (home-literal "/Library/Application Support/Claude/claude_desktop_config.json")
@@ -952,6 +988,7 @@ emit_embedded_policy_template() {
 ;; Agent: Cline
 ;; Cline CLI binary, state, and config paths.
 ;; Source: 60-agents/cline.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - no official standalone CLI install path documented; keep ~/.local/bin fallback
@@ -969,12 +1006,6 @@ emit_embedded_policy_template() {
     (home-literal "/.qwen/oauth_creds.json")
 )
 
-;; Keychain write access: Cline stores API keys via VS Code SecretStorage (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 (allow file-read*
     (home-literal "/.oca/config.json")
 )
@@ -983,6 +1014,7 @@ emit_embedded_policy_template() {
 ;; Agent: Codex
 ;; Codex CLI binary, state, and config paths.
 ;; Source: 60-agents/codex.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm/bun global installs place binaries under package-manager prefix/bin
@@ -994,12 +1026,6 @@ emit_embedded_policy_template() {
     (home-prefix "/.local/bin/codex")
     (home-subpath "/.codex")
     (home-subpath "/.cache/codex")
-)
-
-;; Keychain write access: Codex stores auth credentials via keyring crate (apple-native).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -1061,6 +1087,7 @@ emit_embedded_policy_template() {
 ;; Agent: Gemini
 ;; Gemini CLI binary, state, and config paths.
 ;; Source: 60-agents/gemini.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm global install path follows package-manager prefix/bin
@@ -1074,12 +1101,6 @@ emit_embedded_policy_template() {
     (home-subpath "/.cache/gemini")
 )
 
-;; Keychain write access: Gemini CLI stores auth tokens via keytar (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 ;; Enterprise managed settings
 (allow file-read*
     (subpath "/Library/Application Support/GeminiCli")
@@ -1089,6 +1110,7 @@ emit_embedded_policy_template() {
 ;; Agent: Goose
 ;; Goose CLI binary, state, and config paths.
 ;; Source: 60-agents/goose.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - install script and package-manager installs commonly place `goose` under ~/.local/bin
@@ -1105,16 +1127,11 @@ emit_embedded_policy_template() {
     (home-subpath "/Library/Application Support/Block.goose")
 )
 
-;; Keychain write access: Goose stores secrets via keyring crate (apple-native).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 ;; ---------------------------------------------------------------------------
 ;; Agent: Kilo Code
 ;; Kilo Code CLI binary, state, and config paths.
 ;; Source: 60-agents/kilo-code.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm package @kilocode/cli installs `kilocode` and `kilo` executables
@@ -1131,12 +1148,6 @@ emit_embedded_policy_template() {
     (home-subpath "/.roo")
     (home-subpath "/Documents/Kilo-Code/MCP")
     (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
-)
-
-;; Keychain write access: Kilo Code stores API keys via VS Code SecretStorage (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -1193,6 +1204,7 @@ emit_embedded_policy_template() {
 ;; App: Claude Desktop
 ;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
 ;; Source: 65-apps/claude-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
@@ -1205,12 +1217,6 @@ emit_embedded_policy_template() {
     (home-subpath "/Library/Caches/Claude")
     (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
     (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
-)
-
-;; Keychain write access for credential storage (keychain.sb is read-only by default).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -1255,6 +1261,7 @@ emit_embedded_policy_template() {
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
 ;; including DeveloperTools state and optional extension pairing storage.
 ;; Source: 65-apps/vscode-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
@@ -1284,12 +1291,6 @@ emit_embedded_policy_template() {
     (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
     (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
     (home-subpath "/.vscode-insiders")
-)
-
-;; Keychain write access for credential storage (keychain.sb is read-only by default).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*

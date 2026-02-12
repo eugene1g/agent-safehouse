@@ -144,6 +144,7 @@
     (global-name "com.apple.FSEvents")                                ;; File event stream access used by watchers.
     (global-name "com.apple.SystemConfiguration.configd")             ;; System network/config queries for resolver bootstrap.
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")    ;; Node/c-ares DNS bootstrap XPC dependency.
+    (global-name "com.apple.trustd.agent")                            ;; Baseline trust evaluation service for CFNetwork/URLSession HTTPS.
     (global-name "com.apple.diagnosticd")                             ;; Unified logging diagnosticd backend used by many system frameworks.
     (global-name "com.apple.analyticsd")                              ;; Analytics subsystem queried during runtime initializations.
     (global-name "com.apple.dnssd.service")                           ;; DNS-SD (Bonjour) service used for DNS resolution by ssh, curl, etc.

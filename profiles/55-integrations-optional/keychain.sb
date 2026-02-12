@@ -1,14 +1,17 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: Keychain
-;; macOS Keychain and Security framework for agent authentication and TLS.
+;; macOS Keychain and Security framework for agent authentication/credential storage.
 ;; Source: 55-integrations-optional/keychain.sb
 ;; ---------------------------------------------------------------------------
 
-;; Read-only by default. Apps that store credentials in keychain add write grants in their own profiles.
+;; Auto-injected when a selected app/agent profile declares $$require=55-integrations-optional/keychain.sb$$.
 
-(allow file-read*
+(allow file-read* file-write*
     (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.
     (home-literal "/Library/Preferences/com.apple.security.plist")   ;; User security preferences read by some auth flows.
+)
+
+(allow file-read*
     (literal "/Library/Preferences/com.apple.security.plist")  ;; Security preferences read by security CLI.
     (literal "/Library/Keychains/System.keychain")             ;; System keychain read for security CLI operations.
     (subpath "/private/var/db/mds")                            ;; MDS message store; hosts se_SecurityMessages used by securityd IPC.
@@ -27,8 +30,7 @@
     (global-name "com.apple.securityd.xpc")                    ;; securityd backend needed for certificate/key queries.
     (global-name "com.apple.security.authhost")                ;; Auth host service for interactive credential flows.
     (global-name "com.apple.secd")                             ;; Secure enclave/credential mediation used by macOS security APIs.
-    (global-name "com.apple.trustd.agent")                     ;; Certificate trust evaluation for HTTPS/API clients.
-    (global-name "com.apple.trustd")                           ;; trustd backend used by TLS validation during network calls.
+    (global-name "com.apple.trustd")                           ;; Additional trustd backend used by some keychain/security flows.
 )
 
 (allow ipc-posix-shm-read-data ipc-posix-shm-write-create ipc-posix-shm-write-data

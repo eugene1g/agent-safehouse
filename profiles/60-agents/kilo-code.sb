@@ -2,6 +2,7 @@
 ;; Agent: Kilo Code
 ;; Kilo Code CLI binary, state, and config paths.
 ;; Source: 60-agents/kilo-code.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm package @kilocode/cli installs `kilocode` and `kilo` executables
@@ -18,12 +19,6 @@
     (home-subpath "/.roo")
     (home-subpath "/Documents/Kilo-Code/MCP")
     (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
-)
-
-;; Keychain write access: Kilo Code stores API keys via VS Code SecretStorage (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*

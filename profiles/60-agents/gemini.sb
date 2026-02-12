@@ -2,6 +2,7 @@
 ;; Agent: Gemini
 ;; Gemini CLI binary, state, and config paths.
 ;; Source: 60-agents/gemini.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm global install path follows package-manager prefix/bin
@@ -13,12 +14,6 @@
     (home-prefix "/.local/bin/gemini")
     (home-subpath "/.gemini")
     (home-subpath "/.cache/gemini")
-)
-
-;; Keychain write access: Gemini CLI stores auth tokens via keytar (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 ;; Enterprise managed settings

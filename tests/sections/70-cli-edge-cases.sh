@@ -168,6 +168,7 @@ EOF
 
   assert_command_succeeds "safehouse selects the matching Codex profile for codex command basename" "$SAFEHOUSE" --output "$policy_agent_codex" -- "$fake_codex_bin"
   assert_policy_contains "$policy_agent_codex" "codex command includes codex agent profile only" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$policy_agent_codex" "codex command auto-injects keychain integration from profile metadata" ";; Integration: Keychain"
   assert_policy_not_contains "$policy_agent_codex" "codex command omits unrelated claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
   assert_command_succeeds "safehouse selects the matching Goose profile for goose command basename" "$SAFEHOUSE" --output "$policy_agent_goose" -- "$fake_goose_bin"
@@ -183,14 +184,21 @@ EOF
 
   assert_command_succeeds "safehouse skips scoped app/agent modules for unknown commands by default" "$SAFEHOUSE" --output "$policy_agent_unknown" -- "$fake_unknown_bin"
   assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits codex agent profile" ";; Source: 60-agents/codex.sb"
+  assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits keychain integration (no profile requirement selected)" ";; Integration: Keychain"
   assert_policy_contains "$policy_agent_unknown" "unknown command policy emits skip note for scoped profile layers" "No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
 
   assert_command_succeeds "safehouse detects Claude.app command path and includes claude-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_claude_app" -- "$fake_claude_app_bin"
   assert_policy_contains "$policy_agent_claude_app" "Claude.app command includes claude-app app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects keychain integration from profile metadata" ";; Integration: Keychain"
+  assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects macOS GUI integration from profile metadata" ";; Integration: macOS GUI"
+  assert_policy_contains "$policy_agent_claude_app" "Claude.app command auto-injects electron integration from profile metadata" "#safehouse-test-id:electron-integration#"
   assert_policy_not_contains "$policy_agent_claude_app" "Claude.app command omits claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
   assert_command_succeeds "safehouse detects Visual Studio Code.app command path and includes vscode-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_vscode_app" -- "$fake_vscode_app_bin"
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command includes vscode-app app profile" ";; Source: 65-apps/vscode-app.sb"
+  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects keychain integration from profile metadata" ";; Integration: Keychain"
+  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects macOS GUI integration from profile metadata" ";; Integration: macOS GUI"
+  assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app command auto-injects electron integration from profile metadata" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app policy includes VSCode preference plist literal for direct write/unlink flows" "(home-literal \"/Library/Preferences/com.microsoft.VSCode.plist\")"
   assert_policy_not_contains "$policy_agent_vscode_app" "Visual Studio Code.app command omits claude-app app profile" ";; Source: 65-apps/claude-app.sb"
 
@@ -201,6 +209,9 @@ EOF
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes claude-code profile" ";; Source: 60-agents/claude-code.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes goose profile" ";; Source: 60-agents/goose.sb"
   assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes kilo-code profile" ";; Source: 60-agents/kilo-code.sb"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes keychain integration when required profiles are loaded" ";; Integration: Keychain"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes macOS GUI integration when required profiles are loaded" ";; Integration: macOS GUI"
+  assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes electron integration when required profiles are loaded" "#safehouse-test-id:electron-integration#"
 
   rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents"
   rm -rf "$fake_claude_app_dir" "$fake_vscode_app_dir"

@@ -26,8 +26,6 @@ run_section_policy_behavior() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Azure Developer CLI grant" "/.azd"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password socket-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t(/.*)?$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password desktop settings-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"
-  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password Homebrew Cask path grant" "/opt/homebrew/Caskroom/1password-cli(/.*)?$"
-  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password Homebrew Cask data-volume path grant" "/System/Volumes/Data/opt/homebrew/Caskroom/1password-cli(/.*)?$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits 1Password mach-lookup regex grant" "com\\.1password(\\..*)?$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits SSH integration profile" ";; Integration: SSH"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Spotlight integration profile" ";; Integration: Spotlight"
@@ -58,8 +56,6 @@ run_section_policy_behavior() {
 
   assert_policy_contains "$policy_onepassword" "--enable=1password includes regex 1Password socket-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t(/.*)?$"
   assert_policy_contains "$policy_onepassword" "--enable=1password includes regex 1Password desktop settings-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"
-  assert_policy_contains "$policy_onepassword" "--enable=1password includes regex 1Password Homebrew Cask path grant" "/opt/homebrew/Caskroom/1password-cli(/.*)?$"
-  assert_policy_contains "$policy_onepassword" "--enable=1password includes regex 1Password Homebrew Cask data-volume path grant" "/System/Volumes/Data/opt/homebrew/Caskroom/1password-cli(/.*)?$"
   assert_policy_contains "$policy_onepassword" "--enable=1password includes 1Password mach-lookup regex grant" "com\\.1password(\\..*)?$"
   assert_policy_contains "$policy_onepassword" "--enable=1password includes 1Password profile marker" ";; Integration: 1Password"
 

@@ -2,6 +2,7 @@
 ;; Agent: Claude Code
 ;; Claude Code CLI binary, state, config, and MCP integration paths.
 ;; Source: 60-agents/claude-code.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - installer-managed binary path: ~/.local/bin/claude (symlink target under ~/.local/share/claude/versions/*)
@@ -18,12 +19,6 @@
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")
     (home-literal "/.mcp.json")
-)
-
-;; Keychain write access: Claude Code stores API keys in macOS Keychain via security CLI.
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*

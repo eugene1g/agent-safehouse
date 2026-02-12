@@ -3,6 +3,7 @@
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
 ;; including DeveloperTools state and optional extension pairing storage.
 ;; Source: 65-apps/vscode-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
@@ -32,12 +33,6 @@
     (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
     (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
     (home-subpath "/.vscode-insiders")
-)
-
-;; Keychain write access for credential storage (keychain.sb is read-only by default).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*

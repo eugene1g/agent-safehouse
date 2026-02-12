@@ -2,6 +2,7 @@
 ;; Agent: Goose
 ;; Goose CLI binary, state, and config paths.
 ;; Source: 60-agents/goose.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - install script and package-manager installs commonly place `goose` under ~/.local/bin
@@ -16,10 +17,4 @@
     (home-subpath "/.local/share/goose")
     (home-subpath "/.local/state/goose")
     (home-subpath "/Library/Application Support/Block.goose")
-)
-
-;; Keychain write access: Goose stores secrets via keyring crate (apple-native).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )

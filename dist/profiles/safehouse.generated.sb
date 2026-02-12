@@ -173,6 +173,7 @@
     (global-name "com.apple.FSEvents")                                ;; File event stream access used by watchers.
     (global-name "com.apple.SystemConfiguration.configd")             ;; System network/config queries for resolver bootstrap.
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")    ;; Node/c-ares DNS bootstrap XPC dependency.
+    (global-name "com.apple.trustd.agent")                            ;; Baseline trust evaluation service for CFNetwork/URLSession HTTPS.
     (global-name "com.apple.diagnosticd")                             ;; Unified logging diagnosticd backend used by many system frameworks.
     (global-name "com.apple.analyticsd")                              ;; Analytics subsystem queried during runtime initializations.
     (global-name "com.apple.dnssd.service")                           ;; DNS-SD (Bonjour) service used for DNS resolution by ssh, curl, etc.
@@ -566,6 +567,7 @@
 ;; Opt-in integrations not enabled: docker macos-gui electron ssh spotlight cleanshot 1password cloud-credentials browser-native-messaging
 ;; Use --enable=<feature> (comma-separated) to include them.
 ;; Note: --enable=electron also enables macos-gui.
+;; Note: selected app/agent profiles can auto-inject integration modules via $$require=<integration-profile-path>$$ metadata.
 
 ;; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.
 
@@ -598,6 +600,247 @@
     (home-subpath "/.cache/glab-cli")        ;; glab cache for API and command acceleration.
     (home-subpath "/.local/share/glab-cli")  ;; glab persistent state.
     (home-subpath "/.local/state/glab-cli")  ;; glab runtime state files.
+)
+
+;; ---------------------------------------------------------------------------
+;; Integration: Electron
+;; Chromium/Electron runtime: GPU, Metal shaders, crashpad, and WebView.
+;; Source: 55-integrations-optional/electron.sb
+;; #safehouse-test-id:electron-integration#
+;; ---------------------------------------------------------------------------
+
+;; Chromium/Electron attempts to initialize an internal sandbox for helper
+;; processes (GPU, Renderer, Utility, Network). Under safehouse, the process
+;; tree is already inside macOS Seatbelt via sandbox-exec.
+;;
+;; Re-initializing Seatbelt from inside an existing Seatbelt sandbox is blocked
+;; by the OS (sandbox_init returns EPERM / "Operation not permitted"). This is
+;; not fixable with additional allow rules in this profile.
+;;
+;; Primary workaround under Safehouse: launch Electron with --no-sandbox.
+;; Compatibility fallback: ELECTRON_DISABLE_SANDBOX=1.
+;; Safehouse's outer sandbox still applies to the full process tree.
+
+;; -- GPU / Metal shader compilation --------------------------------------------
+;; #safehouse-test-id:electron-gpu-metal#
+
+(allow mach-lookup
+    (global-name "com.apple.MTLCompilerService")
+    (global-name "com.apple.SafariPlatformSupport.Helper")
+)
+
+(allow iokit-open
+    (iokit-user-client-class "IOSurfaceRootUserClient")
+    (iokit-user-client-class "AGXDeviceUserClient")
+)
+
+(allow file-read-metadata
+    (literal "/private/var/db/.AppleSetupDone")
+)
+
+;; -- Chromium crashpad crash reporting -----------------------------------------
+;; #safehouse-test-id:electron-crashpad#
+;; #safehouse-test-id:electron-crashpad-lookup#
+
+(allow mach-lookup
+    (global-name-regex #"^org\.chromium\.crashpad\.child_port_handshake\.")
+)
+
+;; #safehouse-test-id:electron-crashpad-register#
+(allow mach-register
+    (global-name-regex #"^org\.chromium\.crashpad\.child_port_handshake\.")
+)
+
+;; ---------------------------------------------------------------------------
+;; Integration: Keychain
+;; macOS Keychain and Security framework for agent authentication/credential storage.
+;; Source: 55-integrations-optional/keychain.sb
+;; ---------------------------------------------------------------------------
+
+;; Auto-injected when a selected app/agent profile declares $$require=55-integrations-optional/keychain.sb$$.
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.
+    (home-literal "/Library/Preferences/com.apple.security.plist")   ;; User security preferences read by some auth flows.
+)
+
+(allow file-read*
+    (literal "/Library/Preferences/com.apple.security.plist")  ;; Security preferences read by security CLI.
+    (literal "/Library/Keychains/System.keychain")             ;; System keychain read for security CLI operations.
+    (subpath "/private/var/db/mds")                            ;; MDS message store; hosts se_SecurityMessages used by securityd IPC.
+)
+
+(allow file-read-metadata
+    (home-literal "/Library")                                  ;; Restrict home traversal to the Library root only.
+    (home-literal "/Library/Keychains")                        ;; User keychain directory metadata for login/session lookups.
+    (literal "/Library")                                       ;; System Library traversal for system keychain access.
+    (literal "/Library/Keychains")                             ;; System keychain directory metadata.
+)
+
+(allow mach-lookup
+    (global-name "com.apple.SecurityServer")                   ;; Keychain operations depend on SecurityServer IPC.
+    (global-name "com.apple.security.agent")                   ;; Login prompts/token unlock dialogs route through this service.
+    (global-name "com.apple.securityd.xpc")                    ;; securityd backend needed for certificate/key queries.
+    (global-name "com.apple.security.authhost")                ;; Auth host service for interactive credential flows.
+    (global-name "com.apple.secd")                             ;; Secure enclave/credential mediation used by macOS security APIs.
+    (global-name "com.apple.trustd")                           ;; Additional trustd backend used by some keychain/security flows.
+)
+
+(allow ipc-posix-shm-read-data ipc-posix-shm-write-create ipc-posix-shm-write-data
+    (ipc-posix-name "com.apple.AppleDatabaseChanged")          ;; Keychain database change notifications via shared memory.
+)
+
+;; ---------------------------------------------------------------------------
+;; Integration: macOS GUI
+;; Window server, AppKit, accessibility, input, and framework services
+;; needed by any graphical macOS application running under sandbox.
+;; Source: 55-integrations-optional/macos-gui.sb
+;; ---------------------------------------------------------------------------
+
+;; -- System preferences and framework data -------------------------------------
+
+(allow file-read*
+    (literal "/private/etc")
+    (literal "/private/var/db/eligibilityd/eligibility.plist")
+    (literal "/private/var/db/nsurlstoraged/dafsaData.bin")
+    (literal "/Library/Application Support/Apple/Spotlight/MailUsesCoreSpotlight")
+    (home-literal "/Library/Preferences/com.apple.universalaccess.plist")
+    (home-literal "/Library/Preferences/com.apple.Accessibility.plist")
+    (home-literal "/Library/Preferences/com.apple.CoreGraphics.plist")
+    (home-literal "/Library/Preferences/com.apple.symbolichotkeys.plist")
+    (home-literal "/Library/Preferences/com.apple.ServicesMenu.Services.plist")
+    (home-literal "/Library/Preferences/com.apple.speech.recognition.AppleSpeechRecognition.prefs.plist")
+    (home-literal "/Library/Preferences/com.apple.SpeakSelection.plist")
+    (home-literal "/Library/Preferences/com.apple.assistant.support.plist")
+    (home-literal "/Library/Preferences/com.apple.assistant.backedup.plist")
+    (home-literal "/Library/Preferences/pbs.plist")
+    (home-literal "/Library/Preferences/com.apple.HIToolbox.plist")
+    (literal "/Library/Preferences/com.apple.HIToolbox.plist")
+    (home-subpath "/Library/Preferences/com.apple.LaunchServices")
+    (home-subpath "/Library/Application Support/CrashReporter")
+    (home-subpath "/Library/Spelling")
+    (home-literal "/Library/Keyboard Layouts")
+    (home-literal "/Library/Input Methods")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Accessibility")
+)
+
+;; Directory metadata (stat/readdir) for standard user and system paths
+(allow file-read-metadata
+    (literal "/private/var/db")
+    (literal "/Volumes")
+    (subpath "/Volumes")
+    (home-literal "/Desktop")
+    (home-literal "/Documents")
+    (home-literal "/Downloads")
+    (home-literal "/Applications")
+    (home-literal "/Library")
+    (home-literal "/Library/Application Support")
+    (home-literal "/Library/Caches")
+    (home-literal "/Library/CloudStorage")
+    (home-literal "/Library/Containers")
+    (home-literal "/Library/HTTPStorages")
+    (home-literal "/Library/Logs")
+    (home-literal "/Library/Mobile Documents")
+    (home-subpath "/Library/Mobile Documents")
+    (home-literal "/Library/Spelling")
+    (home-literal "/.Trash")
+)
+
+(allow user-preference-read
+    (preference-domain "com.apple.hitoolbox")
+)
+
+;; -- Mach services -------------------------------------------------------------
+
+(allow mach-lookup
+    ;; Font services
+    (global-name "com.apple.fonts")
+    (global-name "com.apple.FontObjectsServer")
+    ;; Core rendering and window management
+    (global-name "com.apple.CARenderServer")
+    (global-name "com.apple.windowserver.active")
+    (global-name "com.apple.windowmanager.server")
+    (global-name "com.apple.window_proxies")
+    (global-name "com.apple.dock.server")
+    (global-name "com.apple.dock.fullscreen")
+    ;; TCC (permission) and security
+    (global-name "com.apple.tccd")
+    (global-name "com.apple.tccd.system")
+    (global-name "com.apple.universalaccessAuthWarn")
+    ;; Launch Services, Core Services, and icon resolution
+    (global-name "com.apple.lsd.mapdb")
+    (global-name "com.apple.lsd.modifydb")
+    (global-name "com.apple.lsd.advertisingidentifiers")
+    (global-name "com.apple.iconservices")
+    (global-name "com.apple.coreservices.appleevents")
+    (global-name "com.apple.coreservices.sharedfilelistd.xpc")
+    (global-name "com.apple.coreservices.quarantine-resolver")
+    ;; HI services, input, and accessibility
+    (global-name "com.apple.hiservices-xpcservice")
+    (global-name "com.apple.iohideventsystem")
+    (global-name "com.apple.tsm.uiserver")
+    (global-name "com.apple.touchbarserver.mig")
+    (global-name "com.apple.accessibility.voices")
+    (global-name "com.apple.backboard.hid-services.xpc")
+    (global-name "com.apple.backboard.BKSEndpointProviderService")
+    (global-name "com.apple.TextInputUI.xpc.CursorUIViewService")
+    (global-name "com.apple.inputmethodkit.launchagent")
+    (global-name "com.apple.inputmethodkit.launcher")
+    (global-name "com.apple.inputmethodkit.getxpcendpoint")
+    ;; AppKit and UI framework services
+    (global-name "com.apple.ViewBridgeAuxiliary")
+    (global-name "com.apple.appkit.restoration_storage")
+    (global-name "com.apple.pbs.fetch_services")
+    (global-name "com.apple.uiintelligencesupport.agent")
+    (global-name "com.apple.controlcenter.statusitems")
+    (global-name "com.apple.sidecar-relay")            ;; Sidecar/AirPlay display menu probing in AppKit.
+    (global-name "com.apple.storekitagent")
+    (global-name "com.apple.scopedbookmarksagent.xpc")
+    ;; XPC, directory, and system services
+    (global-name "com.apple.xpc.smd")
+    (global-name "com.apple.bsd.dirhelper")
+    (global-name "com.apple.system.opendirectoryd.membership")
+    (global-name "com.apple.logd.events")
+    (global-name "com.apple.usymptomsd")
+    (global-name "com.apple.spotlight.IndexAgent")
+    ;; Location services
+    (global-name "com.apple.CoreLocation.agent")
+    (global-name "com.apple.locationd.desktop.registration")
+    ;; Notifications and audio
+    (global-name "com.apple.usernotifications.listener")
+    (global-name "com.apple.audio.SystemSoundServer-OSX")
+    (global-name "com.apple.audio.audiohald")
+    (global-name "com.apple.cmio.registerassistantservice.system-extensions")
+    ;; Spell checking, grammar, and natural language
+    (global-name "mul-xpc (Apple)_OpenStep")
+    (global-name "com.apple.naturallanguaged")
+    (global-name "com.apple.inputanalyticsd")
+    ;; Backup
+    (global-name "com.apple.backupd.sandbox.xpc")
+    ;; SSO and Siri
+    (global-name "com.apple.AppSSO.service-xpc")
+    (global-name "com.apple.siri.VoiceShortcuts.xpc")
+    (global-name "com.apple.proactive.app-client.donation")
+    ;; Distributed notifications (per-user suffix varies)
+    (global-name-prefix "com.apple.distributed_notifications@")
+)
+
+;; Per-pid mach port registrations for accessibility, text input, and drag-and-drop
+(allow mach-register
+    (local-name "com.apple.axserver")
+    (local-name "com.apple.tsm.portname")
+    (local-name "com.apple.coredrag")
+)
+
+;; -- IOKit (power management, HID input, storage) ------------------------------
+
+(allow iokit-open
+    (iokit-user-client-class "RootDomainUserClient")
+    (iokit-user-client-class "IOHIDParamUserClient")
+    (iokit-user-client-class "AppleNVMeEANUC")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -665,6 +908,7 @@
 ;; Agent: Claude Code
 ;; Claude Code CLI binary, state, config, and MCP integration paths.
 ;; Source: 60-agents/claude-code.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - installer-managed binary path: ~/.local/bin/claude (symlink target under ~/.local/share/claude/versions/*)
@@ -683,12 +927,6 @@
     (home-literal "/.mcp.json")
 )
 
-;; Keychain write access: Claude Code stores API keys in macOS Keychain via security CLI.
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 (allow file-read*
     (home-prefix "/.claude.json.")
     (home-literal "/Library/Application Support/Claude/claude_desktop_config.json")
@@ -702,6 +940,7 @@
 ;; Agent: Cline
 ;; Cline CLI binary, state, and config paths.
 ;; Source: 60-agents/cline.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - no official standalone CLI install path documented; keep ~/.local/bin fallback
@@ -719,12 +958,6 @@
     (home-literal "/.qwen/oauth_creds.json")
 )
 
-;; Keychain write access: Cline stores API keys via VS Code SecretStorage (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 (allow file-read*
     (home-literal "/.oca/config.json")
 )
@@ -733,6 +966,7 @@
 ;; Agent: Codex
 ;; Codex CLI binary, state, and config paths.
 ;; Source: 60-agents/codex.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm/bun global installs place binaries under package-manager prefix/bin
@@ -744,12 +978,6 @@
     (home-prefix "/.local/bin/codex")
     (home-subpath "/.codex")
     (home-subpath "/.cache/codex")
-)
-
-;; Keychain write access: Codex stores auth credentials via keyring crate (apple-native).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -811,6 +1039,7 @@
 ;; Agent: Gemini
 ;; Gemini CLI binary, state, and config paths.
 ;; Source: 60-agents/gemini.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm global install path follows package-manager prefix/bin
@@ -824,12 +1053,6 @@
     (home-subpath "/.cache/gemini")
 )
 
-;; Keychain write access: Gemini CLI stores auth tokens via keytar (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 ;; Enterprise managed settings
 (allow file-read*
     (subpath "/Library/Application Support/GeminiCli")
@@ -839,6 +1062,7 @@
 ;; Agent: Goose
 ;; Goose CLI binary, state, and config paths.
 ;; Source: 60-agents/goose.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - install script and package-manager installs commonly place `goose` under ~/.local/bin
@@ -855,16 +1079,11 @@
     (home-subpath "/Library/Application Support/Block.goose")
 )
 
-;; Keychain write access: Goose stores secrets via keyring crate (apple-native).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
-)
-
 ;; ---------------------------------------------------------------------------
 ;; Agent: Kilo Code
 ;; Kilo Code CLI binary, state, and config paths.
 ;; Source: 60-agents/kilo-code.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm package @kilocode/cli installs `kilocode` and `kilo` executables
@@ -881,12 +1100,6 @@
     (home-subpath "/.roo")
     (home-subpath "/Documents/Kilo-Code/MCP")
     (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
-)
-
-;; Keychain write access: Kilo Code stores API keys via VS Code SecretStorage (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -943,6 +1156,7 @@
 ;; App: Claude Desktop
 ;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
 ;; Source: 65-apps/claude-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
@@ -955,12 +1169,6 @@
     (home-subpath "/Library/Caches/Claude")
     (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
     (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
-)
-
-;; Keychain write access for credential storage (keychain.sb is read-only by default).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -1005,6 +1213,7 @@
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
 ;; including DeveloperTools state and optional extension pairing storage.
 ;; Source: 65-apps/vscode-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
@@ -1034,12 +1243,6 @@
     (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
     (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
     (home-subpath "/.vscode-insiders")
-)
-
-;; Keychain write access for credential storage (keychain.sb is read-only by default).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*

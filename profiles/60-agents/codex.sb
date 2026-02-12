@@ -2,6 +2,7 @@
 ;; Agent: Codex
 ;; Codex CLI binary, state, and config paths.
 ;; Source: 60-agents/codex.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - npm/bun global installs place binaries under package-manager prefix/bin
@@ -13,12 +14,6 @@
     (home-prefix "/.local/bin/codex")
     (home-subpath "/.codex")
     (home-subpath "/.cache/codex")
-)
-
-;; Keychain write access: Codex stores auth credentials via keyring crate (apple-native).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*

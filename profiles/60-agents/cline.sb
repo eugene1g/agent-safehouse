@@ -2,6 +2,7 @@
 ;; Agent: Cline
 ;; Cline CLI binary, state, and config paths.
 ;; Source: 60-agents/cline.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - no official standalone CLI install path documented; keep ~/.local/bin fallback
@@ -17,12 +18,6 @@
     (home-subpath "/Documents/Cline")               ;; Cline MCP servers, rules, workflows, hooks.
     (home-subpath "/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev")
     (home-literal "/.qwen/oauth_creds.json")
-)
-
-;; Keychain write access: Cline stores API keys via VS Code SecretStorage (macOS Keychain).
-(allow file-write*
-    (home-subpath "/Library/Keychains")
-    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*

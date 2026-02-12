@@ -153,14 +153,17 @@ run_section_integrations() {
 
   assert_denied_if_exists "$POLICY_DEFAULT" "security find-certificate denied by default (no baseline keychain access)" "security" /usr/bin/security find-certificate -a
   assert_denied_if_exists "$policy_non_keychain_agent" "security find-certificate denied for non-keychain agent profile" "security" /usr/bin/security find-certificate -a
-  assert_denied_if_exists "$policy_keychain_agent" "security find-certificate remains denied when keychain integration module is not injected" "security" /usr/bin/security find-certificate -a
+  assert_allowed_if_exists "$policy_keychain_agent" "security find-certificate allowed for keychain-enabled agent profile" "security" /usr/bin/security find-certificate -a
 
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits keychain integration profile" ";; Integration: Keychain"
-  assert_policy_not_contains "$policy_keychain_agent" "keychain-enabled agent policy omits shared keychain integration profile" ";; Integration: Keychain"
+  assert_policy_contains "$policy_keychain_agent" "keychain-enabled agent policy auto-injects shared keychain integration profile" ";; Integration: Keychain"
   assert_policy_not_contains "$policy_non_keychain_agent" "non-keychain agent policy omits keychain integration profile" ";; Integration: Keychain"
+  assert_policy_contains "$POLICY_DEFAULT" "default runtime includes baseline trustd agent for TLS" "(global-name \"com.apple.trustd.agent\")"
+  assert_policy_contains "$policy_non_keychain_agent" "non-keychain agent policy includes baseline trustd agent for TLS" "(global-name \"com.apple.trustd.agent\")"
   assert_policy_not_contains "$policy_keychain_agent" "keychain policy omits broad home Library metadata grant" "(home-subpath \"/Library\")"
-  assert_policy_contains "$policy_keychain_agent" "keychain-enabled agent profile provides keychain write path grant" "(home-subpath \"/Library/Keychains\")"
-  assert_policy_contains "$policy_keychain_agent" "keychain-enabled agent profile provides scoped security preferences grant" "(home-literal \"/Library/Preferences/com.apple.security.plist\")"
+  assert_policy_contains "$policy_keychain_agent" "keychain integration provides keychain write path grant" "(home-subpath \"/Library/Keychains\")"
+  assert_policy_contains "$policy_keychain_agent" "keychain integration provides scoped security preferences grant" "(home-literal \"/Library/Preferences/com.apple.security.plist\")"
+  assert_policy_contains "$policy_keychain_agent" "keychain integration provides SecurityServer mach-lookup grant" "(global-name \"com.apple.SecurityServer\")"
 
   rm -f "$policy_ssh" "$policy_browser_native_messaging" "$policy_onepassword" "$policy_keychain_agent" "$policy_non_keychain_agent"
 }

@@ -42,6 +42,11 @@ invoked_command_basename=""
 invoked_command_app_bundle=""
 selected_agent_profile_basenames=()
 selected_agent_profiles_resolved=0
+keychain_requirement_token="55-integrations-optional/keychain.sb"
+macos_gui_requirement_token="55-integrations-optional/macos-gui.sb"
+electron_requirement_token="55-integrations-optional/electron.sb"
+selected_profiles_require_keychain=0
+selected_profiles_require_keychain_resolved=0
 
 readonly_paths=()
 rw_paths=()
