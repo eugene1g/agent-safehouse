@@ -678,50 +678,7 @@ append_optional_integration_profiles() {
     found_any=1
 
     base_name="$(basename "$key")"
-    case "$base_name" in
-      docker.sb)
-        [[ "$enable_docker_integration" -eq 1 ]] || continue
-        ;;
-      kubectl.sb)
-        [[ "$enable_kubectl_integration" -eq 1 ]] || continue
-        ;;
-      macos-gui.sb)
-        [[ "$enable_macos_gui_integration" -eq 1 ]] \
-          || selected_profiles_require_integration "$macos_gui_requirement_token" \
-          || selected_profiles_require_integration "$electron_requirement_token" \
-          || continue
-        ;;
-      electron.sb)
-        [[ "$enable_electron_integration" -eq 1 ]] \
-          || selected_profiles_require_integration "$electron_requirement_token" \
-          || continue
-        ;;
-      ssh.sb)
-        [[ "$enable_ssh_integration" -eq 1 ]] || continue
-        ;;
-      spotlight.sb)
-        [[ "$enable_spotlight_integration" -eq 1 ]] || continue
-        ;;
-      cleanshot.sb)
-        [[ "$enable_cleanshot_integration" -eq 1 ]] || continue
-        ;;
-      1password.sb)
-        [[ "$enable_onepassword_integration" -eq 1 ]] || continue
-        ;;
-      cloud-credentials.sb)
-        [[ "$enable_cloud_credentials_integration" -eq 1 ]] || continue
-        ;;
-      browser-native-messaging.sb)
-        [[ "$enable_browser_native_messaging_integration" -eq 1 ]] || continue
-        ;;
-      keychain.sb)
-        selected_profiles_require_integration "$keychain_requirement_token" || continue
-        ;;
-      *)
-        echo "Unknown optional integration profile: ${base_name}" >&2
-        exit 1
-        ;;
-    esac
+    should_include_optional_integration_profile "$base_name" || continue
 
     append_profile "$target" "$key"
   done

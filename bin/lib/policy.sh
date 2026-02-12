@@ -69,38 +69,16 @@ parse_enabled_features() {
     trimmed="$(trim_whitespace "$value")"
     [[ -n "$trimmed" ]] || continue
 
+    if [[ "$trimmed" == "onepassword" ]]; then
+      trimmed="1password"
+    fi
+
+    if is_known_optional_integration_feature "$trimmed"; then
+      set_optional_integration_feature_enabled "$trimmed"
+      continue
+    fi
+
     case "$trimmed" in
-      docker)
-        enable_docker_integration=1
-        ;;
-      kubectl)
-        enable_kubectl_integration=1
-        ;;
-      macos-gui)
-        enable_macos_gui_integration=1
-        ;;
-      electron)
-        enable_electron_integration=1
-        enable_macos_gui_integration=1
-        ;;
-      ssh)
-        enable_ssh_integration=1
-        ;;
-      spotlight)
-        enable_spotlight_integration=1
-        ;;
-      cleanshot)
-        enable_cleanshot_integration=1
-        ;;
-      1password|onepassword)
-        enable_onepassword_integration=1
-        ;;
-      cloud-credentials)
-        enable_cloud_credentials_integration=1
-        ;;
-      browser-native-messaging)
-        enable_browser_native_messaging_integration=1
-        ;;
       all-agents)
         enable_all_agents_profiles=1
         ;;
@@ -109,11 +87,99 @@ parse_enabled_features() {
         ;;
       *)
         echo "Unknown feature in --enable: ${trimmed}" >&2
-        echo "Supported features: docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read" >&2
+        echo "Supported features: ${supported_enable_features}" >&2
         exit 1
         ;;
     esac
   done
+}
+
+optional_integration_feature_flag_var() {
+  local feature="$1"
+  local normalized
+
+  case "$feature" in
+    1password)
+      printf '%s\n' "enable_onepassword_integration"
+      return 0
+      ;;
+    "")
+      return 1
+      ;;
+  esac
+
+  normalized="${feature//-/_}"
+  printf 'enable_%s_integration\n' "$normalized"
+}
+
+set_optional_integration_feature_enabled() {
+  local feature="$1"
+  local var_name
+
+  var_name="$(optional_integration_feature_flag_var "$feature")" || return 1
+  printf -v "$var_name" '%s' "1"
+}
+
+optional_integration_feature_enabled() {
+  local feature="$1"
+  local var_name
+
+  var_name="$(optional_integration_feature_flag_var "$feature")" || return 1
+  [[ "${!var_name:-0}" -eq 1 ]]
+}
+
+is_known_optional_integration_feature() {
+  local candidate="$1"
+  local feature
+
+  for feature in "${optional_integration_features[@]-}"; do
+    if [[ "$feature" == "$candidate" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+optional_integration_feature_from_profile_basename() {
+  local profile_basename="$1"
+  local feature
+
+  [[ "$profile_basename" == *.sb ]] || return 1
+  feature="${profile_basename%.sb}"
+
+  if is_known_optional_integration_feature "$feature"; then
+    printf '%s\n' "$feature"
+    return 0
+  fi
+
+  return 1
+}
+
+optional_integration_profile_path_from_feature() {
+  local feature="$1"
+
+  if ! is_known_optional_integration_feature "$feature"; then
+    return 1
+  fi
+
+  printf '%s/55-integrations-optional/%s.sb\n' "$PROFILES_DIR" "$feature"
+}
+
+optional_enabled_integrations_require_integration() {
+  local integration="$1"
+  local feature profile_path
+
+  for feature in "${optional_integration_features[@]-}"; do
+    optional_integration_feature_enabled "$feature" || continue
+
+    profile_path="$(optional_integration_profile_path_from_feature "$feature")" || continue
+    if profile_declares_requirement "$profile_path" "$integration"; then
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 append_selected_agent_profile() {
@@ -409,38 +475,14 @@ append_all_module_profiles() {
 
 emit_integration_preamble() {
   local target="$1"
+  local feature
 
   local -a opt_in_integrations=()
-  if [[ "$enable_docker_integration" -ne 1 ]]; then
-    opt_in_integrations+=("docker")
-  fi
-  if [[ "$enable_kubectl_integration" -ne 1 ]]; then
-    opt_in_integrations+=("kubectl")
-  fi
-  if [[ "$enable_macos_gui_integration" -ne 1 ]]; then
-    opt_in_integrations+=("macos-gui")
-  fi
-  if [[ "$enable_electron_integration" -ne 1 ]]; then
-    opt_in_integrations+=("electron")
-  fi
-  if [[ "$enable_ssh_integration" -ne 1 ]]; then
-    opt_in_integrations+=("ssh")
-  fi
-  if [[ "$enable_spotlight_integration" -ne 1 ]]; then
-    opt_in_integrations+=("spotlight")
-  fi
-  if [[ "$enable_cleanshot_integration" -ne 1 ]]; then
-    opt_in_integrations+=("cleanshot")
-  fi
-  if [[ "$enable_onepassword_integration" -ne 1 ]]; then
-    opt_in_integrations+=("1password")
-  fi
-  if [[ "$enable_cloud_credentials_integration" -ne 1 ]]; then
-    opt_in_integrations+=("cloud-credentials")
-  fi
-  if [[ "$enable_browser_native_messaging_integration" -ne 1 ]]; then
-    opt_in_integrations+=("browser-native-messaging")
-  fi
+  for feature in "${optional_integration_features[@]-}"; do
+    if ! optional_integration_feature_enabled "$feature"; then
+      opt_in_integrations+=("$feature")
+    fi
+  done
 
   if [[ "${#opt_in_integrations[@]}" -gt 0 ]]; then
     echo ";; Opt-in integrations not enabled: ${opt_in_integrations[*]}" >> "$target"
@@ -452,6 +494,30 @@ emit_integration_preamble() {
 
   echo ";; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox." >> "$target"
   echo "" >> "$target"
+}
+
+should_include_optional_integration_profile() {
+  local profile_basename="$1"
+  local feature integration_token
+
+  integration_token="55-integrations-optional/${profile_basename}"
+
+  case "$profile_basename" in
+    keychain.sb)
+      selected_profiles_require_integration "$integration_token" \
+        || optional_enabled_integrations_require_integration "$integration_token"
+      return
+      ;;
+  esac
+
+  feature="$(optional_integration_feature_from_profile_basename "$profile_basename")" || {
+    echo "Unknown optional integration profile: ${profile_basename}" >&2
+    exit 1
+  }
+
+  optional_integration_feature_enabled "$feature" \
+    || selected_profiles_require_integration "$integration_token" \
+    || optional_enabled_integrations_require_integration "$integration_token"
 }
 
 append_optional_integration_profiles() {
@@ -466,50 +532,7 @@ append_optional_integration_profiles() {
 
     local base_name
     base_name="$(basename "$file")"
-    case "$base_name" in
-      docker.sb)
-        [[ "$enable_docker_integration" -eq 1 ]] || continue
-        ;;
-      kubectl.sb)
-        [[ "$enable_kubectl_integration" -eq 1 ]] || continue
-        ;;
-      macos-gui.sb)
-        [[ "$enable_macos_gui_integration" -eq 1 ]] \
-          || selected_profiles_require_integration "$macos_gui_requirement_token" \
-          || selected_profiles_require_integration "$electron_requirement_token" \
-          || continue
-        ;;
-      electron.sb)
-        [[ "$enable_electron_integration" -eq 1 ]] \
-          || selected_profiles_require_integration "$electron_requirement_token" \
-          || continue
-        ;;
-      ssh.sb)
-        [[ "$enable_ssh_integration" -eq 1 ]] || continue
-        ;;
-      spotlight.sb)
-        [[ "$enable_spotlight_integration" -eq 1 ]] || continue
-        ;;
-      cleanshot.sb)
-        [[ "$enable_cleanshot_integration" -eq 1 ]] || continue
-        ;;
-      1password.sb)
-        [[ "$enable_onepassword_integration" -eq 1 ]] || continue
-        ;;
-      cloud-credentials.sb)
-        [[ "$enable_cloud_credentials_integration" -eq 1 ]] || continue
-        ;;
-      browser-native-messaging.sb)
-        [[ "$enable_browser_native_messaging_integration" -eq 1 ]] || continue
-        ;;
-      keychain.sb)
-        selected_profiles_require_integration "$keychain_requirement_token" || continue
-        ;;
-      *)
-        echo "Unknown optional integration profile: ${base_name}" >&2
-        exit 1
-        ;;
-    esac
+    should_include_optional_integration_profile "$base_name" || continue
 
     append_profile "$target" "$file"
   done < <(find "$base_dir" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)

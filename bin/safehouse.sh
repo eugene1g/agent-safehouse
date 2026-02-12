@@ -18,6 +18,19 @@ enable_cleanshot_integration=0
 enable_onepassword_integration=0
 enable_cloud_credentials_integration=0
 enable_browser_native_messaging_integration=0
+optional_integration_features=(
+  docker
+  kubectl
+  macos-gui
+  electron
+  ssh
+  spotlight
+  cleanshot
+  1password
+  cloud-credentials
+  browser-native-messaging
+)
+supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read"
 enable_all_agents_profiles=0
 enable_wide_read_access=0
 output_path=""

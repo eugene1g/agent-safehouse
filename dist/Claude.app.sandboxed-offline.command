@@ -680,6 +680,7 @@ emit_embedded_policy_template() {
 ;; Integration: Electron
 ;; Chromium/Electron runtime: GPU, Metal shaders, crashpad, and WebView.
 ;; Source: 55-integrations-optional/electron.sb
+;; $$require=55-integrations-optional/macos-gui.sb$$
 ;; #safehouse-test-id:electron-integration#
 ;; ---------------------------------------------------------------------------
 
