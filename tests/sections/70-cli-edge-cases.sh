@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_macos_gui policy_enable_electron policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
@@ -32,9 +32,12 @@ run_section_cli_edge_cases() {
   section_begin "Enable Flag Parsing"
   policy_enable_arg="${TEST_CWD}/policy-enable-arg.sb"
   policy_enable_csv="${TEST_CWD}/policy-enable-csv.sb"
+  policy_enable_browser_native_messaging="${TEST_CWD}/policy-enable-browser-native-messaging.sb"
   assert_command_succeeds "--enable docker parses as separate argument form" "$GENERATOR" --output "$policy_enable_arg" --enable docker
   assert_policy_contains "$policy_enable_arg" "--enable docker includes docker grants" "/var/run/docker.sock"
-  assert_policy_contains "$policy_enable_arg" "--enable docker preserves default browser native messaging grants" "/NativeMessagingHosts"
+  assert_policy_not_contains "$policy_enable_arg" "--enable docker does not include browser native messaging grants unless explicitly enabled" "/NativeMessagingHosts"
+  assert_command_succeeds "--enable browser-native-messaging parses as separate argument form" "$GENERATOR" --output "$policy_enable_browser_native_messaging" --enable browser-native-messaging
+  assert_policy_contains "$policy_enable_browser_native_messaging" "--enable browser-native-messaging includes browser native messaging grants" "/NativeMessagingHosts"
   assert_command_succeeds "--enable=docker,electron parses CSV with whitespace" "$GENERATOR" --output "$policy_enable_csv" "--enable=docker, electron"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes docker grants" "/var/run/docker.sock"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes electron grants" "#safehouse-test-id:electron-integration#"
@@ -216,7 +219,7 @@ EOF
   section_begin "Policy Emission Order"
   assert_policy_order_literal "$POLICY_MERGE" "dynamic grants are emitted before workdir grant" "$marker_dynamic" "$marker_workdir"
   assert_policy_order_literal "$POLICY_DEFAULT" "toolchain modules are emitted in deterministic lexical order" ";; Source: 30-toolchains/bun.sb" ";; Source: 30-toolchains/deno.sb"
-  assert_policy_order_literal "$POLICY_DEFAULT" "core integration modules are emitted in deterministic lexical order" ";; Source: 50-integrations-core/1password.sb" ";; Source: 50-integrations-core/browser-native-messaging.sb"
+  assert_policy_order_literal "$POLICY_DEFAULT" "core integration modules are emitted in deterministic lexical order" ";; Source: 50-integrations-core/git.sb" ";; Source: 50-integrations-core/scm-clis.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic agent module order" ";; Source: 60-agents/aider.sb" ";; Source: 60-agents/amp.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Claude module order across agent/app layers" ";; Source: 60-agents/claude-code.sb" ";; Source: 65-apps/claude-app.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Goose module order" ";; Source: 60-agents/gemini.sb" ";; Source: 60-agents/goose.sb"

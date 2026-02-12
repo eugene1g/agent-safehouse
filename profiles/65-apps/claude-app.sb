@@ -16,6 +16,12 @@
     (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
 )
 
+;; Keychain write access for credential storage (keychain.sb is read-only by default).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
+)
+
 (allow file-read*
     (subpath "/Applications/Claude.app")
     (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
@@ -33,6 +39,7 @@
 ;; powerlog logger service is probed by Claude Desktop on startup.
 ;; File coordination and syspolicy services are queried by AppKit/LaunchServices
 ;; flows during file operations and app trust checks.
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID).
 (allow mach-lookup
     (global-name "com.apple.backgroundtaskmanagementagent")
     (global-name "com.apple.appkit.xpc.openAndSavePanelService")
@@ -40,18 +47,14 @@
     (global-name "com.apple.FileCoordination")
     (global-name "com.apple.security.syspolicy")
     (global-name "com.apple.security.syspolicy.exec")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
-)
-
-;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID)
-(allow mach-lookup
     (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
 )
 
 (allow mach-register
     (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
 )

@@ -8,12 +8,16 @@
 ;; - ~/.skills/ (full access)
 ;; - ~/.agents/ (full access)
 ;; - ~/AGENTS.md (full access)
+;; - ~/.claude/agents, ~/.claude/skills, ~/CLAUDE.md (read-only)
 
 (allow file-read* file-write*
     (home-subpath "/.skills")         ;; Shared skill instructions/scripts that agents may read or update.
-    (data-home-subpath "/.skills")    ;; Same skill access on macOS Data volume path aliases.
     (home-subpath "/.agents")         ;; Agent config/skills directory (alternate location alongside ~/.skills).
-    (data-home-subpath "/.agents")
     (home-literal "/AGENTS.md")       ;; Shared agent policy/instructions file read+write for local workflows.
-    (data-home-literal "/AGENTS.md")  ;; Same AGENTS.md access on macOS Data volume path aliases.
+)
+
+(allow file-read*
+    (home-subpath "/.claude/agents")  ;; Cross-agent convention: shared Claude agents directory.
+    (home-subpath "/.claude/skills")  ;; Cross-agent convention: shared Claude skills directory.
+    (home-literal "/CLAUDE.md")       ;; Cross-agent convention: repository/user guidance file.
 )

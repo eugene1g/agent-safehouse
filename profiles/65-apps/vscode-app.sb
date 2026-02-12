@@ -17,16 +17,12 @@
     (home-subpath "/Library/Caches/com.microsoft.VSCode.ShipIt")
     (home-subpath "/Library/Saved Application State/com.microsoft.VSCode.savedState")
     (home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
-    (data-home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
     (home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
-    (data-home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
     (home-subpath "/.vscode")
 
     ;; Direct plist writes/unlink probes used during some Electron preference sync flows.
     (home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
-    (data-home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
     (home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
-    (data-home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
 
     ;; Insiders
     (home-subpath "/Library/Application Support/Code - Insiders")
@@ -36,6 +32,12 @@
     (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
     (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
     (home-subpath "/.vscode-insiders")
+)
+
+;; Keychain write access for credential storage (keychain.sb is read-only by default).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -55,6 +57,7 @@
 ;; powerlog logger service is probed by Electron on startup.
 ;; File coordination and syspolicy services are queried by AppKit/LaunchServices
 ;; flows during file operations and app trust checks.
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle IDs).
 (allow mach-lookup
     (global-name "com.apple.backgroundtaskmanagementagent")
     (global-name "com.apple.appkit.xpc.openAndSavePanelService")
@@ -62,15 +65,6 @@
     (global-name "com.apple.FileCoordination")
     (global-name "com.apple.security.syspolicy")
     (global-name "com.apple.security.syspolicy.exec")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
-)
-
-;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle IDs)
-(allow mach-lookup
     (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
 )
@@ -78,4 +72,9 @@
 (allow mach-register
     (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
 )

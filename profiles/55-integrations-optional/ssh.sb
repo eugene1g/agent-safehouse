@@ -1,7 +1,7 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: SSH
 ;; SSH agent sockets, system config, key deny rules, and safe config access.
-;; Source: 50-integrations-core/ssh.sb
+;; Source: 55-integrations-optional/ssh.sb
 ;; ---------------------------------------------------------------------------
 
 ;; Consolidates agent socket access, system config reads, key deny rules, and safe config allowances.
@@ -9,13 +9,11 @@
 ;; Defense-in-depth: block private key reads/writes by default.
 (deny file-read* file-write*
     (home-subpath "/.ssh")                                          ;; Block SSH key reads and tampering from any jailed agent process.
-    (data-home-subpath "/.ssh")                                     ;; Same deny for macOS Data volume path aliases.
 )
 
 ;; Directory traversal so specific-file allows below can resolve through ~/.ssh.
 (allow file-read-metadata
     (home-literal "/.ssh")
-    (data-home-literal "/.ssh")
 )
 
 ;; Allow non-sensitive SSH metadata that agents need for git/remote operations.

@@ -1,7 +1,7 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: Browser Native Messaging
 ;; Browser native messaging host registration (Chromium + Firefox) and Chromium extension detection.
-;; Source: 50-integrations-core/browser-native-messaging.sb
+;; Source: 55-integrations-optional/browser-native-messaging.sb
 ;; ---------------------------------------------------------------------------
 
 ;; Three things are needed per Chromium browser:
@@ -22,15 +22,6 @@
     (home-literal "/Library/Application Support/com.operasoftware.Opera")
     (home-literal "/Library/Application Support/Firefox")
     (home-literal "/Library/Application Support/Mozilla")
-    (data-home-literal "/Library/Application Support/Google/Chrome")
-    (data-home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
-    (data-home-literal "/Library/Application Support/Arc/User Data")
-    (data-home-literal "/Library/Application Support/Microsoft Edge")
-    (data-home-literal "/Library/Application Support/Chromium")
-    (data-home-literal "/Library/Application Support/Vivaldi")
-    (data-home-literal "/Library/Application Support/com.operasoftware.Opera")
-    (data-home-literal "/Library/Application Support/Firefox")
-    (data-home-literal "/Library/Application Support/Mozilla")
     (home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
     (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
     (home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
@@ -38,13 +29,6 @@
     (home-subpath "/Library/Application Support/Chromium/Default/Extensions")
     (home-subpath "/Library/Application Support/Vivaldi/Default/Extensions")
     (home-subpath "/Library/Application Support/com.operasoftware.Opera/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Microsoft Edge/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Chromium/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Vivaldi/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/Default/Extensions")
 )
 
 (allow file-read* file-write*
@@ -56,12 +40,4 @@
     (home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
     (home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
     (home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Microsoft Edge/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
 )

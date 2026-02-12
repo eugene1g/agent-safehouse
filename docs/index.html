@@ -1260,11 +1260,11 @@
           <li>Full process exec/fork (agents spawn deep trees)</li>
           <li>Scoped toolchain caches (<code class="il">~/.cargo</code>, <code class="il">~/.npm</code>, etc.)</li>
           <li>Command-matched agent config dirs (<code class="il">~/.claude</code>, <code class="il">~/.cursor</code>, etc.)</li>
-          <li>Keychain and Security framework (always-on)</li>
+          <li>Keychain and Security framework (selectively injected for keychain-dependent agents/apps)</li>
           <li>Shell startup files (<code class="il">~/.zshenv</code>, <code class="il">~/.zprofile</code>)</li>
           <li>Network (fully open by default)</li>
-          <li>SSH config and known_hosts (not private keys)</li>
-          <li>Cloud credentials (always-on by default; deny via overrides if needed)</li>
+          <li>SSH config and known_hosts (optional via <code class="il">--enable=ssh</code>; private keys still denied)</li>
+          <li>Cloud credentials (optional via <code class="il">--enable=cloud-credentials</code>)</li>
           <li>Temp directories (<code class="il">/tmp</code>, <code class="il">/var/folders</code>)</li>
         </ul>
       </div>
@@ -1276,7 +1276,7 @@
           <li>Raw device access (<code class="il">/dev/disk*</code>, <code class="il">/dev/bpf*</code>)</li>
           <li>Setuid/setgid binaries (<code class="il">sudo</code>, <code class="il">passwd</code>)</li>
           <li>Everything not explicitly allowed (deny-first)</li>
-          <li>Cloud credentials are NOT denied by default (deny via overrides)</li>
+          <li>Cloud credentials are denied by default unless explicitly enabled</li>
           <li>Directories outside your project and toolchains</li>
         </ul>
       </div>
@@ -1289,12 +1289,12 @@
     <h2 class="section-title">Necessary evils</h2>
     <p class="section-sub">Access that looks scary but is genuinely required. Narrowest scope possible.</p>
     <ul class="why-list fade-in">
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations-core/keychain.sb">Keychain &amp; Security framework</a></strong>  - most agents store login tokens in macOS Keychain and cannot authenticate without it. We allow read/write to Keychain files and Security mach services (<code class="il">com.apple.SecurityServer</code>, <code class="il">trustd</code>) because agents fail to start without them. This also covers TLS certificate validation.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/55-integrations-optional/keychain.sb">Keychain &amp; Security framework</a></strong>  - most agents store login tokens in macOS Keychain and cannot authenticate without it. Keychain access is now injected selectively for keychain-dependent agent/app profiles instead of baseline default. This keeps compatibility while reducing ambient secret exposure.</li>
       <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/10-system-runtime.sb">Device nodes</a></strong>  - agents need <code class="il">/dev/null</code>, <code class="il">/dev/urandom</code>, <code class="il">/dev/tty*</code>, and <code class="il">/dev/ptmx</code> for basic I/O, randomness, and pseudo-terminal allocation. We allow these specific safe nodes but deny raw disk access (<code class="il">/dev/disk*</code>), packet capture (<code class="il">/dev/bpf*</code>), and audit devices.</li>
       <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/20-network.sb">Full network access</a></strong> <span class="evil-tag">Configurable</span>  - agents need package registries, LLM APIs, MCP servers, git remotes, and localhost dev servers. The default policy is fully open, but <a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/20-network.sb">profiles/20-network.sb</a> includes commented alternatives for outbound-only or localhost-only modes.</li>
       <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/10-system-runtime.sb">Mach services &amp; IPC</a></strong>  - macOS frameworks probe dozens of mach services during process init  - notification center, <code class="il">logd</code>, <code class="il">diagnosticd</code>, CoreServices, and more. Without these, even basic CLI tools like <code class="il">git</code> and <code class="il">node</code> crash on startup.</li>
       <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/00-base.sb">Full process exec &amp; fork</a></strong>  - agents orchestrate deep subprocess trees: shell &rarr; git &rarr; ssh &rarr; credential-helper. Restricting <code class="il">process-exec</code> or <code class="il">process-fork</code> would break every agent immediately. Instead, we constrain <em>what</em> those processes can access via filesystem rules.</li>
-      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations-core/1password.sb">1Password &amp; credential helpers</a></strong> <span class="evil-tag">Configurable</span>  - git credential helpers, SSH agent forwarding, and CLI tools like <code class="il">gh</code> and <code class="il">glab</code> often rely on 1Password or the macOS SSH agent socket. The <a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/50-integrations-core/ssh.sb">SSH profile</a> still denies private key files  - only the agent socket and 1Password CLI integration are allowed.</li>
+      <li><strong><a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/55-integrations-optional/1password.sb">1Password &amp; credential helpers</a></strong> <span class="evil-tag">Configurable</span>  - git credential helpers, SSH agent forwarding, and CLI tools like <code class="il">gh</code> and <code class="il">glab</code> often rely on 1Password or the macOS SSH agent socket. Enable this with <code class="il">--enable=1password</code>. The <a href="https://github.com/eugene1g/agent-safehouse/blob/main/profiles/55-integrations-optional/ssh.sb">SSH profile</a> (enabled via <code class="il">--enable=ssh</code>) still denies private key files; only the agent socket and safe SSH metadata paths are allowed.</li>
     </ul>
   </div>
 </section>
@@ -1426,7 +1426,6 @@ mkdir -p ~/.config/agent-safehouse
 cat > ~/.config/agent-safehouse/local-overrides.sb <<'EOF'
 (allow file-read*
   (home-literal "/.gitignore_global")
-  (data-home-literal "/.gitignore_global")
 )
 EOF
 

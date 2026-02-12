@@ -8,22 +8,27 @@
 ;; - local state/config under ~/.claude and ~/.claude.json
 ;; - macOS managed policy files under /Library/Application Support/ClaudeCode
 ;; - optional Claude Desktop MCP import source in ~/Library/Application Support/Claude
-;; - optional user-level guidance file at ~/CLAUDE.md
+;; - optional user-level guidance file at ~/CLAUDE.md (granted via shared profile)
 
 (allow file-read* file-write*
     (home-prefix "/.local/bin/claude")
     (home-subpath "/.cache/claude")
     (home-prefix "/.claude") ; this include .claude folder, as well as .claude.json and .claude.lock.json etc files
+    (home-subpath "/.config/claude")
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")
-    (home-literal "/CLAUDE.md")
-    (data-home-literal "/CLAUDE.md")
+    (home-literal "/.mcp.json")
+)
+
+;; Keychain write access: Claude Code stores API keys in macOS Keychain via security CLI.
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
     (home-prefix "/.claude.json.")
     (home-literal "/Library/Application Support/Claude/claude_desktop_config.json")
-    (data-home-literal "/Library/Application Support/Claude/claude_desktop_config.json")
     (subpath "/Library/Application Support/ClaudeCode/.claude")
     (literal "/Library/Application Support/ClaudeCode/managed-settings.json")
     (literal "/Library/Application Support/ClaudeCode/managed-mcp.json")

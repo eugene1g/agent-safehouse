@@ -6,16 +6,26 @@
 
 ;; - npm package @kilocode/cli installs `kilocode` and `kilo` executables
 ;; - ~/.local/bin is the common user-level target and fallback for npm/pnpm shims
-;; - Kilo CLI stores config, logs, sessions, and commands under ~/.kilocode
-;; - CLI reads VS Code extension global storage (for example global custom modes)
+;; - Kilo CLI stores config, logs, sessions, and commands under ~/.kilocode (and legacy ~/.roo)
+;; - CLI uses VS Code extension global storage for tasks/sessions/settings/cache
+;; - MDM config is read from /Library/Application Support/RooCode
+;; - macOS MCP server directory may live under ~/Documents/Kilo-Code/MCP
 
 (allow file-read* file-write*
     (home-prefix "/.local/bin/kilo")
     (home-prefix "/.local/bin/kilocode")
     (home-subpath "/.kilocode")
+    (home-subpath "/.roo")
+    (home-subpath "/Documents/Kilo-Code/MCP")
+    (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+)
+
+;; Keychain write access: Kilo Code stores API keys via VS Code SecretStorage (macOS Keychain).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
-    (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
-    (data-home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+    (subpath "/Library/Application Support/RooCode")
 )

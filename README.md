@@ -62,7 +62,6 @@ cat > ~/.config/agent-safehouse/local-overrides.sb <<'EOF'
 ;; Local user overrides
 (allow file-read*
   (home-literal "/.gitignore_global")
-  (data-home-literal "/.gitignore_global")
 )
 EOF
 ```

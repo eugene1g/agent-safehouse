@@ -15,6 +15,12 @@
     (home-subpath "/.cache/gemini")
 )
 
+;; Keychain write access: Gemini CLI stores auth tokens via keytar (macOS Keychain).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
+)
+
 ;; Enterprise managed settings
 (allow file-read*
     (subpath "/Library/Application Support/GeminiCli")

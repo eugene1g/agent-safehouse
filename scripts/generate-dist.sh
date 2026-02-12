@@ -518,6 +518,7 @@ append_all_module_profiles() {
   for key in "${PROFILE_KEYS[@]}"; do
     [[ "$key" == "${profile_prefix}"* ]] || continue
     found_any=1
+
     if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$key"; then
       continue
     fi
@@ -583,6 +584,29 @@ append_optional_integration_profiles() {
         ;;
       electron.sb)
         [[ "$enable_electron_integration" -eq 1 ]] || continue
+        ;;
+      ssh.sb)
+        [[ "$enable_ssh_integration" -eq 1 ]] || continue
+        ;;
+      spotlight.sb)
+        [[ "$enable_spotlight_integration" -eq 1 ]] || continue
+        ;;
+      cleanshot.sb)
+        [[ "$enable_cleanshot_integration" -eq 1 ]] || continue
+        ;;
+      1password.sb)
+        [[ "$enable_onepassword_integration" -eq 1 ]] || continue
+        ;;
+      cloud-credentials.sb)
+        [[ "$enable_cloud_credentials_integration" -eq 1 ]] || continue
+        ;;
+      browser-native-messaging.sb)
+        [[ "$enable_browser_native_messaging_integration" -eq 1 ]] || continue
+        ;;
+      keychain.sb)
+        # Keychain rules are now defined in agent/app profiles directly.
+        # Keep this module skipped to avoid duplicating those grants.
+        continue
         ;;
       *)
         echo "Unknown optional integration profile: ${base_name}" >&2

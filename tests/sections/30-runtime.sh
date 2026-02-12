@@ -5,8 +5,11 @@ run_section_runtime() {
   assert_allowed "$POLICY_DEFAULT" "read /usr/bin" /bin/ls /usr/bin
   assert_allowed_if_exists "$POLICY_DEFAULT" "read /opt (Homebrew)" "/opt" /bin/ls /opt
   assert_allowed "$POLICY_DEFAULT" "read system frameworks" /bin/ls /System/Library/Frameworks
+  assert_denied_if_exists "$POLICY_DEFAULT" "read /System/Volumes/Data/Library/Keychains denied" "/System/Volumes/Data/Library/Keychains" /bin/ls /System/Volumes/Data/Library/Keychains
+  assert_denied_if_exists "$POLICY_DEFAULT" "read /System/Volumes/Data/Users/Shared denied" "/System/Volumes/Data/Users/Shared" /bin/ls /System/Volumes/Data/Users/Shared
   assert_allowed "$POLICY_DEFAULT" "read /dev/null" /bin/cat /dev/null
   assert_allowed "$POLICY_DEFAULT" "read /dev/urandom (1 byte)" /bin/dd if=/dev/urandom bs=1 count=1
+  assert_denied_strict "$POLICY_DEFAULT" "write /dev/zero denied" /bin/sh -c 'printf x > /dev/zero'
   assert_allowed "$POLICY_DEFAULT" "read /tmp" /bin/ls /tmp
   assert_allowed_strict "$POLICY_DEFAULT" "write to /tmp" /usr/bin/touch "$TEST_TMP_CANARY"
   assert_allowed "$POLICY_DEFAULT" "read shell startup (/etc/zshrc)" /bin/cat /private/etc/zshrc

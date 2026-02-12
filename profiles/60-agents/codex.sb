@@ -15,6 +15,15 @@
     (home-subpath "/.cache/codex")
 )
 
+;; Keychain write access: Codex stores auth credentials via keyring crate (apple-native).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
+)
+
 (allow file-read*
-    (home-literal "/Library/Preferences/com.openai.codex.plist")  ;; Codex macOS preferences plist.
+    (home-literal "/Library/Preferences/com.openai.codex.plist")  ;; Codex user-level preferences plist.
+    (literal "/Library/Preferences/com.openai.codex.plist")       ;; Codex system preferences plist (managed setups).
+    (literal "/Library/Managed Preferences/com.openai.codex.plist") ;; Codex MDM-managed preferences payload.
+    (subpath "/etc/codex")                                         ;; System-wide config and requirements layers.
 )

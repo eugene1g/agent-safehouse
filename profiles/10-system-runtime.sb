@@ -11,7 +11,8 @@
     (subpath "/bin")                                                  ;; POSIX userland binaries used by shell/task orchestration.
     (subpath "/sbin")                                                 ;; System utilities some build/test flows invoke.
     (subpath "/opt")                                                  ;; Homebrew and other package-manager install roots.
-    (subpath "/System")                                               ;; macOS runtime frameworks and system assets for dynamic linking.
+    (subpath "/System/Library")                                       ;; macOS runtime frameworks/resources; excludes broader /System/Volumes data paths.
+    (subpath "/System/Volumes/Preboot")                               ;; system libraries and frameworks may resolve through this path
     (subpath "/Library/Apple")                                        ;; Apple private frameworks touched by Node/Bun/JVM/native toolchains.
     (subpath "/Library/Frameworks")                                   ;; Global framework lookup path for language runtimes and CLIs.
     (subpath "/Library/Java")                                         ;; JVM runtime and helper assets.
@@ -21,6 +22,10 @@
     (literal "/Library/Preferences/.GlobalPreferences.plist")         ;; Locale/time/user defaults queried by runtimes.
     (literal "/Library/Preferences/com.apple.networkd.plist")         ;; DNS/network bootstrap reads networkd config.
     (literal "/dev")                                                  ;; /dev directory listing; shells enumerate it during initialization.
+)
+
+(allow file-read-metadata
+   (subpath "/System")
 )
 
 ;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to common runtime needs.
@@ -88,25 +93,48 @@
 (allow mach-priv-task-port (target same-sandbox))                     ;; Required by some runtimes for same-sandbox process controls.
 (allow pseudo-tty)                                                    ;; Required for interactive terminal sessions and PTY allocation.
 
-(allow file-read* file-write* file-ioctl
+(allow file-read* file-write*
     (subpath "/tmp")                                                  ;; Primary temp dir for transient files and IPC sockets.
     (subpath "/private/tmp")                                          ;; macOS backing path for /tmp.
     (subpath "/var/folders")                                          ;; macOS per-user temp/cache roots used by many CLIs.
     (subpath "/private/var/folders")                                  ;; macOS backing path for /var/folders.
+)
+
+;; Defense-in-depth: keep launchd-managed user socket endpoints opt-in by integration profile.
+(deny file-read* file-write*
+    (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")
+    (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")
+)
+
+(allow file-read* file-write*
     (subpath "/dev/fd")                                               ;; Process substitution and file-descriptor access (bash <(...), /dev/fd/N).
     (literal "/dev/stdout")                                           ;; Standard output stream device.
     (literal "/dev/stderr")                                           ;; Standard error stream device.
     (literal "/dev/null")                                             ;; Null sink/source device used by scripts/tools.
-    (literal "/dev/zero")                                             ;; Zero-filled device used by some runtimes/tests.
     (literal "/dev/tty")                                              ;; Controlling terminal device for interactive sessions.
     (literal "/dev/ptmx")                                             ;; PTY multiplexer required for pseudo-terminal allocation.
+    (literal "/dev/dtracehelper")                                             
+    (regex #"^/dev/tty")                                              ;; Dynamic tty device names created for terminal sessions.
+    (regex #"^/dev/ttys")                                             ;; Alternate tty naming pattern on macOS.
+    (regex #"^/dev/pty")                                              ;; Legacy PTY naming pattern used by some tools.
+)
+
+(allow file-read*
+    (literal "/dev/zero")                                             ;; Zero-filled source used by some runtimes/tests.
     (literal "/dev/autofs_nowait")                                    ;; Automount readiness check probed by most CLI processes at startup.
     (literal "/dev/dtracehelper")                                     ;; DTrace helper probed by dyld at process start; harmless read avoids log noise.
     (literal "/dev/urandom")                                          ;; Non-blocking entropy source used by crypto/token generation.
     (literal "/dev/random")                                           ;; Blocking entropy source used by some security-sensitive tools.
-    (regex #"^/dev/tty")                                              ;; Dynamic tty device names created for terminal sessions.
-    (regex #"^/dev/ttys")                                             ;; Alternate tty naming pattern on macOS.
-    (regex #"^/dev/pty")                                              ;; Legacy PTY naming pattern used by some tools.
+)
+
+;; Restrict ioctl to terminal-related devices needed for interactive shell behavior.
+(allow file-ioctl
+    (literal "/dev/dtracehelper")                                             
+    (literal "/dev/tty")
+    (literal "/dev/ptmx")
+    (regex #"^/dev/tty")
+    (regex #"^/dev/ttys")
+    (regex #"^/dev/pty")
 )
 
 (allow mach-lookup

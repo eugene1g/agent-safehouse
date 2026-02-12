@@ -34,11 +34,10 @@ Policy scope options:
   --enable FEATURES
   --enable=FEATURES
       Comma-separated optional features to enable
-      Supported values: docker, macos-gui, electron, all-agents, wide-read
+      Supported values: docker, macos-gui, electron, ssh, spotlight, cleanshot, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read
       Note: electron implies macos-gui
       Note: all-agents restores legacy behavior by loading every 60-agents and 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)
-      Browser native messaging is always on (not toggleable)
 
   --add-dirs-ro PATHS
   --add-dirs-ro=PATHS

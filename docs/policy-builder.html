@@ -658,10 +658,10 @@
           <span class="step-number">3</span>
           <h2>Things you want your agents to access</h2>
 
-          <p class="group-title">Default-enabled integrations (enabled by default; toggle off if you don’t need them)</p>
+          <p class="group-title">Always-on core integrations</p>
           <div id="integrations-default-grid" class="grid"></div>
 
-          <p class="group-title">Additional integrations</p>
+          <p class="group-title">Optional integrations</p>
           <div id="integrations-extra-grid" class="grid"></div>
 
           <p class="group-title" style="margin-top:12px">Desktop app profiles</p>
@@ -770,19 +770,18 @@
       ];
 
       var INTEGRATIONS = [
-        { key: '1password', label: '1Password', path: 'profiles/50-integrations-core/1password.sb', group: 'default', logo: 'https://github.com/1Password.png?size=96', on: true },
-        { key: 'browser-nm', label: 'Browser native messaging', path: 'profiles/50-integrations-core/browser-native-messaging.sb', group: 'default', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/chrome/chrome-original.svg', on: true },
-        { key: 'cleanshot', label: 'CleanShot', path: 'profiles/50-integrations-core/cleanshot.sb', group: 'default', glyph: '📸', on: true },
-        { key: 'cloud-creds', label: 'Cloud credentials', path: 'profiles/50-integrations-core/cloud-credentials.sb', group: 'default', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg', on: true },
         { key: 'git', label: 'Git', path: 'profiles/50-integrations-core/git.sb', group: 'default', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg', on: true },
-        { key: 'keychain', label: 'Keychain', path: 'profiles/50-integrations-core/keychain.sb', group: 'default', glyph: '🔐', on: true },
         { key: 'scm-clis', label: 'SCM CLIs', path: 'profiles/50-integrations-core/scm-clis.sb', group: 'default', logo: 'https://github.com/github.png?size=96', on: true },
-        { key: 'spotlight', label: 'Spotlight', path: 'profiles/50-integrations-core/spotlight.sb', group: 'default', glyph: '🔎', on: true },
-        { key: 'ssh', label: 'SSH', path: 'profiles/50-integrations-core/ssh.sb', group: 'default', glyph: '>_', on: true },
-
+        { key: '1password', label: '1Password', path: 'profiles/55-integrations-optional/1password.sb', group: 'extra', feature: '1password', logo: 'https://github.com/1Password.png?size=96', on: false },
+        { key: 'browser-native-messaging', label: 'Browser native messaging', path: 'profiles/55-integrations-optional/browser-native-messaging.sb', group: 'extra', feature: 'browser-native-messaging', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/chrome/chrome-original.svg', on: false },
+        { key: 'cleanshot', label: 'CleanShot', path: 'profiles/55-integrations-optional/cleanshot.sb', group: 'extra', feature: 'cleanshot', glyph: '📸', on: false },
+        { key: 'cloud-credentials', label: 'Cloud credentials', path: 'profiles/55-integrations-optional/cloud-credentials.sb', group: 'extra', feature: 'cloud-credentials', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg', on: false },
         { key: 'docker', label: 'Docker', path: 'profiles/55-integrations-optional/docker.sb', group: 'extra', feature: 'docker', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg', on: false },
         { key: 'electron', label: 'Electron', path: 'profiles/55-integrations-optional/electron.sb', group: 'extra', feature: 'electron', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/electron/electron-original.svg', on: false },
+        { key: 'keychain', label: 'Keychain', path: 'profiles/55-integrations-optional/keychain.sb', group: 'extra', glyph: '🔐', on: false },
         { key: 'macos-gui', label: 'macOS GUI', path: 'profiles/55-integrations-optional/macos-gui.sb', group: 'extra', feature: 'macosGui', glyph: '', on: false },
+        { key: 'spotlight', label: 'Spotlight', path: 'profiles/55-integrations-optional/spotlight.sb', group: 'extra', feature: 'spotlight', glyph: '🔎', on: false },
+        { key: 'ssh', label: 'SSH', path: 'profiles/55-integrations-optional/ssh.sb', group: 'extra', feature: 'ssh', glyph: '>_', on: false },
         { key: 'wide-read', label: 'Wide read', group: 'extra', feature: 'wideRead', glyph: '👁', on: false }
       ];
 
@@ -924,6 +923,12 @@
         if (!s.docker) offOpt.push('docker');
         if (!s.macosGui) offOpt.push('macos-gui');
         if (!s.electron) offOpt.push('electron');
+        if (!s.ssh) offOpt.push('ssh');
+        if (!s.spotlight) offOpt.push('spotlight');
+        if (!s.cleanshot) offOpt.push('cleanshot');
+        if (!s.onepassword) offOpt.push('1password');
+        if (!s.cloudCredentials) offOpt.push('cloud-credentials');
+        if (!s.browserNativeMessaging) offOpt.push('browser-native-messaging');
 
         if (offOpt.length) {
           l.push(';; Optional integrations not enabled: ' + offOpt.join(' '));
@@ -1004,6 +1009,13 @@
         var electron = !!byKey['electron'];
         var macosGui = !!byKey['macos-gui'] || electron;
         var docker = !!byKey['docker'];
+        var ssh = !!byKey['ssh'];
+        var spotlight = !!byKey['spotlight'];
+        var cleanshot = !!byKey['cleanshot'];
+        var onepassword = !!byKey['1password'];
+        var cloudCredentials = !!byKey['cloud-credentials'];
+        var browserNativeMessaging = !!byKey['browser-native-messaging'];
+        var keychain = !!byKey['keychain'];
         var wideRead = !!byKey['wide-read'];
 
         if (electron) {
@@ -1043,6 +1055,13 @@
           docker: docker,
           electron: electron,
           macosGui: macosGui,
+          ssh: ssh,
+          spotlight: spotlight,
+          cleanshot: cleanshot,
+          onepassword: onepassword,
+          cloudCredentials: cloudCredentials,
+          browserNativeMessaging: browserNativeMessaging,
+          keychain: keychain,
           wideRead: wideRead
         };
       }
@@ -1067,6 +1086,12 @@
         if (s.docker) feats.push('docker');
         if (s.electron) feats.push('electron');
         if (!s.electron && s.macosGui) feats.push('macos-gui');
+        if (s.ssh) feats.push('ssh');
+        if (s.spotlight) feats.push('spotlight');
+        if (s.cleanshot) feats.push('cleanshot');
+        if (s.onepassword) feats.push('1password');
+        if (s.cloudCredentials) feats.push('cloud-credentials');
+        if (s.browserNativeMessaging) feats.push('browser-native-messaging');
         if (s.wideRead) feats.push('wide-read');
 
         var flags = [];
@@ -1084,6 +1109,9 @@
 
         if (s.disabledDefaultIntegrationLabels.length) {
           l.push('# Note: disabled default integrations are specific to this static policy output.');
+        }
+        if (s.keychain) {
+          l.push('# Note: keychain is selectable in the builder policy; safehouse CLI injects keychain automatically for keychain-dependent agent/app profiles.');
         }
 
         return l.join('\n');

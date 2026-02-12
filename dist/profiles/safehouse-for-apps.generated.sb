@@ -19,15 +19,11 @@
 ;; Manual policy-only example (no generator):
 ;;   Replace the next line with:
 ;;     (define HOME_DIR "/Users/alice")
-;;   and keep DATA_HOME_DIR unchanged.
 (define HOME_DIR "/tmp/agent-safehouse-static-template/home")
-(define DATA_HOME_DIR (string-append "/System/Volumes/Data" HOME_DIR))
 
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
 (define (home-literal rel) (literal (string-append HOME_DIR rel)))
 (define (home-prefix rel) (prefix (string-append HOME_DIR rel)))
-(define (data-home-subpath rel) (subpath (string-append DATA_HOME_DIR rel)))
-(define (data-home-literal rel) (literal (string-append DATA_HOME_DIR rel)))
 
 (deny default)
 
@@ -44,7 +40,8 @@
     (subpath "/bin")                                                  ;; POSIX userland binaries used by shell/task orchestration.
     (subpath "/sbin")                                                 ;; System utilities some build/test flows invoke.
     (subpath "/opt")                                                  ;; Homebrew and other package-manager install roots.
-    (subpath "/System")                                               ;; macOS runtime frameworks and system assets for dynamic linking.
+    (subpath "/System/Library")                                       ;; macOS runtime frameworks/resources; excludes broader /System/Volumes data paths.
+    (subpath "/System/Volumes/Preboot")                               ;; system libraries and frameworks may resolve through this path
     (subpath "/Library/Apple")                                        ;; Apple private frameworks touched by Node/Bun/JVM/native toolchains.
     (subpath "/Library/Frameworks")                                   ;; Global framework lookup path for language runtimes and CLIs.
     (subpath "/Library/Java")                                         ;; JVM runtime and helper assets.
@@ -54,6 +51,10 @@
     (literal "/Library/Preferences/.GlobalPreferences.plist")         ;; Locale/time/user defaults queried by runtimes.
     (literal "/Library/Preferences/com.apple.networkd.plist")         ;; DNS/network bootstrap reads networkd config.
     (literal "/dev")                                                  ;; /dev directory listing; shells enumerate it during initialization.
+)
+
+(allow file-read-metadata
+   (subpath "/System")
 )
 
 ;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to common runtime needs.
@@ -121,25 +122,48 @@
 (allow mach-priv-task-port (target same-sandbox))                     ;; Required by some runtimes for same-sandbox process controls.
 (allow pseudo-tty)                                                    ;; Required for interactive terminal sessions and PTY allocation.
 
-(allow file-read* file-write* file-ioctl
+(allow file-read* file-write*
     (subpath "/tmp")                                                  ;; Primary temp dir for transient files and IPC sockets.
     (subpath "/private/tmp")                                          ;; macOS backing path for /tmp.
     (subpath "/var/folders")                                          ;; macOS per-user temp/cache roots used by many CLIs.
     (subpath "/private/var/folders")                                  ;; macOS backing path for /var/folders.
+)
+
+;; Defense-in-depth: keep launchd-managed user socket endpoints opt-in by integration profile.
+(deny file-read* file-write*
+    (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")
+    (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")
+)
+
+(allow file-read* file-write*
     (subpath "/dev/fd")                                               ;; Process substitution and file-descriptor access (bash <(...), /dev/fd/N).
     (literal "/dev/stdout")                                           ;; Standard output stream device.
     (literal "/dev/stderr")                                           ;; Standard error stream device.
     (literal "/dev/null")                                             ;; Null sink/source device used by scripts/tools.
-    (literal "/dev/zero")                                             ;; Zero-filled device used by some runtimes/tests.
     (literal "/dev/tty")                                              ;; Controlling terminal device for interactive sessions.
     (literal "/dev/ptmx")                                             ;; PTY multiplexer required for pseudo-terminal allocation.
+    (literal "/dev/dtracehelper")                                             
+    (regex #"^/dev/tty")                                              ;; Dynamic tty device names created for terminal sessions.
+    (regex #"^/dev/ttys")                                             ;; Alternate tty naming pattern on macOS.
+    (regex #"^/dev/pty")                                              ;; Legacy PTY naming pattern used by some tools.
+)
+
+(allow file-read*
+    (literal "/dev/zero")                                             ;; Zero-filled source used by some runtimes/tests.
     (literal "/dev/autofs_nowait")                                    ;; Automount readiness check probed by most CLI processes at startup.
     (literal "/dev/dtracehelper")                                     ;; DTrace helper probed by dyld at process start; harmless read avoids log noise.
     (literal "/dev/urandom")                                          ;; Non-blocking entropy source used by crypto/token generation.
     (literal "/dev/random")                                           ;; Blocking entropy source used by some security-sensitive tools.
-    (regex #"^/dev/tty")                                              ;; Dynamic tty device names created for terminal sessions.
-    (regex #"^/dev/ttys")                                             ;; Alternate tty naming pattern on macOS.
-    (regex #"^/dev/pty")                                              ;; Legacy PTY naming pattern used by some tools.
+)
+
+;; Restrict ioctl to terminal-related devices needed for interactive shell behavior.
+(allow file-ioctl
+    (literal "/dev/dtracehelper")                                             
+    (literal "/dev/tty")
+    (literal "/dev/ptmx")
+    (regex #"^/dev/tty")
+    (regex #"^/dev/ttys")
+    (regex #"^/dev/pty")
 )
 
 (allow mach-lookup
@@ -525,156 +549,25 @@
 ;; - ~/.skills/ (full access)
 ;; - ~/.agents/ (full access)
 ;; - ~/AGENTS.md (full access)
+;; - ~/.claude/agents, ~/.claude/skills, ~/CLAUDE.md (read-only)
 
 (allow file-read* file-write*
     (home-subpath "/.skills")         ;; Shared skill instructions/scripts that agents may read or update.
-    (data-home-subpath "/.skills")    ;; Same skill access on macOS Data volume path aliases.
     (home-subpath "/.agents")         ;; Agent config/skills directory (alternate location alongside ~/.skills).
-    (data-home-subpath "/.agents")
     (home-literal "/AGENTS.md")       ;; Shared agent policy/instructions file read+write for local workflows.
-    (data-home-literal "/AGENTS.md")  ;; Same AGENTS.md access on macOS Data volume path aliases.
 )
 
-;; Opt-in integrations not enabled: docker
+(allow file-read*
+    (home-subpath "/.claude/agents")  ;; Cross-agent convention: shared Claude agents directory.
+    (home-subpath "/.claude/skills")  ;; Cross-agent convention: shared Claude skills directory.
+    (home-literal "/CLAUDE.md")       ;; Cross-agent convention: repository/user guidance file.
+)
+
+;; Opt-in integrations not enabled: docker ssh spotlight cleanshot 1password cloud-credentials browser-native-messaging
 ;; Use --enable=<feature> (comma-separated) to include them.
 ;; Note: --enable=electron also enables macos-gui.
 
 ;; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.
-
-;; ---------------------------------------------------------------------------
-;; Integration: 1Password
-;; 1Password desktop app and CLI agent socket access.
-;; Source: 50-integrations-core/1password.sb
-;; ---------------------------------------------------------------------------
-
-(allow file-read* file-write*
-    (home-subpath "/.config/op")                               ;; 1Password CLI (op) config and session tokens.
-    (home-subpath "/.1password")                               ;; 1Password SSH agent symlink dir (includes ~/.1password/agent.sock).
-    (subpath "/Users/Shared/.1password")                       ;; Some installs use shared path for SSH agent socket.
-    (regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))       ;; 1Password SSH agent socket directory (team prefix varies).
-    (regex (string-append "^" DATA_HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t(/.*)?$"))  ;; Data-volume variant for APFS firmlink traversal.
-)
-
-;; 1Password Desktop settings probe (read-only)
-;; Newer op builds read settings.json here to detect Desktop integration state.
-(allow file-read*
-    (regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"))      ;; Desktop settings dir (includes settings.json).
-    (regex (string-append "^" DATA_HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$")) ;; Data-volume variant for APFS firmlink traversal.
-)
-
-;; 1Password Browser Helper probes the installed op binary path for Desktop integration.
-;; Homebrew Cask installs resolve under versioned Caskroom directories.
-(allow file-read*
-    (regex #"^/opt/homebrew/Caskroom/1password-cli(/.*)?$")                      ;; Apple Silicon Homebrew Cask path.
-    (regex #"^/System/Volumes/Data/opt/homebrew/Caskroom/1password-cli(/.*)?$") ;; Data-volume alias for APFS firmlink traversal.
-    (regex #"^/usr/local/Caskroom/1password-cli(/.*)?$")                         ;; Intel Homebrew Cask path.
-    (regex #"^/System/Volumes/Data/usr/local/Caskroom/1password-cli(/.*)?$")    ;; Data-volume alias for APFS firmlink traversal.
-)
-
-;; 1Password SSH agent config
-(allow file-read*
-    (home-subpath "/.config/1Password")  ;; ssh/agent.toml — controls which keys are offered.
-)
-
-(allow mach-lookup
-    (global-name-regex #"^([A-Za-z0-9]+\.)?com\.1password(\..*)?$")  ;; 1Password app/service IPC endpoints (including team-prefixed browser-helper names).
-    (global-name-regex #"^com\.agilebits(\..*)?$")                    ;; Legacy AgileBits service names still used by some installs.
-)
-
-;; ---------------------------------------------------------------------------
-;; Integration: Browser Native Messaging
-;; Browser native messaging host registration (Chromium + Firefox) and Chromium extension detection.
-;; Source: 50-integrations-core/browser-native-messaging.sb
-;; ---------------------------------------------------------------------------
-
-;; Three things are needed per Chromium browser:
-;;   1. Directory listing on the browser root (check if browser is installed)
-;;   2. Read+write on NativeMessagingHosts (register/update the native messaging manifest)
-;;   3. Read on Default/Extensions (check if a specific extension is installed)
-;; Firefox support only needs NativeMessagingHosts registration paths.
-;; Extensions dir only contains publicly-available extension source/manifests — no browsing data.
-;; No access to cookies, passwords, history, bookmarks, or profile data.
-
-(allow file-read*
-    (home-literal "/Library/Application Support/Google/Chrome")
-    (home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
-    (home-literal "/Library/Application Support/Arc/User Data")
-    (home-literal "/Library/Application Support/Microsoft Edge")
-    (home-literal "/Library/Application Support/Chromium")
-    (home-literal "/Library/Application Support/Vivaldi")
-    (home-literal "/Library/Application Support/com.operasoftware.Opera")
-    (home-literal "/Library/Application Support/Firefox")
-    (home-literal "/Library/Application Support/Mozilla")
-    (data-home-literal "/Library/Application Support/Google/Chrome")
-    (data-home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
-    (data-home-literal "/Library/Application Support/Arc/User Data")
-    (data-home-literal "/Library/Application Support/Microsoft Edge")
-    (data-home-literal "/Library/Application Support/Chromium")
-    (data-home-literal "/Library/Application Support/Vivaldi")
-    (data-home-literal "/Library/Application Support/com.operasoftware.Opera")
-    (data-home-literal "/Library/Application Support/Firefox")
-    (data-home-literal "/Library/Application Support/Mozilla")
-    (home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
-    (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
-    (home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
-    (home-subpath "/Library/Application Support/Microsoft Edge/Default/Extensions")
-    (home-subpath "/Library/Application Support/Chromium/Default/Extensions")
-    (home-subpath "/Library/Application Support/Vivaldi/Default/Extensions")
-    (home-subpath "/Library/Application Support/com.operasoftware.Opera/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Microsoft Edge/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Chromium/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/Vivaldi/Default/Extensions")
-    (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/Default/Extensions")
-)
-
-(allow file-read* file-write*
-    (home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
-    (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
-    (home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
-    (home-subpath "/Library/Application Support/Microsoft Edge/NativeMessagingHosts")
-    (home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
-    (home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
-    (home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
-    (home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Microsoft Edge/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
-    (data-home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
-)
-
-;; ---------------------------------------------------------------------------
-;; Integration: CleanShot
-;; Read access to CleanShot screenshot/recording media for pasting into agents.
-;; Source: 50-integrations-core/cleanshot.sb
-;; ---------------------------------------------------------------------------
-
-(allow file-read*
-    (home-subpath "/Library/Application Support/CleanShot/media")       ;; Screenshot and recording files saved by CleanShot X.
-    (data-home-subpath "/Library/Application Support/CleanShot/media")  ;; Data-volume variant for APFS firmlink traversal.
-)
-
-;; ---------------------------------------------------------------------------
-;; Integration: Cloud Credentials
-;; Cloud provider CLI/SDK credential, config, and cache access.
-;; Source: 50-integrations-core/cloud-credentials.sb
-;; ---------------------------------------------------------------------------
-
-;; Threat-model note: preventing exfiltration/C2 is NOT a goal; this keeps cloud tooling usable when needed.
-;; Use --append-profile to selectively deny specific providers (e.g. block ~/.aws reads).
-
-(allow file-read* file-write*
-    (home-subpath "/.aws")            ;; AWS profiles/sso/cache files needed for aws cli and SDK auth flows.
-    (home-subpath "/.config/gcloud")  ;; gcloud account/config/token files needed for CLI auth and project commands.
-    (home-subpath "/.azure")          ;; Azure CLI config, credentials, and token cache.
-    (home-subpath "/.azd")            ;; Azure Developer CLI environment/auth state.
-)
 
 ;; ---------------------------------------------------------------------------
 ;; Integration: Git
@@ -686,54 +579,6 @@
     (home-prefix "/.gitconfig")    ;; User gitconfig and variants (.gitconfig.local, etc.) read by git CLI.
     (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
     (home-literal "/.gitattributes")  ;; Global gitattributes file.
-)
-
-;; ---------------------------------------------------------------------------
-;; Integration: Keychain
-;; macOS Keychain and Security framework for agent authentication and TLS.
-;; Source: 50-integrations-core/keychain.sb
-;; ---------------------------------------------------------------------------
-
-;; Most agents (Claude Code, Amp, etc.) store login/auth tokens in the macOS Keychain.
-;; Without this, agents cannot authenticate and will fail to start.
-;; Read+write access is needed for credential storage, retrieval, and TLS certificate validation.
-
-(allow file-read* file-write*
-    (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.
-    (data-home-subpath "/Library/Keychains")                   ;; Same keychain access on macOS Data volume path aliases.
-)
-
-(allow file-read-metadata
-    (home-literal "/Library")                                  ;; Restrict home traversal to the Library root only.
-    (home-literal "/Library/Keychains")                        ;; User keychain directory metadata for login/session lookups.
-    (data-home-literal "/Library")                             ;; Same traversal on macOS Data volume path aliases.
-    (data-home-literal "/Library/Keychains")                   ;; Same keychain metadata on macOS Data volume path aliases.
-    (literal "/Library")                                       ;; System Library traversal for system keychain access.
-    (literal "/Library/Keychains")                             ;; System keychain directory metadata.
-)
-
-(allow file-read* file-write*
-    (home-literal "/Library/Preferences/com.apple.security.plist")   ;; User security preferences touched by some auth flows.
-    (data-home-literal "/Library/Preferences/com.apple.security.plist") ;; Same preferences path on macOS Data volume aliases.
-    (literal "/Library/Preferences/com.apple.security.plist")  ;; Security preferences read/written by security CLI.
-)
-
-(allow file-read*
-    (literal "/Library/Keychains/System.keychain")             ;; System keychain read for security CLI operations.
-)
-
-(allow mach-lookup
-    (global-name "com.apple.SecurityServer")                   ;; Keychain operations depend on SecurityServer IPC.
-    (global-name "com.apple.security.agent")                   ;; Login prompts/token unlock dialogs route through this service.
-    (global-name "com.apple.securityd.xpc")                    ;; securityd backend needed for certificate/key queries.
-    (global-name "com.apple.security.authhost")                ;; Auth host service for interactive credential flows.
-    (global-name "com.apple.secd")                             ;; Secure enclave/credential mediation used by macOS security APIs.
-    (global-name "com.apple.trustd.agent")                     ;; Certificate trust evaluation for HTTPS/API clients.
-    (global-name "com.apple.trustd")                           ;; trustd backend used by TLS validation during network calls.
-)
-
-(allow ipc-posix-shm-read-data ipc-posix-shm-write-create ipc-posix-shm-write-data
-    (ipc-posix-name "com.apple.AppleDatabaseChanged")          ;; Keychain database change notifications via shared memory.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -753,66 +598,6 @@
     (home-subpath "/.cache/glab-cli")        ;; glab cache for API and command acceleration.
     (home-subpath "/.local/share/glab-cli")  ;; glab persistent state.
     (home-subpath "/.local/state/glab-cli")  ;; glab runtime state files.
-)
-
-;; ---------------------------------------------------------------------------
-;; Integration: Spotlight
-;; Spotlight search via mdfind/mdls/mdutil for filesystem indexing.
-;; Source: 50-integrations-core/spotlight.sb
-;; ---------------------------------------------------------------------------
-
-(allow file-read* file-write*
-    (subpath "/private/var/db/mds")                    ;; Spotlight metadata store; also hosts se_SecurityMessages used by keychain.
-)
-
-(allow mach-lookup
-    (global-name "com.apple.metadata.mds")             ;; Primary Spotlight metadata server used by mdfind/mdls queries.
-    (global-name "com.apple.metadata.mds.legacy")      ;; Legacy Spotlight query interface still used by some tools.
-    (global-name "com.apple.PowerManagement.control")  ;; Power state queries used by spotlightknowledged helper.
-)
-
-;; ---------------------------------------------------------------------------
-;; Integration: SSH
-;; SSH agent sockets, system config, key deny rules, and safe config access.
-;; Source: 50-integrations-core/ssh.sb
-;; ---------------------------------------------------------------------------
-
-;; Consolidates agent socket access, system config reads, key deny rules, and safe config allowances.
-
-;; Defense-in-depth: block private key reads/writes by default.
-(deny file-read* file-write*
-    (home-subpath "/.ssh")                                          ;; Block SSH key reads and tampering from any jailed agent process.
-    (data-home-subpath "/.ssh")                                     ;; Same deny for macOS Data volume path aliases.
-)
-
-;; Directory traversal so specific-file allows below can resolve through ~/.ssh.
-(allow file-read-metadata
-    (home-literal "/.ssh")
-    (data-home-literal "/.ssh")
-)
-
-;; Allow non-sensitive SSH metadata that agents need for git/remote operations.
-(allow file-read*
-    (home-literal "/.ssh/known_hosts")                              ;; Host verification for GitHub/remote connections.
-    (home-literal "/.ssh/config")                                   ;; Custom host definitions used by git-ssh and scp.
-    (home-subpath "/.ssh/config.d")                                 ;; Include-based SSH config fragments.
-    (home-literal "/.ssh/allowed_signers")                          ;; SSH signature verification (git commit signing).
-    (literal "/private/etc/ssh/ssh_config")                         ;; System SSH client config read during ssh/git-ssh connections.
-    (subpath "/private/etc/ssh/ssh_config.d")                       ;; SSH config.d drop-in directory read by modern ssh clients.
-    (literal "/private/etc/ssh/crypto.conf")                        ;; System-wide SSH crypto policy (ciphers, MACs, KEX algorithms).
-    (subpath "/private/etc/ssh/crypto")                             ;; SSH crypto config subdirectory (e.g. apple.conf).
-)
-
-;; Allow writing known_hosts so first-connect host key acceptance persists.
-(allow file-write*
-    (home-literal "/.ssh/known_hosts")                              ;; Persist host keys on first connection.
-    (home-literal "/.ssh/known_hosts.old")                          ;; Rotated during host key updates.
-)
-
-;; SSH agent socket access via launchd-managed SSH_AUTH_SOCK.
-(allow file-read* file-write*
-    (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")  ;; launchd-managed SSH_AUTH_SOCK path on macOS.
-    (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")          ;; symlinked tmp variant of SSH_AUTH_SOCK path.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -892,9 +677,7 @@
     (literal "/Library/Preferences/com.apple.HIToolbox.plist")
     (home-subpath "/Library/Preferences/com.apple.LaunchServices")
     (home-subpath "/Library/Application Support/CrashReporter")
-    (data-home-subpath "/Library/Application Support/CrashReporter")
     (home-subpath "/Library/Spelling")
-    (data-home-subpath "/Library/Spelling")
     (home-literal "/Library/Keyboard Layouts")
     (home-literal "/Library/Input Methods")
 )
@@ -921,7 +704,6 @@
     (home-literal "/Library/Logs")
     (home-literal "/Library/Mobile Documents")
     (home-subpath "/Library/Mobile Documents")
-    (data-home-subpath "/Library/Mobile Documents")
     (home-literal "/Library/Spelling")
     (home-literal "/.Trash")
 )
@@ -1034,6 +816,10 @@
     (home-prefix "/.local/bin/aider")
     (home-prefix "/.local/bin/aider-install")
     (home-prefix "/.aider")
+    (home-literal "/.aider.conf.yml")
+    (home-literal "/.aider.model.settings.yml")
+    (home-literal "/.aider.model.metadata.json")
+    (home-literal "/.env")
     (home-subpath "/.config/aider")
     (home-subpath "/.cache/aider")
     (home-subpath "/.local/share/aider")
@@ -1049,6 +835,8 @@
 ;;   - ~/.amp/bin/amp
 ;;   - ~/.local/bin/amp (symlink target)
 ;; - local state/config
+;; - auth storage: Amp CLI stores encrypted credentials in ~/.local/share/amp/secrets.json
+;;   (not macOS Keychain)
 
 (allow file-read* file-write*
     (home-prefix "/.amp/bin/amp")
@@ -1085,22 +873,27 @@
 ;; - local state/config under ~/.claude and ~/.claude.json
 ;; - macOS managed policy files under /Library/Application Support/ClaudeCode
 ;; - optional Claude Desktop MCP import source in ~/Library/Application Support/Claude
-;; - optional user-level guidance file at ~/CLAUDE.md
+;; - optional user-level guidance file at ~/CLAUDE.md (granted via shared profile)
 
 (allow file-read* file-write*
     (home-prefix "/.local/bin/claude")
     (home-subpath "/.cache/claude")
     (home-prefix "/.claude") ; this include .claude folder, as well as .claude.json and .claude.lock.json etc files
+    (home-subpath "/.config/claude")
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")
-    (home-literal "/CLAUDE.md")
-    (data-home-literal "/CLAUDE.md")
+    (home-literal "/.mcp.json")
+)
+
+;; Keychain write access: Claude Code stores API keys in macOS Keychain via security CLI.
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
     (home-prefix "/.claude.json.")
     (home-literal "/Library/Application Support/Claude/claude_desktop_config.json")
-    (data-home-literal "/Library/Application Support/Claude/claude_desktop_config.json")
     (subpath "/Library/Application Support/ClaudeCode/.claude")
     (literal "/Library/Application Support/ClaudeCode/managed-settings.json")
     (literal "/Library/Application Support/ClaudeCode/managed-mcp.json")
@@ -1124,6 +917,18 @@
     (home-subpath "/.local/share/cline")
     (home-subpath "/.local/state/cline")
     (home-subpath "/Documents/Cline")               ;; Cline MCP servers, rules, workflows, hooks.
+    (home-subpath "/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev")
+    (home-literal "/.qwen/oauth_creds.json")
+)
+
+;; Keychain write access: Cline stores API keys via VS Code SecretStorage (macOS Keychain).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
+)
+
+(allow file-read*
+    (home-literal "/.oca/config.json")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1143,8 +948,17 @@
     (home-subpath "/.cache/codex")
 )
 
+;; Keychain write access: Codex stores auth credentials via keyring crate (apple-native).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
+)
+
 (allow file-read*
-    (home-literal "/Library/Preferences/com.openai.codex.plist")  ;; Codex macOS preferences plist.
+    (home-literal "/Library/Preferences/com.openai.codex.plist")  ;; Codex user-level preferences plist.
+    (literal "/Library/Preferences/com.openai.codex.plist")       ;; Codex system preferences plist (managed setups).
+    (literal "/Library/Managed Preferences/com.openai.codex.plist") ;; Codex MDM-managed preferences payload.
+    (subpath "/etc/codex")                                         ;; System-wide config and requirements layers.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1212,6 +1026,12 @@
     (home-subpath "/.cache/gemini")
 )
 
+;; Keychain write access: Gemini CLI stores auth tokens via keytar (macOS Keychain).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
+)
+
 ;; Enterprise managed settings
 (allow file-read*
     (subpath "/Library/Application Support/GeminiCli")
@@ -1234,6 +1054,13 @@
     (home-subpath "/.cache/goose")
     (home-subpath "/.local/share/goose")
     (home-subpath "/.local/state/goose")
+    (home-subpath "/Library/Application Support/Block.goose")
+)
+
+;; Keychain write access: Goose stores secrets via keyring crate (apple-native).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1244,18 +1071,28 @@
 
 ;; - npm package @kilocode/cli installs `kilocode` and `kilo` executables
 ;; - ~/.local/bin is the common user-level target and fallback for npm/pnpm shims
-;; - Kilo CLI stores config, logs, sessions, and commands under ~/.kilocode
-;; - CLI reads VS Code extension global storage (for example global custom modes)
+;; - Kilo CLI stores config, logs, sessions, and commands under ~/.kilocode (and legacy ~/.roo)
+;; - CLI uses VS Code extension global storage for tasks/sessions/settings/cache
+;; - MDM config is read from /Library/Application Support/RooCode
+;; - macOS MCP server directory may live under ~/Documents/Kilo-Code/MCP
 
 (allow file-read* file-write*
     (home-prefix "/.local/bin/kilo")
     (home-prefix "/.local/bin/kilocode")
     (home-subpath "/.kilocode")
+    (home-subpath "/.roo")
+    (home-subpath "/Documents/Kilo-Code/MCP")
+    (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+)
+
+;; Keychain write access: Kilo Code stores API keys via VS Code SecretStorage (macOS Keychain).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
-    (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
-    (data-home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
+    (subpath "/Library/Application Support/RooCode")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1322,6 +1159,12 @@
     (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
 )
 
+;; Keychain write access for credential storage (keychain.sb is read-only by default).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
+)
+
 (allow file-read*
     (subpath "/Applications/Claude.app")
     (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
@@ -1339,6 +1182,7 @@
 ;; powerlog logger service is probed by Claude Desktop on startup.
 ;; File coordination and syspolicy services are queried by AppKit/LaunchServices
 ;; flows during file operations and app trust checks.
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID).
 (allow mach-lookup
     (global-name "com.apple.backgroundtaskmanagementagent")
     (global-name "com.apple.appkit.xpc.openAndSavePanelService")
@@ -1346,20 +1190,16 @@
     (global-name "com.apple.FileCoordination")
     (global-name "com.apple.security.syspolicy")
     (global-name "com.apple.security.syspolicy.exec")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
-)
-
-;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle ID)
-(allow mach-lookup
     (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
 )
 
 (allow mach-register
     (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1381,16 +1221,12 @@
     (home-subpath "/Library/Caches/com.microsoft.VSCode.ShipIt")
     (home-subpath "/Library/Saved Application State/com.microsoft.VSCode.savedState")
     (home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
-    (data-home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
     (home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
-    (data-home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
     (home-subpath "/.vscode")
 
     ;; Direct plist writes/unlink probes used during some Electron preference sync flows.
     (home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
-    (data-home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
     (home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
-    (data-home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
 
     ;; Insiders
     (home-subpath "/Library/Application Support/Code - Insiders")
@@ -1400,6 +1236,12 @@
     (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
     (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
     (home-subpath "/.vscode-insiders")
+)
+
+;; Keychain write access for credential storage (keychain.sb is read-only by default).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )
 
 (allow file-read*
@@ -1419,6 +1261,7 @@
 ;; powerlog logger service is probed by Electron on startup.
 ;; File coordination and syspolicy services are queried by AppKit/LaunchServices
 ;; flows during file operations and app trust checks.
+;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle IDs).
 (allow mach-lookup
     (global-name "com.apple.backgroundtaskmanagementagent")
     (global-name "com.apple.appkit.xpc.openAndSavePanelService")
@@ -1426,15 +1269,6 @@
     (global-name "com.apple.FileCoordination")
     (global-name "com.apple.security.syspolicy")
     (global-name "com.apple.security.syspolicy.exec")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
-)
-
-;; Electron MachPortRendezvousServer IPC (PID-suffixed, app-specific bundle IDs)
-(allow mach-lookup
     (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
 )
@@ -1442,6 +1276,11 @@
 (allow mach-register
     (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
+)
+
+;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during Desktop app file flows.
+(allow system-fsctl
+    (fsctl-command (_IO "h" 47))
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.

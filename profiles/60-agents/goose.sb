@@ -15,4 +15,11 @@
     (home-subpath "/.cache/goose")
     (home-subpath "/.local/share/goose")
     (home-subpath "/.local/state/goose")
+    (home-subpath "/Library/Application Support/Block.goose")
+)
+
+;; Keychain write access: Goose stores secrets via keyring crate (apple-native).
+(allow file-write*
+    (home-subpath "/Library/Keychains")
+    (home-literal "/Library/Preferences/com.apple.security.plist")
 )

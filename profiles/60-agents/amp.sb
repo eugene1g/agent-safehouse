@@ -8,6 +8,8 @@
 ;;   - ~/.amp/bin/amp
 ;;   - ~/.local/bin/amp (symlink target)
 ;; - local state/config
+;; - auth storage: Amp CLI stores encrypted credentials in ~/.local/share/amp/secrets.json
+;;   (not macOS Keychain)
 
 (allow file-read* file-write*
     (home-prefix "/.amp/bin/amp")

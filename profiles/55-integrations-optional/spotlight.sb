@@ -1,12 +1,8 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: Spotlight
 ;; Spotlight search via mdfind/mdls/mdutil for filesystem indexing.
-;; Source: 50-integrations-core/spotlight.sb
+;; Source: 55-integrations-optional/spotlight.sb
 ;; ---------------------------------------------------------------------------
-
-(allow file-read* file-write*
-    (subpath "/private/var/db/mds")                    ;; Spotlight metadata store; also hosts se_SecurityMessages used by keychain.
-)
 
 (allow mach-lookup
     (global-name "com.apple.metadata.mds")             ;; Primary Spotlight metadata server used by mdfind/mdls queries.

@@ -1,35 +1,24 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: Keychain
 ;; macOS Keychain and Security framework for agent authentication and TLS.
-;; Source: 50-integrations-core/keychain.sb
+;; Source: 55-integrations-optional/keychain.sb
 ;; ---------------------------------------------------------------------------
 
-;; Most agents (Claude Code, Amp, etc.) store login/auth tokens in the macOS Keychain.
-;; Without this, agents cannot authenticate and will fail to start.
-;; Read+write access is needed for credential storage, retrieval, and TLS certificate validation.
+;; Read-only by default. Apps that store credentials in keychain add write grants in their own profiles.
 
-(allow file-read* file-write*
+(allow file-read*
     (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.
-    (data-home-subpath "/Library/Keychains")                   ;; Same keychain access on macOS Data volume path aliases.
+    (home-literal "/Library/Preferences/com.apple.security.plist")   ;; User security preferences read by some auth flows.
+    (literal "/Library/Preferences/com.apple.security.plist")  ;; Security preferences read by security CLI.
+    (literal "/Library/Keychains/System.keychain")             ;; System keychain read for security CLI operations.
+    (subpath "/private/var/db/mds")                            ;; MDS message store; hosts se_SecurityMessages used by securityd IPC.
 )
 
 (allow file-read-metadata
     (home-literal "/Library")                                  ;; Restrict home traversal to the Library root only.
     (home-literal "/Library/Keychains")                        ;; User keychain directory metadata for login/session lookups.
-    (data-home-literal "/Library")                             ;; Same traversal on macOS Data volume path aliases.
-    (data-home-literal "/Library/Keychains")                   ;; Same keychain metadata on macOS Data volume path aliases.
     (literal "/Library")                                       ;; System Library traversal for system keychain access.
     (literal "/Library/Keychains")                             ;; System keychain directory metadata.
-)
-
-(allow file-read* file-write*
-    (home-literal "/Library/Preferences/com.apple.security.plist")   ;; User security preferences touched by some auth flows.
-    (data-home-literal "/Library/Preferences/com.apple.security.plist") ;; Same preferences path on macOS Data volume aliases.
-    (literal "/Library/Preferences/com.apple.security.plist")  ;; Security preferences read/written by security CLI.
-)
-
-(allow file-read*
-    (literal "/Library/Keychains/System.keychain")             ;; System keychain read for security CLI operations.
 )
 
 (allow mach-lookup
