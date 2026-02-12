@@ -21,17 +21,17 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 - **Full process exec/fork**  - agents orchestrate deep subprocess trees (shell > git > ssh > credential-helper). Restricting process creation is impractical.
 - **Toolchain and app/agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and app/agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`, and `Visual Studio Code.app` loads `vscode-app`). Use `--enable=all-agents` to restore legacy behavior and load every scoped app/agent profile.
 - **Keychain and Security framework** (auto-injected for keychain-dependent profiles)  - profiles can declare `$$require=55-integrations-optional/keychain.sb$$`, and Safehouse injects shared keychain/security rules automatically for those agents/apps. This avoids duplicating keychain rules across many profile files while keeping non-keychain agents on a tighter baseline.
-- **Cloud credential stores** (always-on)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are enabled by default for compatibility. Safehouse does **not** protect cloud credentials by default; block them with `--append-profile` denies if needed.
+- **Cloud credential stores** (opt-in)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are available via `--enable=cloud-credentials` and are disabled by default because they expose sensitive credentials.
 - **Shell startup files**  - `~/.zshenv`, `~/.zprofile`, `/etc/zshrc`, etc. Without these, agents get a broken PATH and misconfigured environment.
-- **SSH config (not `~/.ssh` keys)**  - `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
+- **SSH config (not `~/.ssh` keys)**  - available when `--enable=ssh` is set: `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
 - **Runtime mach services**  - notification center, logd, diagnosticd, CoreServices, DiskArbitration, DNS-SD, opendirectory, FSEvents, trustd, etc. These are framework-level dependencies that many CLI tools probe during init.
 - **Network (fully open)**  - agents need package registries, APIs, MCP servers, and git remotes. Restricting network is possible but breaks most workflows.
 - **Temp directories**  - `/tmp`, `/var/folders`. Transient files, IPC sockets, build artifacts.
 
 ### What we specifically deny (and why)
 
-- **`~/.ssh` private keys (default policy)**  - blocked by default via the SSH integration profile; only `config` and `known_hosts` are re-allowed. If you explicitly grant `~/.ssh` later via CLI path grants, you can override this.
-- **Browser profile directories (default)**  - browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging support is always-on, but narrowly scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only) paths.
+- **`~/.ssh` private keys**  - blocked by default. With `--enable=ssh`, the SSH integration still denies `~/.ssh` broadly and only re-allows non-sensitive config paths like `config` and `known_hosts`.
+- **Browser profile directories (default)**  - browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging access is opt-in via `--enable=browser-native-messaging`, scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only).
 - **`/dev` raw device access**  - this policy allows `/dev` traversal/metadata plus specific safe device nodes (`/dev/null`, `/dev/urandom`, `/dev/tty*`, `/dev/ptmx`, `/dev/autofs_nowait`). It does not grant broad read/write access to raw device files.
 - **`forbidden-exec-sugid`**  - execution of setuid/setgid binaries (`sudo`, `passwd`, etc.) is denied. Agents should never escalate privileges. If a specific setuid binary is needed, allow it by name rather than blanket-allowing privilege escalation.
 - **`osascript` execution** (optional)  - if you want to hard-block AppleScript entrypoints, add a deny in a custom appended profile file (`--append-profile`). This can reduce GUI/session automation surface but may break agent notification UX.
@@ -180,7 +180,8 @@ safehouse --enable=all-agents codex
 # Big-hammer mode: read-only visibility across / (use cautiously)
 safehouse --enable=wide-read -- claude --dangerously-skip-permissions
 
-# Browser native messaging integration is always on (not toggleable)
+# Enable browser native messaging integration (off by default)
+safehouse --enable=browser-native-messaging -- codex
 
 # Enable macOS GUI integration (off by default)
 safehouse --enable=macos-gui -- /Applications/TextEdit.app/Contents/MacOS/TextEdit
@@ -282,14 +283,14 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 | `20-network.sb` | Network policy (fully open) |
 | `30-toolchains/*.sb` | Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent policy modules |
-| `50-integrations-core/*.sb` | Always-on integrations: Git, SSH, Keychain, Spotlight, AWS, GCloud, GitHub/GitLab CLI, 1Password, Browser NM |
-| `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: Docker, macOS GUI, Electron (`electron` also enables `macos-gui`) |
+| `50-integrations-core/*.sb` | Always-on integrations: `git` and `scm-clis` |
+| `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: `docker`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging` (`electron` also enables `macos-gui`; keychain is auto-injected for profiles that declare `$$require=55-integrations-optional/keychain.sb$$`) |
 | `60-agents/*.sb` | Product-specific per-agent config/state paths selected by wrapped command basename |
 | `65-apps/*.sb` | Desktop app bundle profiles selected by known app bundles (`Claude.app`, `Visual Studio Code.app`) (`--enable=all-agents` loads all `60-agents` + `65-apps` profiles) |
 | Config/env/CLI path grants | `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
 | Appended profile(s) | Optional extra profile files appended last via `--append-profile=PATH` (repeatable) |
 
-Later rules override earlier ones. CLI path grants are emitted late, so broad `--add-dirs` can reopen paths denied earlier. `--enable=wide-read` is intentionally broad and can also reopen earlier read-denies. Put must-not-read paths in appended profiles (`--append-profile`) if you want them to remain blocked. Cloud credential stores are allowed by default via always-on integrations; deny them explicitly if your threat model requires it.
+SBPL rule interactions are matcher-dependent. Safehouse tests currently verify that broad late grants (for example `--add-dirs` and `--enable=wide-read`) can reopen earlier read-denies, while some deny+allow literal/subpath combinations still remain denied. Put must-not-read paths in appended profiles (`--append-profile`) if you want them to remain blocked. Cloud credential stores are opt-in via `--enable=cloud-credentials`.
 
 ## Options
 
@@ -299,7 +300,7 @@ Later rules override earlier ones. CLI path grants are emitted late, so broad `-
 | `--add-dirs-ro=PATHS` | Colon-separated paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
-| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility) |
+| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 

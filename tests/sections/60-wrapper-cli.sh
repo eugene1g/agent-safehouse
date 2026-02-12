@@ -5,8 +5,11 @@ run_section_wrapper_and_cli() {
   local stdout_first_line stdout_canary output_policy config_file config_policy
   local dist_path dist_no_command_policy dist_no_command_status dist_stdout_first_line
   local dist_stdout_canary dist_output_policy dist_policy_from_bin dist_policy_from_dist
+  local dist_policy_from_bin_codex dist_policy_from_dist_codex
+  local dist_policy_from_bin_claude_app dist_policy_from_dist_claude_app
   local dist_claude_launcher dist_claude_offline_launcher dist_output_dir dist_launcher_path dist_offline_launcher_path
   local dist_default_static dist_apps_static
+  local dist_fake_bin_dir dist_fake_codex_bin dist_fake_claude_app_dir dist_fake_claude_app_bin
   local dist_append_profile_file dist_append_profile_policy dist_append_profile_marker
 
   section_begin "safehouse.sh Entry Point"
@@ -180,11 +183,20 @@ EOF
   dist_output_policy="${TEST_CWD}/dist-output-policy.sb"
   dist_policy_from_bin="${TEST_CWD}/bin-policy-parity.sb"
   dist_policy_from_dist="${TEST_CWD}/dist-policy-parity.sb"
+  dist_policy_from_bin_codex="${TEST_CWD}/bin-policy-parity-codex.sb"
+  dist_policy_from_dist_codex="${TEST_CWD}/dist-policy-parity-codex.sb"
+  dist_policy_from_bin_claude_app="${TEST_CWD}/bin-policy-parity-claude-app.sb"
+  dist_policy_from_dist_claude_app="${TEST_CWD}/dist-policy-parity-claude-app.sb"
+  dist_fake_bin_dir="${TEST_CWD}/dist-parity-bin"
+  dist_fake_codex_bin="${dist_fake_bin_dir}/codex"
+  dist_fake_claude_app_dir="${TEST_CWD}/dist-parity-app/Claude.app"
+  dist_fake_claude_app_bin="${dist_fake_claude_app_dir}/Contents/MacOS/Claude"
   dist_append_profile_file="${TEST_CWD}/dist-append-profile.sb"
   dist_append_profile_policy="${TEST_CWD}/dist-append-profile-policy.sb"
   dist_append_profile_marker="#safehouse-test-id:dist-append-profile-external#"
   rm -rf "$dist_output_dir"
-  rm -f "$dist_path" "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_append_profile_file" "$dist_append_profile_policy"
+  rm -rf "$dist_fake_bin_dir" "${TEST_CWD}/dist-parity-app"
+  rm -f "$dist_path" "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex" "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app" "$dist_append_profile_file" "$dist_append_profile_policy"
 
   assert_command_succeeds "generate-dist script succeeds" "${REPO_ROOT}/scripts/generate-dist.sh" --output "$dist_path" --output-dir "$dist_output_dir"
   if [[ -x "$dist_path" ]]; then
@@ -259,8 +271,41 @@ EOF
     log_fail "dist safehouse policy output matches bin/safehouse.sh byte-for-byte"
   fi
 
+  mkdir -p "$dist_fake_bin_dir" "$(dirname "$dist_fake_claude_app_bin")"
+  cp /usr/bin/true "$dist_fake_codex_bin"
+  cp /usr/bin/true "$dist_fake_claude_app_bin"
+
+  assert_command_succeeds "bin safehouse writes command-scoped Codex parity policy file in --stdout mode" "$SAFEHOUSE" --stdout --output "$dist_policy_from_bin_codex" -- "$dist_fake_codex_bin"
+  assert_command_succeeds "dist safehouse writes command-scoped Codex parity policy file in --stdout mode" "$dist_path" --stdout --output "$dist_policy_from_dist_codex" -- "$dist_fake_codex_bin"
+  assert_policy_contains "$dist_policy_from_bin_codex" "bin Codex policy includes codex agent profile marker" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$dist_policy_from_bin_codex" "bin Codex policy auto-injects keychain integration marker" ";; Integration: Keychain"
+  assert_policy_contains "$dist_policy_from_dist_codex" "dist Codex policy includes codex agent profile marker" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$dist_policy_from_dist_codex" "dist Codex policy auto-injects keychain integration marker" ";; Integration: Keychain"
+  if cmp -s "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex"; then
+    log_pass "dist Codex command-scoped policy output matches bin/safehouse.sh byte-for-byte"
+  else
+    log_fail "dist Codex command-scoped policy output matches bin/safehouse.sh byte-for-byte"
+  fi
+
+  assert_command_succeeds "bin safehouse writes command-scoped Claude.app parity policy file in --stdout mode" "$SAFEHOUSE" --stdout --output "$dist_policy_from_bin_claude_app" -- "$dist_fake_claude_app_bin"
+  assert_command_succeeds "dist safehouse writes command-scoped Claude.app parity policy file in --stdout mode" "$dist_path" --stdout --output "$dist_policy_from_dist_claude_app" -- "$dist_fake_claude_app_bin"
+  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy includes app profile marker" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy auto-injects keychain integration marker" ";; Integration: Keychain"
+  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy auto-injects macOS GUI integration marker" ";; Integration: macOS GUI"
+  assert_policy_contains "$dist_policy_from_bin_claude_app" "bin Claude.app policy auto-injects electron integration marker" "#safehouse-test-id:electron-integration#"
+  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy includes app profile marker" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy auto-injects keychain integration marker" ";; Integration: Keychain"
+  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy auto-injects macOS GUI integration marker" ";; Integration: macOS GUI"
+  assert_policy_contains "$dist_policy_from_dist_claude_app" "dist Claude.app policy auto-injects electron integration marker" "#safehouse-test-id:electron-integration#"
+  if cmp -s "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app"; then
+    log_pass "dist Claude.app command-scoped policy output matches bin/safehouse.sh byte-for-byte"
+  else
+    log_fail "dist Claude.app command-scoped policy output matches bin/safehouse.sh byte-for-byte"
+  fi
+
   rm -rf "$dist_output_dir"
-  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_append_profile_file" "$dist_append_profile_policy"
+  rm -rf "$dist_fake_bin_dir" "${TEST_CWD}/dist-parity-app"
+  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex" "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app" "$dist_append_profile_file" "$dist_append_profile_policy"
 }
 
 register_section run_section_wrapper_and_cli

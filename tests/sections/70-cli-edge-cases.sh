@@ -11,10 +11,11 @@ run_section_cli_edge_cases() {
   local append_profile_tilde_file
   local test_ro_dir_rel test_ro_dir_2_rel test_rw_dir_2_rel
   local resolved_test_rw_dir resolved_test_ro_dir
-  local marker_dynamic marker_workdir marker_append_profile_one marker_append_profile_two
+  local marker_dynamic marker_workdir marker_container_runtime_socket_deny marker_append_profile_one marker_append_profile_two
 
   marker_dynamic="#safehouse-test-id:dynamic-cli-grants#"
   marker_workdir="#safehouse-test-id:workdir-grant#"
+  marker_container_runtime_socket_deny="#safehouse-test-id:container-runtime-socket-deny#"
   marker_append_profile_one="#safehouse-test-id:append-profile-one#"
   marker_append_profile_two="#safehouse-test-id:append-profile-two#"
   resolved_test_rw_dir="$(cd "$TEST_RW_DIR" && pwd -P)"
@@ -229,6 +230,7 @@ EOF
 
   section_begin "Policy Emission Order"
   assert_policy_order_literal "$POLICY_MERGE" "dynamic grants are emitted before workdir grant" "$marker_dynamic" "$marker_workdir"
+  assert_policy_order_literal "$policy_enable_arg" "container runtime deny core profile is emitted before docker optional integration profile" "$marker_container_runtime_socket_deny" ";; Integration: Docker"
   assert_policy_order_literal "$POLICY_DEFAULT" "toolchain modules are emitted in deterministic lexical order" ";; Source: 30-toolchains/bun.sb" ";; Source: 30-toolchains/deno.sb"
   assert_policy_order_literal "$POLICY_DEFAULT" "core integration modules are emitted in deterministic lexical order" ";; Source: 50-integrations-core/git.sb" ";; Source: 50-integrations-core/scm-clis.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic agent module order" ";; Source: 60-agents/aider.sb" ";; Source: 60-agents/amp.sb"
@@ -252,6 +254,7 @@ EOF
   assert_command_succeeds "--append-profile appends custom profile file" "$GENERATOR" --output "$policy_append_profile" --append-profile "$append_profile_file"
   assert_policy_contains "$policy_append_profile" "appended profile content is present" "$marker_append_profile_one"
   assert_policy_order_literal "$policy_append_profile" "workdir grant is emitted before appended profile rules" "$marker_workdir" "$marker_append_profile_one"
+  assert_policy_order_literal "$policy_append_profile" "container runtime socket deny is emitted before appended profile rules" "$marker_container_runtime_socket_deny" "$marker_append_profile_one"
   assert_command_succeeds "--append-profile supports repeated values and equals form" "$GENERATOR" --output "$policy_append_profile_multi" --append-profile="$append_profile_file" --append-profile "$append_profile_file_2"
   assert_policy_order_literal "$policy_append_profile_multi" "repeated --append-profile values preserve append order" "$marker_append_profile_one" "$marker_append_profile_two"
   assert_command_fails "--append-profile fails for nonexistent file" "$GENERATOR" --append-profile "$missing_path"

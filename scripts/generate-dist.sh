@@ -427,6 +427,109 @@ profile_key_from_source() {
   printf '%s\n' "$source"
 }
 
+profile_declares_requirement() {
+  local profile_path="$1"
+  local required_integration="$2"
+  local required_normalized line raw_requirements entry normalized_entry profile_key
+  local -a requirement_entries=()
+
+  required_normalized="$(to_lowercase "$required_integration")"
+  profile_key="$(profile_key_from_source "$profile_path")"
+
+  if embedded_profile_body "$profile_key" >/dev/null 2>&1; then
+    while IFS= read -r line; do
+      [[ "$line" == *'$$require='*'$$'* ]] || continue
+      raw_requirements="${line#*\$\$require=}"
+      raw_requirements="${raw_requirements%%\$\$*}"
+      raw_requirements="$(trim_whitespace "$raw_requirements")"
+      [[ -n "$raw_requirements" ]] || continue
+
+      IFS=',' read -r -a requirement_entries <<< "$raw_requirements"
+      for entry in "${requirement_entries[@]}"; do
+        normalized_entry="$(to_lowercase "$(trim_whitespace "$entry")")"
+        [[ -n "$normalized_entry" ]] || continue
+        if [[ "$normalized_entry" == "$required_normalized" ]]; then
+          return 0
+        fi
+      done
+    done < <(embedded_profile_body "$profile_key")
+    return 1
+  fi
+
+  if [[ ! -f "$profile_path" ]]; then
+    return 1
+  fi
+
+  while IFS= read -r line; do
+    [[ "$line" == *'$$require='*'$$'* ]] || continue
+    raw_requirements="${line#*\$\$require=}"
+    raw_requirements="${raw_requirements%%\$\$*}"
+    raw_requirements="$(trim_whitespace "$raw_requirements")"
+    [[ -n "$raw_requirements" ]] || continue
+
+    IFS=',' read -r -a requirement_entries <<< "$raw_requirements"
+    for entry in "${requirement_entries[@]}"; do
+      normalized_entry="$(to_lowercase "$(trim_whitespace "$entry")")"
+      [[ -n "$normalized_entry" ]] || continue
+      if [[ "$normalized_entry" == "$required_normalized" ]]; then
+        return 0
+      fi
+    done
+  done < "$profile_path"
+
+  return 1
+}
+
+selected_profiles_require_integration() {
+  local integration="$1"
+  local integration_normalized selected_profile profile_path profile_key
+  local keychain_requirement_normalized
+  local requires_integration=0
+
+  integration_normalized="$(to_lowercase "$integration")"
+  keychain_requirement_normalized="$(to_lowercase "$keychain_requirement_token")"
+
+  if [[ "$integration_normalized" == "$keychain_requirement_normalized" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
+    [[ "$selected_profiles_require_keychain" -eq 1 ]]
+    return
+  fi
+
+  if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+    for profile_key in "${PROFILE_KEYS[@]}"; do
+      case "$profile_key" in
+        profiles/60-agents/*.sb|profiles/65-apps/*.sb)
+          if profile_declares_requirement "$profile_key" "$integration_normalized"; then
+            requires_integration=1
+            break
+          fi
+          ;;
+      esac
+    done
+  else
+    resolve_selected_agent_profiles
+    for selected_profile in "${selected_agent_profile_basenames[@]-}"; do
+      profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
+      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+        requires_integration=1
+        break
+      fi
+
+      profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
+      if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+        requires_integration=1
+        break
+      fi
+    done
+  fi
+
+  if [[ "$integration_normalized" == "$keychain_requirement_normalized" ]]; then
+    selected_profiles_require_keychain="$requires_integration"
+    selected_profiles_require_keychain_resolved=1
+  fi
+
+  [[ "$requires_integration" -eq 1 ]]
+}
+
 append_profile() {
   local target="$1"
   local source="$2"
@@ -580,10 +683,15 @@ append_optional_integration_profiles() {
         [[ "$enable_docker_integration" -eq 1 ]] || continue
         ;;
       macos-gui.sb)
-        [[ "$enable_macos_gui_integration" -eq 1 ]] || continue
+        [[ "$enable_macos_gui_integration" -eq 1 ]] \
+          || selected_profiles_require_integration "$macos_gui_requirement_token" \
+          || selected_profiles_require_integration "$electron_requirement_token" \
+          || continue
         ;;
       electron.sb)
-        [[ "$enable_electron_integration" -eq 1 ]] || continue
+        [[ "$enable_electron_integration" -eq 1 ]] \
+          || selected_profiles_require_integration "$electron_requirement_token" \
+          || continue
         ;;
       ssh.sb)
         [[ "$enable_ssh_integration" -eq 1 ]] || continue
@@ -604,9 +712,7 @@ append_optional_integration_profiles() {
         [[ "$enable_browser_native_messaging_integration" -eq 1 ]] || continue
         ;;
       keychain.sb)
-        # Keychain rules are now defined in agent/app profiles directly.
-        # Keep this module skipped to avoid duplicating those grants.
-        continue
+        selected_profiles_require_integration "$keychain_requirement_token" || continue
         ;;
       *)
         echo "Unknown optional integration profile: ${base_name}" >&2

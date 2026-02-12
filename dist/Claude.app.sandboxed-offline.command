@@ -620,6 +620,32 @@ emit_embedded_policy_template() {
 ;; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.
 
 ;; ---------------------------------------------------------------------------
+;; Integration: Container Runtime Default Deny
+;; Default-deny local container daemon sockets; docker integration can re-open later.
+;; Source: 50-integrations-core/container-runtime-default-deny.sb
+;; ---------------------------------------------------------------------------
+
+;; #safehouse-test-id:container-runtime-socket-deny# Keep container daemon access opt-in.
+;; This core deny profile is loaded before optional integrations. When --enable=docker is set,
+;; profiles/55-integrations-optional/docker.sb is appended later and can re-open these paths.
+
+(deny file-read* file-write*
+    (literal "/var/run/docker.sock")
+    (literal "/private/var/run/docker.sock")
+    (literal "/var/run/podman/podman.sock")
+    (literal "/private/var/run/podman/podman.sock")
+    (home-literal "/.docker/run/docker.sock")
+    (home-literal "/.rd/docker.sock")
+    (home-literal "/.orbstack/run/docker.sock")
+    (regex (string-append "^" HOME_DIR "/\\.colima/docker\\.sock$"))
+    (regex (string-append "^" HOME_DIR "/\\.colima/[^/]+/docker\\.sock$"))
+    (regex (string-append "^" HOME_DIR "/\\.local/share/containers/podman/machine/podman\\.sock$"))
+    (regex (string-append "^" HOME_DIR "/\\.local/share/containers/podman/machine/[^/]+/podman\\.sock$"))
+    (regex (string-append "^" HOME_DIR "/\\.config/containers/podman/machine/podman\\.sock$"))
+    (regex (string-append "^" HOME_DIR "/\\.config/containers/podman/machine/[^/]+/podman\\.sock$"))
+)
+
+;; ---------------------------------------------------------------------------
 ;; Integration: Git
 ;; Git client configuration and XDG config directory access.
 ;; Source: 50-integrations-core/git.sb

@@ -4,10 +4,21 @@ run_section_policy_behavior() {
   local policy_all_agents
   local policy_browser_native_messaging policy_cloud_credentials policy_onepassword
   local policy_ssh policy_spotlight policy_cleanshot
+  local policy_docker_wide_read policy_docker_workdir_root policy_docker_append_allow
+  local append_docker_allow append_docker_allow_marker
+  local policy_override_same_literal policy_override_subpath_literal policy_override_wide_read
+  local append_override_same_literal append_override_subpath_literal append_override_wide_read
+  local override_test_dir override_literal_file override_subpath_dir override_subpath_allowed_file override_subpath_blocked_file override_wide_read_file
 
   section_begin "Feature Toggles"
-  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits docker socket grants" "/var/run/docker.sock"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Docker integration profile marker" ";; Integration: Docker"
   assert_policy_contains "$POLICY_DOCKER" "--enable=docker includes docker socket grants" "/var/run/docker.sock"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy emits container runtime socket deny marker" "#safehouse-test-id:container-runtime-socket-deny#"
+  assert_policy_contains "$POLICY_DOCKER" "--enable=docker still includes container runtime socket deny marker from core profile" "#safehouse-test-id:container-runtime-socket-deny#"
+  assert_policy_order_literal "$POLICY_DOCKER" "docker optional integration is emitted after core container runtime deny profile" "#safehouse-test-id:container-runtime-socket-deny#" ";; Integration: Docker"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy container deny block includes OrbStack home socket path" "/.orbstack/run/docker.sock"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy container deny block includes Podman runtime socket path" "/var/run/podman/podman.sock"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy container deny block includes Colima socket regex" "/\\\\.colima/[^/]+/docker\\\\.sock$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits browser native messaging grants" "/NativeMessagingHosts"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Firefox native messaging grants" "/Mozilla/NativeMessagingHosts"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits extensions read grants" "/Default/Extensions"
@@ -79,9 +90,52 @@ run_section_policy_behavior() {
   for docker_sock in \
     "/var/run/docker.sock" \
     "/private/var/run/docker.sock" \
-    "${HOME}/.docker/run/docker.sock"; do
+    "${HOME}/.docker/run/docker.sock" \
+    "${HOME}/.orbstack/run/docker.sock" \
+    "${HOME}/.rd/docker.sock" \
+    "${HOME}/.colima/docker.sock" \
+    "${HOME}/.colima/default/docker.sock"; do
     assert_denied_if_exists "$POLICY_DEFAULT" "docker socket access denied by default (${docker_sock})" "$docker_sock" /bin/ls "$docker_sock"
     assert_allowed_if_exists "$POLICY_DOCKER" "docker socket access allowed with --enable=docker (${docker_sock})" "$docker_sock" /bin/ls "$docker_sock"
+  done
+
+  for podman_sock in \
+    "/var/run/podman/podman.sock" \
+    "/private/var/run/podman/podman.sock" \
+    "${HOME}/.local/share/containers/podman/machine/podman.sock" \
+    "${HOME}/.local/share/containers/podman/machine/default/podman.sock" \
+    "${HOME}/.config/containers/podman/machine/podman.sock" \
+    "${HOME}/.config/containers/podman/machine/default/podman.sock"; do
+    assert_denied_if_exists "$POLICY_DEFAULT" "podman socket access denied by default (${podman_sock})" "$podman_sock" /bin/ls "$podman_sock"
+  done
+
+  append_docker_allow_marker="#safehouse-test-id:append-docker-allow#"
+  policy_docker_wide_read="${TEST_CWD}/policy-docker-wide-read.sb"
+  policy_docker_workdir_root="${TEST_CWD}/policy-docker-workdir-root.sb"
+  policy_docker_append_allow="${TEST_CWD}/policy-docker-append-allow.sb"
+  append_docker_allow="${TEST_CWD}/append-docker-allow.sb"
+
+  assert_command_succeeds "generator emits --enable=wide-read policy for container socket deny checks" "$GENERATOR" --output "$policy_docker_wide_read" --enable=wide-read
+  assert_command_succeeds "generator emits --workdir=/ policy for container socket deny checks" "$GENERATOR" --output "$policy_docker_workdir_root" --workdir /
+
+  cat > "$append_docker_allow" <<EOF
+;; ${append_docker_allow_marker}
+(allow file-read* file-write*
+    (literal "/var/run/docker.sock")
+    (literal "/private/var/run/docker.sock")
+    (home-literal "/.orbstack/run/docker.sock")
+)
+EOF
+  assert_command_succeeds "generator emits append-profile policy that intentionally re-opens docker sockets" "$GENERATOR" --output "$policy_docker_append_allow" --append-profile "$append_docker_allow"
+  assert_policy_order_literal "$policy_docker_append_allow" "container runtime socket deny block is emitted before appended profile rules" "#safehouse-test-id:container-runtime-socket-deny#" "$append_docker_allow_marker"
+
+  for docker_sock in \
+    "/var/run/docker.sock" \
+    "/private/var/run/docker.sock" \
+    "${HOME}/.orbstack/run/docker.sock"; do
+    assert_allowed_if_exists "$policy_docker_wide_read" "core container runtime deny can be overridden by --enable=wide-read (${docker_sock})" "$docker_sock" /bin/ls "$docker_sock"
+    assert_allowed_if_exists "$policy_docker_workdir_root" "core container runtime deny can be overridden by broad --workdir=/ grant (${docker_sock})" "$docker_sock" /bin/ls "$docker_sock"
+    assert_allowed_if_exists "$policy_docker_append_allow" "docker socket can be intentionally re-opened via --append-profile (${docker_sock})" "$docker_sock" /bin/ls "$docker_sock"
   done
 
   for ext_dir in \
@@ -126,7 +180,53 @@ run_section_policy_behavior() {
   assert_allowed_strict "$POLICY_MERGE" "read allowed for read/write file grant" /bin/cat "$TEST_RW_FILE"
   assert_allowed_strict "$POLICY_MERGE" "write allowed for read/write file grant" /bin/sh -c "echo allowed >> '$TEST_RW_FILE'"
 
+  section_begin "Rule Override Semantics"
+  override_test_dir="${TEST_DENIED_DIR}/override-semantics"
+  override_literal_file="${override_test_dir}/override-same-literal.txt"
+  override_subpath_dir="${override_test_dir}/override-subpath"
+  override_subpath_allowed_file="${override_subpath_dir}/allowed.txt"
+  override_subpath_blocked_file="${override_subpath_dir}/blocked.txt"
+  override_wide_read_file="${override_test_dir}/override-wide-read.txt"
+  policy_override_same_literal="${TEST_CWD}/policy-override-same-literal.sb"
+  policy_override_subpath_literal="${TEST_CWD}/policy-override-subpath-literal.sb"
+  policy_override_wide_read="${TEST_CWD}/policy-override-wide-read.sb"
+  append_override_same_literal="${TEST_CWD}/append-override-same-literal.sb"
+  append_override_subpath_literal="${TEST_CWD}/append-override-subpath-literal.sb"
+  append_override_wide_read="${TEST_CWD}/append-override-wide-read.sb"
+
+  mkdir -p "$override_subpath_dir"
+  printf 'override-same-literal\n' > "$override_literal_file"
+  printf 'override-subpath-allowed\n' > "$override_subpath_allowed_file"
+  printf 'override-subpath-blocked\n' > "$override_subpath_blocked_file"
+  printf 'override-wide-read\n' > "$override_wide_read_file"
+
+  cat > "$append_override_same_literal" <<EOF
+(deny file-read* (literal "${override_literal_file}"))
+(allow file-read* (literal "${override_literal_file}"))
+EOF
+  assert_command_succeeds "generator emits deny-then-allow literal override test policy" "$GENERATOR" --workdir="" --output "$policy_override_same_literal" --append-profile "$append_override_same_literal"
+  assert_denied_strict "$policy_override_same_literal" "deny then allow on the same literal path remains denied on current macOS" /bin/cat "$override_literal_file"
+
+  cat > "$append_override_subpath_literal" <<EOF
+(deny file-read* (subpath "${override_subpath_dir}"))
+(allow file-read* (literal "${override_subpath_allowed_file}"))
+EOF
+  assert_command_succeeds "generator emits deny-subpath-plus-allow-literal override test policy" "$GENERATOR" --workdir="" --output "$policy_override_subpath_literal" --append-profile "$append_override_subpath_literal"
+  assert_denied_strict "$policy_override_subpath_literal" "deny subpath plus later allow literal still leaves the specific file denied on current macOS" /bin/cat "$override_subpath_allowed_file"
+  assert_denied_strict "$policy_override_subpath_literal" "deny subpath still blocks sibling files not explicitly re-allowed" /bin/cat "$override_subpath_blocked_file"
+
+  cat > "$append_override_wide_read" <<EOF
+(deny file-read* (literal "${override_wide_read_file}"))
+(allow file-read* (subpath "/"))
+EOF
+  assert_command_succeeds "generator emits deny-then-wide-read override test policy" "$GENERATOR" --workdir="" --output "$policy_override_wide_read" --append-profile "$append_override_wide_read"
+  assert_allowed_strict "$policy_override_wide_read" "later broad allow (subpath /) re-opens an earlier literal deny" /bin/cat "$override_wide_read_file"
+
   rm -f "$policy_browser_native_messaging" "$policy_cloud_credentials" "$policy_onepassword" "$policy_ssh" "$policy_spotlight" "$policy_cleanshot"
+  rm -f "$policy_docker_wide_read" "$policy_docker_workdir_root" "$policy_docker_append_allow" "$append_docker_allow"
+  rm -f "$policy_override_same_literal" "$policy_override_subpath_literal" "$policy_override_wide_read"
+  rm -f "$append_override_same_literal" "$append_override_subpath_literal" "$append_override_wide_read"
+  rm -rf "$override_test_dir"
 }
 
 register_section run_section_policy_behavior
