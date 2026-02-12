@@ -612,7 +612,7 @@ emit_embedded_policy_template() {
     (home-literal "/CLAUDE.md")       ;; Cross-agent convention: repository/user guidance file.
 )
 
-;; Opt-in integrations not enabled: docker ssh spotlight cleanshot 1password cloud-credentials browser-native-messaging
+;; Opt-in integrations not enabled: docker kubectl ssh spotlight cleanshot 1password cloud-credentials browser-native-messaging
 ;; Use --enable=<feature> (comma-separated) to include them.
 ;; Note: --enable=electron also enables macos-gui.
 ;; Note: selected app/agent profiles can auto-inject integration modules via $$require=<integration-profile-path>$$ metadata.

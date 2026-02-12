@@ -13,6 +13,10 @@ run_section_policy_behavior() {
   section_begin "Feature Toggles"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Docker integration profile marker" ";; Integration: Docker"
   assert_policy_contains "$POLICY_DOCKER" "--enable=docker includes docker socket grants" "/var/run/docker.sock"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits kubectl integration profile marker" ";; Integration: kubectl"
+  assert_policy_contains "$POLICY_KUBECTL" "--enable=kubectl includes kubectl integration profile marker" "#safehouse-test-id:kubectl-integration#"
+  assert_policy_contains "$POLICY_KUBECTL" "--enable=kubectl includes kubeconfig path grants" "/.kube/config"
+  assert_policy_contains "$POLICY_KUBECTL" "--enable=kubectl includes krew path grants" "/.krew"
   assert_policy_contains "$POLICY_DEFAULT" "default policy emits container runtime socket deny marker" "#safehouse-test-id:container-runtime-socket-deny#"
   assert_policy_contains "$POLICY_DOCKER" "--enable=docker still includes container runtime socket deny marker from core profile" "#safehouse-test-id:container-runtime-socket-deny#"
   assert_policy_order_literal "$POLICY_DOCKER" "docker optional integration is emitted after core container runtime deny profile" "#safehouse-test-id:container-runtime-socket-deny#" ";; Integration: Docker"
@@ -107,6 +111,16 @@ run_section_policy_behavior() {
     "${HOME}/.config/containers/podman/machine/podman.sock" \
     "${HOME}/.config/containers/podman/machine/default/podman.sock"; do
     assert_denied_if_exists "$POLICY_DEFAULT" "podman socket access denied by default (${podman_sock})" "$podman_sock" /bin/ls "$podman_sock"
+  done
+
+  for kubectl_path in \
+    "${HOME}/.kube" \
+    "${HOME}/.kube/config" \
+    "${HOME}/.kube/cache" \
+    "${HOME}/.kube/kuberc" \
+    "${HOME}/.krew"; do
+    assert_denied_if_exists "$POLICY_DEFAULT" "kubectl path access denied by default (${kubectl_path})" "$kubectl_path" /bin/ls "$kubectl_path"
+    assert_allowed_if_exists "$POLICY_KUBECTL" "kubectl path access allowed with --enable=kubectl (${kubectl_path})" "$kubectl_path" /bin/ls "$kubectl_path"
   done
 
   append_docker_allow_marker="#safehouse-test-id:append-docker-allow#"

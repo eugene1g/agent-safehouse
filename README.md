@@ -22,6 +22,7 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 - **Toolchain and app/agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and app/agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`, and `Visual Studio Code.app` loads `vscode-app`). Use `--enable=all-agents` to restore legacy behavior and load every scoped app/agent profile.
 - **Keychain and Security framework** (auto-injected for keychain-dependent profiles)  - profiles can declare `$$require=55-integrations-optional/keychain.sb$$`, and Safehouse injects shared keychain/security rules automatically for those agents/apps. This avoids duplicating keychain rules across many profile files while keeping non-keychain agents on a tighter baseline.
 - **Cloud credential stores** (opt-in)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are available via `--enable=cloud-credentials` and are disabled by default because they expose sensitive credentials.
+- **Kubernetes CLI state** (opt-in)  - `--enable=kubectl` opens canonical kubectl defaults (`~/.kube/config`, `~/.kube/cache`, `~/.kube/kuberc`) and krew plugin state under `~/.krew`.
 - **Shell startup files**  - `~/.zshenv`, `~/.zprofile`, `/etc/zshrc`, etc. Without these, agents get a broken PATH and misconfigured environment.
 - **SSH config (not `~/.ssh` keys)**  - available when `--enable=ssh` is set: `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
 - **Runtime mach services**  - notification center, logd, diagnosticd, CoreServices, DiskArbitration, DNS-SD, opendirectory, FSEvents, trustd, etc. These are framework-level dependencies that many CLI tools probe during init.
@@ -174,6 +175,9 @@ safehouse aider
 # Enable Docker socket access (off by default)
 safehouse --enable=docker -- docker ps
 
+# Enable kubectl config/cache + krew plugin paths (off by default)
+safehouse --enable=kubectl -- kubectl get pods -A
+
 # Restore legacy behavior and include all scoped app/agent profiles
 safehouse --enable=all-agents codex
 
@@ -284,7 +288,7 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 | `30-toolchains/*.sb` | Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent policy modules |
 | `50-integrations-core/*.sb` | Always-on integrations: `git` and `scm-clis` |
-| `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: `docker`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging` (`electron` also enables `macos-gui`; keychain is auto-injected for profiles that declare `$$require=55-integrations-optional/keychain.sb$$`) |
+| `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging` (`electron` also enables `macos-gui`; keychain is auto-injected for profiles that declare `$$require=55-integrations-optional/keychain.sb$$`) |
 | `60-agents/*.sb` | Product-specific per-agent config/state paths selected by wrapped command basename |
 | `65-apps/*.sb` | Desktop app bundle profiles selected by known app bundles (`Claude.app`, `Visual Studio Code.app`) (`--enable=all-agents` loads all `60-agents` + `65-apps` profiles) |
 | Config/env/CLI path grants | `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
@@ -300,7 +304,7 @@ SBPL rule interactions are matcher-dependent. Safehouse tests currently verify t
 | `--add-dirs-ro=PATHS` | Colon-separated paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
-| `--enable=FEATURES` | Enable optional features: `docker`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
+| `--enable=FEATURES` | Enable optional features: `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 

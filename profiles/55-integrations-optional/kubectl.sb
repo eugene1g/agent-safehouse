@@ -1,0 +1,28 @@
+;; ---------------------------------------------------------------------------
+;; Integration: kubectl
+;; Kubernetes CLI config, cache, and plugin-manager state.
+;; Source: 55-integrations-optional/kubectl.sb
+;; #safehouse-test-id:kubectl-integration#
+;; ---------------------------------------------------------------------------
+
+;; Canonical kubectl defaults:
+;; - kubeconfig: $HOME/.kube/config
+;; - cache-dir:  $HOME/.kube/cache
+;; - kuberc:     $HOME/.kube/kuberc
+;; Canonical krew default install root:
+;; - KREW_ROOT defaults to $HOME/.krew
+
+(allow file-read*
+    (home-subpath "/.kube")                                         ;; kubeconfig, cert/key refs, and kubectl preference data.
+    (home-subpath "/.krew")                                         ;; krew index/manifests and installed plugin binaries.
+)
+
+(allow file-write*
+    (home-literal "/.kube")                                         ;; allow creating cache/config sidecar files under ~/.kube.
+    (home-literal "/.kube/config")                                  ;; kubectl config set-context/set-credentials updates.
+    (home-literal "/.kube/kuberc")                                  ;; kuberc preference updates.
+    (home-subpath "/.kube/cache")                                   ;; default kubectl discovery/http cache writes.
+    (home-subpath "/.kube/http-cache")                              ;; explicit http-cache path variants.
+    (home-literal "/.krew")                                         ;; allow initializing krew root.
+    (home-subpath "/.krew")                                         ;; krew plugin install/upgrade/uninstall state changes.
+)

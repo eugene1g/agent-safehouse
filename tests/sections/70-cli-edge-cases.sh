@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
@@ -33,15 +33,19 @@ run_section_cli_edge_cases() {
   section_begin "Enable Flag Parsing"
   policy_enable_arg="${TEST_CWD}/policy-enable-arg.sb"
   policy_enable_csv="${TEST_CWD}/policy-enable-csv.sb"
+  policy_enable_kubectl="${TEST_CWD}/policy-enable-kubectl.sb"
   policy_enable_browser_native_messaging="${TEST_CWD}/policy-enable-browser-native-messaging.sb"
   assert_command_succeeds "--enable docker parses as separate argument form" "$GENERATOR" --output "$policy_enable_arg" --enable docker
   assert_policy_contains "$policy_enable_arg" "--enable docker includes docker grants" "/var/run/docker.sock"
   assert_policy_not_contains "$policy_enable_arg" "--enable docker does not include browser native messaging grants unless explicitly enabled" "/NativeMessagingHosts"
+  assert_command_succeeds "--enable kubectl parses as separate argument form" "$GENERATOR" --output "$policy_enable_kubectl" --enable kubectl
+  assert_policy_contains "$policy_enable_kubectl" "--enable kubectl includes kubectl integration profile marker" "#safehouse-test-id:kubectl-integration#"
   assert_command_succeeds "--enable browser-native-messaging parses as separate argument form" "$GENERATOR" --output "$policy_enable_browser_native_messaging" --enable browser-native-messaging
   assert_policy_contains "$policy_enable_browser_native_messaging" "--enable browser-native-messaging includes browser native messaging grants" "/NativeMessagingHosts"
-  assert_command_succeeds "--enable=docker,electron parses CSV with whitespace" "$GENERATOR" --output "$policy_enable_csv" "--enable=docker, electron"
+  assert_command_succeeds "--enable=docker,electron,kubectl parses CSV with whitespace" "$GENERATOR" --output "$policy_enable_csv" "--enable=docker, electron, kubectl"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes docker grants" "/var/run/docker.sock"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes electron grants" "#safehouse-test-id:electron-integration#"
+  assert_policy_contains "$policy_enable_csv" "CSV --enable includes kubectl grants" "#safehouse-test-id:kubectl-integration#"
   assert_policy_contains "$policy_enable_csv" "CSV --enable=electron implies macOS GUI integration" ";; Integration: macOS GUI"
   policy_enable_macos_gui="${TEST_CWD}/policy-enable-macos-gui.sb"
   policy_enable_electron="${TEST_CWD}/policy-enable-electron.sb"

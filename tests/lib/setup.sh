@@ -75,8 +75,9 @@ setup_test_environment() {
   echo "Generating policy with extra dirs (ro=${TEST_RO_DIR}, rw=${TEST_RW_DIR})..."
   POLICY_EXTRA="$(cd "$TEST_CWD" && "$GENERATOR" --add-dirs-ro="$TEST_RO_DIR" --add-dirs="$TEST_RW_DIR")"
 
-  echo "Generating feature-toggle policies (--enable=docker, --enable=macos-gui, --enable=electron)..."
+  echo "Generating feature-toggle policies (--enable=docker, --enable=kubectl, --enable=macos-gui, --enable=electron)..."
   POLICY_DOCKER="$(cd "$TEST_CWD" && "$GENERATOR" --enable=docker)"
+  POLICY_KUBECTL="$(cd "$TEST_CWD" && "$GENERATOR" --enable=kubectl)"
   POLICY_MACOS_GUI="$(cd "$TEST_CWD" && "$GENERATOR" --enable=macos-gui)"
   POLICY_ELECTRON="$(cd "$TEST_CWD" && "$GENERATOR" --enable=electron)"
 
@@ -131,6 +132,9 @@ cleanup_test_environment() {
   fi
   if [[ -n "${POLICY_DOCKER:-}" && -f "${POLICY_DOCKER:-}" ]]; then
     rm -f "$POLICY_DOCKER"
+  fi
+  if [[ -n "${POLICY_KUBECTL:-}" && -f "${POLICY_KUBECTL:-}" ]]; then
+    rm -f "$POLICY_KUBECTL"
   fi
   if [[ -n "${POLICY_MACOS_GUI:-}" && -f "${POLICY_MACOS_GUI:-}" ]]; then
     rm -f "$POLICY_MACOS_GUI"

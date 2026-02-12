@@ -73,6 +73,9 @@ parse_enabled_features() {
       docker)
         enable_docker_integration=1
         ;;
+      kubectl)
+        enable_kubectl_integration=1
+        ;;
       macos-gui)
         enable_macos_gui_integration=1
         ;;
@@ -106,7 +109,7 @@ parse_enabled_features() {
         ;;
       *)
         echo "Unknown feature in --enable: ${trimmed}" >&2
-        echo "Supported features: docker, macos-gui, electron, ssh, spotlight, cleanshot, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read" >&2
+        echo "Supported features: docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read" >&2
         exit 1
         ;;
     esac
@@ -411,6 +414,9 @@ emit_integration_preamble() {
   if [[ "$enable_docker_integration" -ne 1 ]]; then
     opt_in_integrations+=("docker")
   fi
+  if [[ "$enable_kubectl_integration" -ne 1 ]]; then
+    opt_in_integrations+=("kubectl")
+  fi
   if [[ "$enable_macos_gui_integration" -ne 1 ]]; then
     opt_in_integrations+=("macos-gui")
   fi
@@ -463,6 +469,9 @@ append_optional_integration_profiles() {
     case "$base_name" in
       docker.sb)
         [[ "$enable_docker_integration" -eq 1 ]] || continue
+        ;;
+      kubectl.sb)
+        [[ "$enable_kubectl_integration" -eq 1 ]] || continue
         ;;
       macos-gui.sb)
         [[ "$enable_macos_gui_integration" -eq 1 ]] \

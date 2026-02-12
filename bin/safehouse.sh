@@ -9,6 +9,7 @@ HOME_DIR_TEMPLATE_TOKEN="__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
 home_dir="${HOME:-}"
 enable_csv_list=""
 enable_docker_integration=0
+enable_kubectl_integration=0
 enable_macos_gui_integration=0
 enable_electron_integration=0
 enable_ssh_integration=0

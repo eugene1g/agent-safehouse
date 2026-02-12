@@ -682,6 +682,9 @@ append_optional_integration_profiles() {
       docker.sb)
         [[ "$enable_docker_integration" -eq 1 ]] || continue
         ;;
+      kubectl.sb)
+        [[ "$enable_kubectl_integration" -eq 1 ]] || continue
+        ;;
       macos-gui.sb)
         [[ "$enable_macos_gui_integration" -eq 1 ]] \
           || selected_profiles_require_integration "$macos_gui_requirement_token" \
