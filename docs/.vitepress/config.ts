@@ -19,7 +19,7 @@ export default defineConfig({
     ['meta', { name: 'twitter:image', content: 'https://agent-safehouse.dev/og-image.png' }],
   ],
 
-  appearance: 'dark',
+  appearance: false,
 
   themeConfig: {
     nav: [
