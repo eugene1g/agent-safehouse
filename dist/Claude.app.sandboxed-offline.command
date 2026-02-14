@@ -1000,7 +1000,6 @@ emit_embedded_policy_template() {
     (home-subpath "/.cache/amp")
     (home-subpath "/.local/share/amp")
     (home-subpath "/.local/state/amp")
-    (home-literal "/Library/Application Support/Zed/db")
 )
 
 (allow file-read*
