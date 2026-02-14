@@ -21,11 +21,14 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 - **Full process exec/fork**  - agents orchestrate deep subprocess trees (shell > git > ssh > credential-helper). Restricting process creation is impractical.
 - **Toolchain and app/agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and app/agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`, and `Visual Studio Code.app` loads `vscode-app`). Use `--enable=all-agents` to restore legacy behavior and load every scoped app/agent profile.
 - **Keychain and Security framework** (auto-injected for keychain-dependent profiles)  - profiles can declare `$$require=55-integrations-optional/keychain.sb$$`, and Safehouse injects shared keychain/security rules automatically for those agents/apps. This avoids duplicating keychain rules across many profile files while keeping non-keychain agents on a tighter baseline.
-- **Cloud credential stores** (opt-in)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are available via `--enable=cloud-credentials` and are disabled by default because they expose sensitive credentials.
+- **SCM credential stores** (always-on)  - `gh` and `glab` integrations are always enabled via core profile: `~/.config/gh`, `~/.cache/gh`, `~/.local/share/gh`, and `~/.config/glab-cli` paths are writable so git and issue workflows keep working. This intentionally allows agent and tool access to repo auth state.
+- **Clipboard access** (opt-in)  - `pbcopy`/`pbpaste` and other pb* workflows remain denied unless you explicitly add `--enable=clipboard` to your invocation. This is deliberate because clipboard contents can include secrets.
+- **Cloud credential stores** (opt-in)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are available via `--enable=cloud-credentials` and are disabled by default because they expose sensitive credentials. This grant is read/write so tools can refresh tokens and SSO/session caches in place.
 - **Kubernetes CLI state** (opt-in)  - `--enable=kubectl` opens canonical kubectl defaults (`~/.kube/config`, `~/.kube/cache`, `~/.kube/kuberc`) and krew plugin state under `~/.krew`.
 - **Shell startup files**  - `~/.zshenv`, `~/.zprofile`, `/etc/zshrc`, etc. Without these, agents get a broken PATH and misconfigured environment.
 - **SSH config (not `~/.ssh` keys)**  - available when `--enable=ssh` is set: `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
 - **Runtime mach services**  - notification center, logd, diagnosticd, CoreServices, DiskArbitration, DNS-SD, opendirectory, FSEvents, trustd, etc. These are framework-level dependencies that many CLI tools probe during init.
+- **Clipboard access (opt-in)**  - pbcopy/pbpaste are blocked by default and available with `--enable=clipboard`, which grants the macOS pasteboard service only.
 - **Network (fully open)**  - agents need package registries, APIs, MCP servers, and git remotes. Restricting network is possible but breaks most workflows.
 - **Temp directories**  - `/tmp`, `/var/folders`. Transient files, IPC sockets, build artifacts.
 
@@ -33,6 +36,7 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 
 - **`~/.ssh` private keys**  - blocked by default. With `--enable=ssh`, the SSH integration still denies `~/.ssh` broadly and only re-allows non-sensitive config paths like `config` and `known_hosts`.
 - **Browser profile directories (default)**  - browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging access is opt-in via `--enable=browser-native-messaging`, scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only).
+- **Clipboard content**  - clipboard interaction (`pbcopy`/`pbpaste`) is opt-in via `--enable=clipboard` and should be treated like any other potential secret exfiltration path.
 - **`/dev` raw device access**  - this policy allows `/dev` traversal/metadata plus specific safe device nodes (`/dev/null`, `/dev/urandom`, `/dev/tty*`, `/dev/ptmx`, `/dev/autofs_nowait`). It does not grant broad read/write access to raw device files.
 - **`forbidden-exec-sugid`**  - execution of setuid/setgid binaries (`sudo`, `passwd`, etc.) is denied. Agents should never escalate privileges. If a specific setuid binary is needed, allow it by name rather than blanket-allowing privilege escalation.
 - **`osascript` execution** (optional)  - if you want to hard-block AppleScript entrypoints, add a deny in a custom appended profile file (`--append-profile`). This can reduce GUI/session automation surface but may break agent notification UX.
@@ -42,7 +46,7 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 
 - **Network exfiltration / C2**  - network is fully open. If an agent can read a file and has network access, it can send the contents anywhere. See `profiles/20-network.sb` for restrictive alternatives.
 - **Sandbox escapes**  - `sandbox-exec` is a userspace mechanism, not a hypervisor. Apple has deprecated the public API, though the kernel enforcement still works.
-- **Credential theft via IPC**  - Mach services like SecurityServer and 1Password are allowed for keychain/auth workflows, which means an agent could theoretically interact with them.
+- **Credential theft via IPC**  - Mach services like SecurityServer and 1Password are allowed for keychain/auth workflows, which means an agent could theoretically interact with them. Clipboard IPC (`com.apple.pasteboard.1`) is not enabled by default; use `--enable=clipboard` when needed.
 - **Data exfiltration via allowed paths**  - the sandbox limits *which* files are visible, not what happens with their contents once read.
 
 ## Setup
@@ -112,7 +116,7 @@ chmod +x ~/Downloads/Claude.app.sandboxed-offline.command
 ```
 
 Drop either launcher into any folder and run it (double-click in Finder or run from Terminal). It launches Claude Desktop sandboxed to that folder.
-Both launchers invoke `sandbox-exec` directly (no Safehouse CLI install required). The online launcher fetches and validates the latest apps policy from GitHub; if you need to pin or override the policy source, set `SAFEHOUSE_CLAUDE_POLICY_URL` before launching.
+Both launchers invoke `sandbox-exec` directly (no Safehouse CLI install required). The online launcher fetches and validates the latest apps policy from GitHub; if you need to pin or override the policy source, set `SAFEHOUSE_CLAUDE_POLICY_URL` before launching. You can additionally pin a SHA-256 checksum with `SAFEHOUSE_CLAUDE_POLICY_SHA256` for integrity verification.
 
 Equivalent launch behavior:
 
@@ -252,7 +256,7 @@ Regenerate them after profile or runtime changes:
 ./scripts/generate-dist.sh
 ```
 
-The static generator uses deterministic template paths under `/tmp/agent-safehouse-static-template` for `HOME` and invocation workdir so commits do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
+The static generator now emits deterministic template paths under `dist/agent-safehouse-static-template` for `HOME` and invocation workdir so committed artifacts do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
 
 ## Single-File Distribution
 
@@ -291,7 +295,7 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 | `30-toolchains/*.sb` | Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent policy modules |
 | `50-integrations-core/*.sb` | Always-on core integrations: `container-runtime-default-deny`, `git`, and `scm-clis` |
-| `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging` (`electron` also enables `macos-gui`; keychain is auto-injected for profiles that declare `$$require=55-integrations-optional/keychain.sb$$`) |
+| `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: `clipboard`, `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging` (`electron` also enables `macos-gui`; keychain is auto-injected for profiles that declare `$$require=55-integrations-optional/keychain.sb$$`) |
 | `60-agents/*.sb` | Product-specific per-agent config/state paths selected by wrapped command basename |
 | `65-apps/*.sb` | Desktop app bundle profiles selected by known app bundles (`Claude.app`, `Visual Studio Code.app`) (`--enable=all-agents` loads all `60-agents` + `65-apps` profiles) |
 | Config/env/CLI path grants | Trusted `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`; loaded only with `--trust-workdir-config` or `SAFEHOUSE_TRUST_WORKDIR_CONFIG`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
@@ -308,7 +312,7 @@ SBPL rule interactions are matcher-dependent. Safehouse tests currently verify t
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
-| `--enable=FEATURES` | Enable optional features: `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
+| `--enable=FEATURES` | Enable optional features: `clipboard`, `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 | `--explain` | Print effective workdir, grant, and profile-selection summary to stderr |
@@ -325,6 +329,7 @@ Environment variables:
 - `SAFEHOUSE_ADD_DIRS`  - Colon-separated paths to grant read/write
 - `SAFEHOUSE_WORKDIR`  - Workdir override (`SAFEHOUSE_WORKDIR=` disables automatic workdir grants)
 - `SAFEHOUSE_TRUST_WORKDIR_CONFIG`  - Trust and load `<workdir>/.safehouse` (`1/0`, `true/false`, `yes/no`, `on/off`)
+- `SAFEHOUSE_CLAUDE_POLICY_SHA256`  - (Claude launcher only) Expected SHA-256 for the downloaded online apps policy. If set, launch fails if the checksum does not match.
 
 Optional workdir config file:
 - `<workdir>/.safehouse`

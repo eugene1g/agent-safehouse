@@ -129,7 +129,7 @@ EOF
     assert_policy_contains "$static_policy_path" "${static_policy_label} includes project banner" ";; Project: https://agent-safehouse.dev"
     assert_policy_contains "$static_policy_path" "${static_policy_label} includes GitHub project URL" ";; GitHub: https://github.com/eugene1g/agent-safehouse"
     assert_policy_contains "$static_policy_path" "${static_policy_label} includes sandbox log helper example" ";;   /usr/bin/log stream --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
-    assert_policy_contains "$static_policy_path" "${static_policy_label} uses deterministic template HOME" "/tmp/agent-safehouse-static-template/home"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} uses deterministic template HOME" "${REPO_ROOT}/dist/agent-safehouse-static-template/home"
     assert_policy_not_contains "$static_policy_path" "${static_policy_label} resolves HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
     assert_policy_contains "$static_policy_path" "${static_policy_label} includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"
     assert_policy_not_contains "$static_policy_path" "${static_policy_label} omits legacy agent common profile path" ";; Source: 60-agents/__common.sb"
@@ -162,6 +162,12 @@ EOF
       assert_policy_contains "$launcher_path" "${launcher_label} includes required marker (${launcher_marker})" "$launcher_marker"
     done
     assert_policy_not_contains "$launcher_path" "${launcher_label} omits source commit hash" "# Source Commit: "
+  assert_policy_contains "$launcher_path" "${launcher_label} switches into launcher directory before sandboxed exec" "cd \"\$launcher_workdir\""
+  assert_policy_contains "$launcher_path" "${launcher_label} runs sandbox-exec via launcher" "sandbox-exec -f \"\$policy_path\" -- \"\$claude_desktop_binary\""
+  if [[ "$launcher_path" == "$dist_claude_launcher" ]]; then
+    assert_policy_contains "$launcher_path" "online launcher exposes optional checksum pinning env hook" "SAFEHOUSE_CLAUDE_POLICY_SHA256"
+    assert_policy_contains "$launcher_path" "online launcher validates optional checksum at launch-time" "policy_checksum_matches"
+  fi
   done
 
   assert_policy_contains "$dist_claude_launcher" "dist Claude launcher resolves workdir from script location" "launcher_workdir=\"\$(cd \"\$(dirname \"\${BASH_SOURCE[0]}\")\" && pwd -P)\""

@@ -29,6 +29,7 @@ PROFILE_KEYS=(
   "profiles/55-integrations-optional/1password.sb"
   "profiles/55-integrations-optional/browser-native-messaging.sb"
   "profiles/55-integrations-optional/cleanshot.sb"
+  "profiles/55-integrations-optional/clipboard.sb"
   "profiles/55-integrations-optional/cloud-credentials.sb"
   "profiles/55-integrations-optional/docker.sb"
   "profiles/55-integrations-optional/electron.sb"
@@ -112,6 +113,7 @@ __SAFEHOUSE_EMBEDDED_profiles_00_base_sb__
 
 (allow file-read-metadata
    (subpath "/System")
+   (subpath "/private/var/run")                                      ;; Metadata traversal for /private/var/run socket namespace.
 )
 
 ;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to common runtime needs.
@@ -119,7 +121,6 @@ __SAFEHOUSE_EMBEDDED_profiles_00_base_sb__
     (literal "/private")                                              ;; Required for symlink traversal under macOS /private namespace.
     (literal "/private/var")                                          ;; Required for symlink traversal to /var-backed paths.
     (subpath "/private/var/db/timezone")                              ;; Timezone DB reads used by language date/time formatting.
-    (subpath "/private/var/run")                                      ;; Resolver/daemon sockets and pid files used by networking flows.
     (literal "/private/var/select/sh")                                ;; /bin/sh selector used by macOS shell launch behavior.
     (literal "/private/var/select/developer_dir")                     ;; xcode-select developer dir pointer used by build CLIs.
     (literal "/var/select/developer_dir")                             ;; Compatibility alias for developer dir pointer.
@@ -239,7 +240,6 @@ __SAFEHOUSE_EMBEDDED_profiles_00_base_sb__
     (global-name "com.apple.analyticsd.messagetracer")                ;; Analytics message tracer probed by frameworks during init.
     (global-name "com.apple.system.logger")                           ;; Legacy system logger endpoint used by some CLIs.
     (global-name "com.apple.coreservices.launchservicesd")            ;; Launch Services daemon for app registration and UTI resolution.
-    (global-name "com.apple.pasteboard.1")                            ;; Pasteboard service used by pbcopy/pbpaste for clipboard access.
 )
 
 (allow system-socket)                                                 ;; AF_SYSTEM sockets used by network stack for kernel event monitoring.
@@ -821,6 +821,19 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_browser_native_messaging_
 )
 __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_cleanshot_sb__
       ;;
+    "profiles/55-integrations-optional/clipboard.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_clipboard_sb__'
+;; ---------------------------------------------------------------------------
+;; Integration: Clipboard
+;; Clipboard read/write access for macOS pbcopy/pbpaste and related workflows.
+;; Source: 55-integrations-optional/clipboard.sb
+;; ---------------------------------------------------------------------------
+
+(allow mach-lookup
+    (global-name "com.apple.pasteboard.1")                               ;; Pasteboard service used by pbcopy/pbpaste.
+)
+__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_clipboard_sb__
+      ;;
     "profiles/55-integrations-optional/cloud-credentials.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_cloud_credentials_sb__'
 ;; ---------------------------------------------------------------------------
@@ -830,9 +843,9 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_cleanshot_sb__
 ;; ---------------------------------------------------------------------------
 
 ;; Threat-model note: preventing exfiltration/C2 is NOT a goal; this keeps cloud tooling usable when needed.
-;; Use --append-profile to selectively deny specific providers (e.g. block ~/.aws reads).
+;; Use --append-profile to selectively deny specific providers (e.g. block ~/.aws reads/writes).
 
-(allow file-read*
+(allow file-read* file-write*
     (home-subpath "/.aws")            ;; AWS profiles/sso/cache files needed for aws cli and SDK auth flows.
     (home-subpath "/.config/gcloud")  ;; gcloud account/config/token files needed for CLI auth and project commands.
     (home-subpath "/.azure")          ;; Azure CLI config, credentials, and token cache.
@@ -1306,7 +1319,8 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_auggie_sb__
 (allow file-read* file-write*
     (home-prefix "/.local/bin/claude")
     (home-subpath "/.cache/claude")
-    (home-prefix "/.claude") ; this include .claude folder, as well as .claude.json and .claude.lock.json etc files
+    (home-subpath "/.claude")
+    (home-prefix "/.claude.json")
     (home-subpath "/.config/claude")
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")
@@ -1700,6 +1714,7 @@ enable_electron_integration=0
 enable_ssh_integration=0
 enable_spotlight_integration=0
 enable_cleanshot_integration=0
+enable_clipboard_integration=0
 enable_onepassword_integration=0
 enable_cloud_credentials_integration=0
 enable_browser_native_messaging_integration=0
@@ -1712,11 +1727,12 @@ optional_integration_features=(
   ssh
   spotlight
   cleanshot
+  clipboard
   1password
   cloud-credentials
   browser-native-messaging
 )
-supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read"
+supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read"
 enable_all_agents_profiles=0
 enable_wide_read_access=0
 output_path=""
@@ -1748,6 +1764,8 @@ trust_workdir_config_env_set=0
 trust_workdir_config_source="default"
 invoked_command_path=""
 invoked_command_basename=""
+invoked_command_profile_path=""
+invoked_command_profile_basename=""
 invoked_command_app_bundle=""
 selected_agent_profile_basenames=()
 selected_agent_profile_reasons=()
@@ -1944,8 +1962,20 @@ resolve_default_workdir() {
   printf '%s\n' "$cwd"
 }
 
+validate_sb_string() {
+  local value="$1"
+  local label="${2:-SBPL string}"
+
+  if [[ "$value" =~ [[:cntrl:]] ]]; then
+    echo "Invalid ${label}: contains control characters and cannot be emitted into SBPL." >&2
+    return 1
+  fi
+}
+
 escape_for_sb() {
   local val="$1"
+
+  validate_sb_string "$val" "SBPL string" || exit 1
   val="${val//\\/\\\\}"
   val="${val//\"/\\\"}"
   printf '%s' "$val"
@@ -2207,7 +2237,7 @@ resolve_selected_agent_profiles() {
     return 0
   fi
 
-  cmd="$(to_lowercase "${invoked_command_basename:-}")"
+  cmd="$(to_lowercase "${invoked_command_profile_basename:-${invoked_command_basename:-}}")"
   app_bundle_base="$(to_lowercase "$(basename "${invoked_command_app_bundle:-}")")"
 
   case "$app_bundle_base" in
@@ -2390,6 +2420,37 @@ append_profile() {
 	append_policy_chunk ""
 }
 
+replace_literal_stream_required() {
+	local from="$1"
+	local to="$2"
+
+	awk -v from="$from" -v to="$to" '
+    BEGIN { replaced = 0 }
+    {
+      if (from == "") {
+        print $0
+        next
+      }
+
+      line = $0
+      out = ""
+      from_len = length(from)
+      while ((idx = index(line, from)) > 0) {
+        replaced = 1
+        out = out substr(line, 1, idx - 1) to
+        line = substr(line, idx + from_len)
+      }
+
+      print out line
+    }
+    END {
+      if (replaced == 0) {
+        exit 64
+      }
+    }
+  '
+}
+
 emit_policy_origin_preamble() {
   local target="$1"
 
@@ -2420,22 +2481,7 @@ append_resolved_base_profile() {
 	fi
 
 	# HOME_DIR in 00-base.sb uses a literal replacement token; inline HOME here.
-	if ! resolved_base="$(awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
-    BEGIN { replaced = 0 }
-    {
-      line = $0
-      count = gsub(token, home, line)
-      if (count > 0) {
-        replaced = 1
-      }
-      print line
-    }
-    END {
-      if (replaced == 0) {
-        exit 64
-      }
-    }
-  ' "$source")"; then
+	if ! resolved_base="$(replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home" < "$source")"; then
 		echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
 		echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
 		exit 1
@@ -2775,7 +2821,8 @@ append_colon_paths() {
 	for part in "${parts[@]}"; do
 		trimmed="$(trim_whitespace "$part")"
 		[[ -n "$trimmed" ]] || continue
-
+		validate_sb_string "$trimmed" "${mode} path" || exit 1
+	
 		expanded="$(expand_tilde "$trimmed")"
 
 		if [[ ! -e "$expanded" ]]; then
@@ -2947,6 +2994,26 @@ build_profile() {
 
 # Top-level policy generation flow.
 
+validate_sb_input() {
+  local label="$1"
+  local value="$2"
+
+  if [[ -z "$value" ]]; then
+    echo "Missing or empty value for ${label}" >&2
+    exit 1
+  fi
+
+  validate_sb_string "$value" "${label} value" || exit 1
+}
+
+validate_optional_sb_input() {
+  local label="$1"
+  local value="$2"
+
+  [[ -n "$value" ]] || return 0
+  validate_sb_string "$value" "${label} value" || exit 1
+}
+
 generate_policy_file() {
   optional_integrations_classified=0
   optional_integrations_explicit_included=()
@@ -2954,7 +3021,7 @@ generate_policy_file() {
   optional_integrations_not_included=()
 
   while [[ $# -gt 0 ]]; do
-    case "$1" in
+  case "$1" in
       --enable)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
         append_csv_values "$2"
@@ -2966,6 +3033,7 @@ generate_policy_file() {
         ;;
       --add-dirs-ro)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--add-dirs-ro" "$2"
         if [[ -n "$add_dirs_ro_list_cli" ]]; then
           add_dirs_ro_list_cli+=":${2}"
         else
@@ -2974,6 +3042,7 @@ generate_policy_file() {
         shift 2
         ;;
       --add-dirs-ro=*)
+        validate_sb_input "--add-dirs-ro" "${1#*=}"
         if [[ -n "$add_dirs_ro_list_cli" ]]; then
           add_dirs_ro_list_cli+=":${1#*=}"
         else
@@ -2983,6 +3052,7 @@ generate_policy_file() {
         ;;
       --add-dirs)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--add-dirs" "$2"
         if [[ -n "$add_dirs_list_cli" ]]; then
           add_dirs_list_cli+=":${2}"
         else
@@ -2991,6 +3061,7 @@ generate_policy_file() {
         shift 2
         ;;
       --add-dirs=*)
+        validate_sb_input "--add-dirs" "${1#*=}"
         if [[ -n "$add_dirs_list_cli" ]]; then
           add_dirs_list_cli+=":${1#*=}"
         else
@@ -3001,11 +3072,13 @@ generate_policy_file() {
       --workdir)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
         workdir_value="$2"
+        validate_optional_sb_input "--workdir" "$workdir_value"
         workdir_flag_set=1
         shift 2
         ;;
       --workdir=*)
         workdir_value="${1#*=}"
+        validate_optional_sb_input "--workdir" "$workdir_value"
         workdir_flag_set=1
         shift
         ;;
@@ -3031,19 +3104,23 @@ generate_policy_file() {
         ;;
       --append-profile)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--append-profile" "$2"
         append_profile_paths+=("$2")
         shift 2
         ;;
       --append-profile=*)
+        validate_sb_input "--append-profile" "${1#*=}"
         append_profile_paths+=("${1#*=}")
         shift
         ;;
       --output)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--output" "$2"
         output_path="$2"
         shift 2
         ;;
       --output=*)
+        validate_sb_input "--output" "${1#*=}"
         output_path="${1#*=}"
         shift
         ;;
@@ -3076,12 +3153,25 @@ generate_policy_file() {
   home_dir="$(normalize_abs_path "$home_dir")"
 
   if [[ -n "$output_path" ]]; then
+    validate_sb_string "$output_path" "--output path" || exit 1
     output_path="$(expand_tilde "$output_path")"
   fi
 
   if [[ ! -d "$invocation_cwd" ]]; then
     echo "Invocation CWD does not exist or is not a directory: $invocation_cwd" >&2
     exit 1
+  fi
+
+  if [[ "$workdir_env_set" -eq 1 && -n "$workdir_env_value" ]]; then
+    validate_sb_string "$workdir_env_value" "SAFEHOUSE_WORKDIR" || exit 1
+  fi
+
+  if [[ -n "$env_add_dirs_ro_list" ]]; then
+    validate_sb_string "$env_add_dirs_ro_list" "SAFEHOUSE_ADD_DIRS_RO" || exit 1
+  fi
+
+  if [[ -n "$env_add_dirs_list" ]]; then
+    validate_sb_string "$env_add_dirs_list" "SAFEHOUSE_ADD_DIRS" || exit 1
   fi
 
   if [[ "$trust_workdir_config_flag_set" -eq 0 ]]; then
@@ -3107,6 +3197,7 @@ generate_policy_file() {
     local -a normalized_append_profile_paths=()
 
     for raw_profile_path in "${append_profile_paths[@]}"; do
+      validate_sb_string "$raw_profile_path" "--append-profile path" || exit 1
       if [[ -z "$raw_profile_path" ]]; then
         echo "Appended profile path cannot be empty." >&2
         exit 1
@@ -3325,6 +3416,25 @@ policy_args_include_output() {
   return 1
 }
 
+resolve_profile_target_path() {
+  local first_arg="$1"
+  local first_basename first_lower
+
+  first_basename="$(basename "$first_arg")"
+  first_lower="$(to_lowercase "$first_basename")"
+
+  case "$first_lower" in
+    npx|bunx|uvx|pipx|xcrun)
+      if [[ $# -ge 2 && -n "$2" ]]; then
+        printf '%s\n' "$2"
+        return 0
+      fi
+      ;;
+  esac
+
+  printf '%s\n' "$first_arg"
+}
+
 main() {
   local -a policy_args=()
   local -a command_args=()
@@ -3391,6 +3501,8 @@ main() {
 
   invoked_command_path=""
   invoked_command_basename=""
+  invoked_command_profile_path=""
+  invoked_command_profile_basename=""
   invoked_command_app_bundle=""
   selected_agent_profile_basenames=()
   selected_agent_profile_reasons=()
@@ -3398,6 +3510,8 @@ main() {
   if [[ "${#command_args[@]}" -gt 0 ]]; then
     invoked_command_path="${command_args[0]}"
     invoked_command_basename="$(basename "${command_args[0]}")"
+    invoked_command_profile_path="$(resolve_profile_target_path "${command_args[@]}")"
+    invoked_command_profile_basename="$(basename "$invoked_command_profile_path")"
     invoked_command_app_bundle="${detected_app_bundle:-}"
   fi
 
@@ -3595,22 +3709,7 @@ append_resolved_base_profile() {
 
   escaped_home="$(escape_for_sb "$home_dir")"
   key="$(profile_key_from_source "$source")"
-  if ! resolved_base="$(embedded_profile_body "$key" | awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
-    BEGIN { replaced = 0 }
-    {
-      line = $0
-      count = gsub(token, home, line)
-      if (count > 0) {
-        replaced = 1
-      }
-      print line
-    }
-    END {
-      if (replaced == 0) {
-        exit 64
-      }
-    }
-  ')"; then
+  if ! resolved_base="$(embedded_profile_body "$key" | replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home")"; then
     echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
     echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
     exit 1

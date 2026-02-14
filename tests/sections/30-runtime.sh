@@ -15,7 +15,7 @@ run_section_runtime() {
   assert_allowed "$POLICY_DEFAULT" "read shell startup (/etc/zshrc)" /bin/cat /private/etc/zshrc
 
   section_begin "Clipboard"
-  assert_allowed_if_exists "$POLICY_DEFAULT" "pbcopy" "pbcopy" /bin/sh -c 'echo safehouse-test | /usr/bin/pbcopy'
+  assert_denied_if_exists "$POLICY_DEFAULT" "pbcopy denied by default" "pbcopy" /bin/sh -c 'echo safehouse-test | /usr/bin/pbcopy'
 
   section_begin "Network"
   assert_allowed_strict "$POLICY_DEFAULT" "outbound HTTPS (curl example.com)" /usr/bin/curl -sf --max-time 5 https://example.com

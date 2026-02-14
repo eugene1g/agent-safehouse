@@ -20,6 +20,7 @@ enable_electron_integration=0
 enable_ssh_integration=0
 enable_spotlight_integration=0
 enable_cleanshot_integration=0
+enable_clipboard_integration=0
 enable_onepassword_integration=0
 enable_cloud_credentials_integration=0
 enable_browser_native_messaging_integration=0
@@ -32,11 +33,12 @@ optional_integration_features=(
   ssh
   spotlight
   cleanshot
+  clipboard
   1password
   cloud-credentials
   browser-native-messaging
 )
-supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read"
+supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read"
 enable_all_agents_profiles=0
 enable_wide_read_access=0
 output_path=""
@@ -68,6 +70,8 @@ trust_workdir_config_env_set=0
 trust_workdir_config_source="default"
 invoked_command_path=""
 invoked_command_basename=""
+invoked_command_profile_path=""
+invoked_command_profile_basename=""
 invoked_command_app_bundle=""
 selected_agent_profile_basenames=()
 selected_agent_profile_reasons=()

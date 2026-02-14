@@ -26,6 +26,7 @@
 
 (allow file-read-metadata
    (subpath "/System")
+   (subpath "/private/var/run")                                      ;; Metadata traversal for /private/var/run socket namespace.
 )
 
 ;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to common runtime needs.
@@ -33,7 +34,6 @@
     (literal "/private")                                              ;; Required for symlink traversal under macOS /private namespace.
     (literal "/private/var")                                          ;; Required for symlink traversal to /var-backed paths.
     (subpath "/private/var/db/timezone")                              ;; Timezone DB reads used by language date/time formatting.
-    (subpath "/private/var/run")                                      ;; Resolver/daemon sockets and pid files used by networking flows.
     (literal "/private/var/select/sh")                                ;; /bin/sh selector used by macOS shell launch behavior.
     (literal "/private/var/select/developer_dir")                     ;; xcode-select developer dir pointer used by build CLIs.
     (literal "/var/select/developer_dir")                             ;; Compatibility alias for developer dir pointer.
@@ -153,7 +153,6 @@
     (global-name "com.apple.analyticsd.messagetracer")                ;; Analytics message tracer probed by frameworks during init.
     (global-name "com.apple.system.logger")                           ;; Legacy system logger endpoint used by some CLIs.
     (global-name "com.apple.coreservices.launchservicesd")            ;; Launch Services daemon for app registration and UTI resolution.
-    (global-name "com.apple.pasteboard.1")                            ;; Pasteboard service used by pbcopy/pbpaste for clipboard access.
 )
 
 (allow system-socket)                                                 ;; AF_SYSTEM sockets used by network stack for kernel event monitoring.

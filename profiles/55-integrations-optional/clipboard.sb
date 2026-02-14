@@ -1,0 +1,9 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Clipboard
+;; Clipboard read/write access for macOS pbcopy/pbpaste and related workflows.
+;; Source: 55-integrations-optional/clipboard.sb
+;; ---------------------------------------------------------------------------
+
+(allow mach-lookup
+    (global-name "com.apple.pasteboard.1")                               ;; Pasteboard service used by pbcopy/pbpaste.
+)

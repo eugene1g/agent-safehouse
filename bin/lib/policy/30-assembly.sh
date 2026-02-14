@@ -20,6 +20,37 @@ append_profile() {
 	append_policy_chunk ""
 }
 
+replace_literal_stream_required() {
+	local from="$1"
+	local to="$2"
+
+	awk -v from="$from" -v to="$to" '
+    BEGIN { replaced = 0 }
+    {
+      if (from == "") {
+        print $0
+        next
+      }
+
+      line = $0
+      out = ""
+      from_len = length(from)
+      while ((idx = index(line, from)) > 0) {
+        replaced = 1
+        out = out substr(line, 1, idx - 1) to
+        line = substr(line, idx + from_len)
+      }
+
+      print out line
+    }
+    END {
+      if (replaced == 0) {
+        exit 64
+      }
+    }
+  '
+}
+
 emit_policy_origin_preamble() {
   local target="$1"
 
@@ -50,22 +81,7 @@ append_resolved_base_profile() {
 	fi
 
 	# HOME_DIR in 00-base.sb uses a literal replacement token; inline HOME here.
-	if ! resolved_base="$(awk -v home="$escaped_home" -v token="$HOME_DIR_TEMPLATE_TOKEN" '
-    BEGIN { replaced = 0 }
-    {
-      line = $0
-      count = gsub(token, home, line)
-      if (count > 0) {
-        replaced = 1
-      }
-      print line
-    }
-    END {
-      if (replaced == 0) {
-        exit 64
-      }
-    }
-  ' "$source")"; then
+	if ! resolved_base="$(replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home" < "$source")"; then
 		echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
 		echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
 		exit 1
@@ -405,7 +421,8 @@ append_colon_paths() {
 	for part in "${parts[@]}"; do
 		trimmed="$(trim_whitespace "$part")"
 		[[ -n "$trimmed" ]] || continue
-
+		validate_sb_string "$trimmed" "${mode} path" || exit 1
+	
 		expanded="$(expand_tilde "$trimmed")"
 
 		if [[ ! -e "$expanded" ]]; then

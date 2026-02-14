@@ -33,7 +33,7 @@ resolve_selected_agent_profiles() {
     return 0
   fi
 
-  cmd="$(to_lowercase "${invoked_command_basename:-}")"
+  cmd="$(to_lowercase "${invoked_command_profile_basename:-${invoked_command_basename:-}}")"
   app_bundle_base="$(to_lowercase "$(basename "${invoked_command_app_bundle:-}")")"
 
   case "$app_bundle_base" in

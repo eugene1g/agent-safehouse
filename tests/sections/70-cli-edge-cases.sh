@@ -3,13 +3,18 @@
 run_section_cli_edge_cases() {
   local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_dedup_paths
+  local bad_path_with_newline
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config policy_workdir_config_ignored policy_workdir_config_env_trust missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_explain explain_output_file
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
   local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents
+  local policy_agent_runner_npx policy_agent_runner_bunx policy_agent_runner_uvx policy_agent_runner_pipx policy_agent_runner_xcrun
   local output_space output_nested args_file workdir_config_file safehouse_env_policy safehouse_env_status
   local fake_codex_bin fake_goose_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin fake_vscode_app_dir fake_vscode_app_bin kilo_cmd
+  local fake_cline_bin fake_aider_bin
+  local fake_npx_bin fake_bunx_bin fake_uvx_bin fake_pipx_bin fake_xcrun_bin
+  local policy_home_ampersand ampersand_home_dir resolved_ampersand_home_dir
   local append_profile_tilde_file
   local test_ro_dir_rel test_ro_dir_2_rel test_rw_dir_2_rel
   local resolved_test_rw_dir resolved_test_ro_dir
@@ -70,6 +75,9 @@ run_section_cli_edge_cases() {
     ";; Source: 60-agents/kilo-code.sb"; do
     assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes expected marker (${policy_marker})" "$policy_marker"
   done
+  assert_policy_contains "$policy_enable_all_agents" "all-agents policy grants ~/.claude directory with subpath scope" "(home-subpath \"/.claude\")"
+  assert_policy_contains "$policy_enable_all_agents" "all-agents policy grants ~/.claude.json with file-prefix scope" "(home-prefix \"/.claude.json\")"
+  assert_policy_not_contains "$policy_enable_all_agents" "all-agents policy avoids over-broad ~/.claude prefix scope" "(home-prefix \"/.claude\")"
   policy_enable_wide_read="${TEST_CWD}/policy-enable-wide-read.sb"
   assert_command_succeeds "--enable=wide-read adds broad read-only filesystem visibility" "$GENERATOR" --output "$policy_enable_wide_read" --enable=wide-read
   assert_policy_contains "$policy_enable_wide_read" "--enable=wide-read emits wide-read marker" "#safehouse-test-id:wide-read#"
@@ -222,9 +230,21 @@ EOF
   policy_agent_claude_app="${TEST_CWD}/policy-agent-claude-app.sb"
   policy_agent_vscode_app="${TEST_CWD}/policy-agent-vscode-app.sb"
   policy_agent_all_agents="${TEST_CWD}/policy-agent-all-agents.sb"
+  policy_agent_runner_npx="${TEST_CWD}/policy-agent-runner-npx.sb"
+  policy_agent_runner_bunx="${TEST_CWD}/policy-agent-runner-bunx.sb"
+  policy_agent_runner_uvx="${TEST_CWD}/policy-agent-runner-uvx.sb"
+  policy_agent_runner_pipx="${TEST_CWD}/policy-agent-runner-pipx.sb"
+  policy_agent_runner_xcrun="${TEST_CWD}/policy-agent-runner-xcrun.sb"
   fake_codex_bin="${TEST_CWD}/codex"
   fake_goose_bin="${TEST_CWD}/goose"
   fake_unknown_bin="${TEST_CWD}/not-an-agent"
+  fake_cline_bin="${TEST_CWD}/cline"
+  fake_aider_bin="${TEST_CWD}/aider"
+  fake_npx_bin="${TEST_CWD}/npx"
+  fake_bunx_bin="${TEST_CWD}/bunx"
+  fake_uvx_bin="${TEST_CWD}/uvx"
+  fake_pipx_bin="${TEST_CWD}/pipx"
+  fake_xcrun_bin="${TEST_CWD}/xcrun"
   fake_claude_app_dir="${TEST_CWD}/Claude.app"
   fake_claude_app_bin="${fake_claude_app_dir}/Contents/MacOS/Claude"
   fake_vscode_app_dir="${TEST_CWD}/Visual Studio Code.app"
@@ -233,6 +253,13 @@ EOF
   cp /usr/bin/true "$fake_codex_bin"
   cp /usr/bin/true "$fake_goose_bin"
   cp /usr/bin/true "$fake_unknown_bin"
+  cp /usr/bin/true "$fake_cline_bin"
+  cp /usr/bin/true "$fake_aider_bin"
+  cp /usr/bin/true "$fake_npx_bin"
+  cp /usr/bin/true "$fake_bunx_bin"
+  cp /usr/bin/true "$fake_uvx_bin"
+  cp /usr/bin/true "$fake_pipx_bin"
+  cp /usr/bin/true "$fake_xcrun_bin"
   mkdir -p "$(dirname "$fake_claude_app_bin")"
   cp /usr/bin/true "$fake_claude_app_bin"
   mkdir -p "$(dirname "$fake_vscode_app_bin")"
@@ -253,6 +280,26 @@ EOF
   assert_command_succeeds "safehouse selects the matching Kilo Code profile for installed kilo/kilocode command basename" "$SAFEHOUSE" --output "$policy_agent_kilo" -- "$kilo_cmd"
   assert_policy_contains "$policy_agent_kilo" "kilo command includes kilo-code agent profile" ";; Source: 60-agents/kilo-code.sb"
   assert_policy_not_contains "$policy_agent_kilo" "kilo command omits unrelated codex profile" ";; Source: 60-agents/codex.sb"
+
+  assert_command_succeeds "safehouse maps npx wrapper command to wrapped command basename for profile selection" "$SAFEHOUSE" --output "$policy_agent_runner_npx" -- "$fake_npx_bin" "$fake_cline_bin"
+  assert_policy_contains "$policy_agent_runner_npx" "npx wrapper command includes cline profile via wrapped command detection" ";; Source: 60-agents/cline.sb"
+  assert_policy_not_contains "$policy_agent_runner_npx" "npx wrapper command omits unrelated codex profile when wrapped command is cline" ";; Source: 60-agents/codex.sb"
+
+  assert_command_succeeds "safehouse maps bunx wrapper command to wrapped command basename for profile selection" "$SAFEHOUSE" --output "$policy_agent_runner_bunx" -- "$fake_bunx_bin" "$fake_goose_bin"
+  assert_policy_contains "$policy_agent_runner_bunx" "bunx wrapper command includes goose profile via wrapped command detection" ";; Source: 60-agents/goose.sb"
+  assert_policy_not_contains "$policy_agent_runner_bunx" "bunx wrapper command omits unrelated codex profile when wrapped command is goose" ";; Source: 60-agents/codex.sb"
+
+  assert_command_succeeds "safehouse maps uvx wrapper command to wrapped command basename for profile selection" "$SAFEHOUSE" --output "$policy_agent_runner_uvx" -- "$fake_uvx_bin" "$fake_aider_bin"
+  assert_policy_contains "$policy_agent_runner_uvx" "uvx wrapper command includes aider profile via wrapped command detection" ";; Source: 60-agents/aider.sb"
+  assert_policy_not_contains "$policy_agent_runner_uvx" "uvx wrapper command omits unrelated codex profile when wrapped command is aider" ";; Source: 60-agents/codex.sb"
+
+  assert_command_succeeds "safehouse maps pipx wrapper command to wrapped command basename for profile selection" "$SAFEHOUSE" --output "$policy_agent_runner_pipx" -- "$fake_pipx_bin" "$fake_aider_bin"
+  assert_policy_contains "$policy_agent_runner_pipx" "pipx wrapper command includes aider profile via wrapped command detection" ";; Source: 60-agents/aider.sb"
+  assert_policy_not_contains "$policy_agent_runner_pipx" "pipx wrapper command omits unrelated codex profile when wrapped command is aider" ";; Source: 60-agents/codex.sb"
+
+  assert_command_succeeds "safehouse maps xcrun wrapper command to wrapped command basename for profile selection" "$SAFEHOUSE" --output "$policy_agent_runner_xcrun" -- "$fake_xcrun_bin" "$fake_codex_bin"
+  assert_policy_contains "$policy_agent_runner_xcrun" "xcrun wrapper command includes codex profile via wrapped command detection" ";; Source: 60-agents/codex.sb"
+  assert_policy_not_contains "$policy_agent_runner_xcrun" "xcrun wrapper command omits unrelated goose profile when wrapped command is codex" ";; Source: 60-agents/goose.sb"
 
   assert_command_succeeds "safehouse skips scoped app/agent modules for unknown commands by default" "$SAFEHOUSE" --output "$policy_agent_unknown" -- "$fake_unknown_bin"
   assert_policy_not_contains "$policy_agent_unknown" "unknown command policy omits codex agent profile" ";; Source: 60-agents/codex.sb"
@@ -299,7 +346,10 @@ EOF
     assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes expected marker (${policy_marker})" "$policy_marker"
   done
 
-  rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$kilo_cmd" "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents"
+  rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$fake_cline_bin" "$fake_aider_bin" "$kilo_cmd"
+  rm -f "$fake_npx_bin" "$fake_bunx_bin" "$fake_uvx_bin" "$fake_pipx_bin" "$fake_xcrun_bin"
+  rm -f "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents"
+  rm -f "$policy_agent_runner_npx" "$policy_agent_runner_bunx" "$policy_agent_runner_uvx" "$policy_agent_runner_pipx" "$policy_agent_runner_xcrun"
   rm -rf "$fake_claude_app_dir" "$fake_vscode_app_dir"
 
   section_begin "Generator Path/Home Validation"
@@ -308,10 +358,28 @@ EOF
   assert_command_fails "--add-dirs fails for nonexistent path" "$GENERATOR" --add-dirs "$missing_path"
   assert_command_fails "--add-dirs-ro fails for nonexistent path" "$GENERATOR" --add-dirs-ro "$missing_path"
   assert_command_fails "--workdir fails for nonexistent path" "$GENERATOR" --workdir "$missing_path"
+  bad_path_with_newline=$'${TEST_RO_DIR}
+${TEST_RW_DIR}'
+  assert_command_fails "--add-dirs rejects newline/control chars" "$GENERATOR" --add-dirs "$bad_path_with_newline"
+  assert_command_fails "--add-dirs-ro rejects newline/control chars" "$GENERATOR" --add-dirs-ro "$bad_path_with_newline"
+  assert_command_fails "--workdir rejects newline/control chars" "$GENERATOR" --workdir "$bad_path_with_newline"
+  assert_command_fails "SAFEHOUSE_ADD_DIRS rejects newline/control chars" /usr/bin/env SAFEHOUSE_ADD_DIRS="$bad_path_with_newline" "$GENERATOR"
+  assert_command_fails "SAFEHOUSE_WORKDIR rejects newline/control chars" /usr/bin/env SAFEHOUSE_WORKDIR="$bad_path_with_newline" "$GENERATOR"
+
   assert_command_fails "generator fails when HOME is unset" /usr/bin/env -u HOME "$GENERATOR"
   home_not_dir="${TEST_CWD}/home-not-a-directory.txt"
   printf 'not-a-directory\n' > "$home_not_dir"
   assert_command_fails "generator fails when HOME is not a directory" /usr/bin/env HOME="$home_not_dir" "$GENERATOR"
+
+  policy_home_ampersand="${TEST_CWD}/policy-home-ampersand.sb"
+  ampersand_home_dir="${TEST_CWD}/home-with-&-char"
+  mkdir -p "$ampersand_home_dir"
+  resolved_ampersand_home_dir="$(cd "$ampersand_home_dir" && pwd -P)"
+  assert_command_succeeds "generator resolves HOME placeholder safely when HOME contains ampersand" /usr/bin/env HOME="$ampersand_home_dir" "$GENERATOR" --workdir="" --output "$policy_home_ampersand"
+  assert_policy_contains "$policy_home_ampersand" "HOME placeholder replacement preserves literal ampersands in HOME path" "(define HOME_DIR \"${resolved_ampersand_home_dir}\")"
+  assert_policy_not_contains "$policy_home_ampersand" "HOME placeholder replacement with ampersand does not leave template token artifacts" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
+  rm -f "$policy_home_ampersand"
+  rm -rf "$ampersand_home_dir"
 
   section_begin "Policy Emission Order"
   assert_policy_order_literal "$POLICY_MERGE" "dynamic grants are emitted before workdir grant" "$marker_dynamic" "$marker_workdir"

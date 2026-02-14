@@ -14,7 +14,8 @@
 (allow file-read* file-write*
     (home-prefix "/.local/bin/claude")
     (home-subpath "/.cache/claude")
-    (home-prefix "/.claude") ; this include .claude folder, as well as .claude.json and .claude.lock.json etc files
+    (home-subpath "/.claude")
+    (home-prefix "/.claude.json")
     (home-subpath "/.config/claude")
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")

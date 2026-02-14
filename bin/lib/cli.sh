@@ -109,6 +109,25 @@ policy_args_include_output() {
   return 1
 }
 
+resolve_profile_target_path() {
+  local first_arg="$1"
+  local first_basename first_lower
+
+  first_basename="$(basename "$first_arg")"
+  first_lower="$(to_lowercase "$first_basename")"
+
+  case "$first_lower" in
+    npx|bunx|uvx|pipx|xcrun)
+      if [[ $# -ge 2 && -n "$2" ]]; then
+        printf '%s\n' "$2"
+        return 0
+      fi
+      ;;
+  esac
+
+  printf '%s\n' "$first_arg"
+}
+
 main() {
   local -a policy_args=()
   local -a command_args=()
@@ -175,6 +194,8 @@ main() {
 
   invoked_command_path=""
   invoked_command_basename=""
+  invoked_command_profile_path=""
+  invoked_command_profile_basename=""
   invoked_command_app_bundle=""
   selected_agent_profile_basenames=()
   selected_agent_profile_reasons=()
@@ -182,6 +203,8 @@ main() {
   if [[ "${#command_args[@]}" -gt 0 ]]; then
     invoked_command_path="${command_args[0]}"
     invoked_command_basename="$(basename "${command_args[0]}")"
+    invoked_command_profile_path="$(resolve_profile_target_path "${command_args[@]}")"
+    invoked_command_profile_basename="$(basename "$invoked_command_profile_path")"
     invoked_command_app_bundle="${detected_app_bundle:-}"
   fi
 

@@ -25,7 +25,7 @@
 ;; Manual policy-only example (no generator):
 ;;   Replace the next line with:
 ;;     (define HOME_DIR "/Users/alice")
-(define HOME_DIR "/tmp/agent-safehouse-static-template/home")
+(define HOME_DIR "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/home")
 
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
 (define (home-literal rel) (literal (string-append HOME_DIR rel)))
@@ -61,6 +61,7 @@
 
 (allow file-read-metadata
    (subpath "/System")
+   (subpath "/private/var/run")                                      ;; Metadata traversal for /private/var/run socket namespace.
 )
 
 ;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to common runtime needs.
@@ -68,7 +69,6 @@
     (literal "/private")                                              ;; Required for symlink traversal under macOS /private namespace.
     (literal "/private/var")                                          ;; Required for symlink traversal to /var-backed paths.
     (subpath "/private/var/db/timezone")                              ;; Timezone DB reads used by language date/time formatting.
-    (subpath "/private/var/run")                                      ;; Resolver/daemon sockets and pid files used by networking flows.
     (literal "/private/var/select/sh")                                ;; /bin/sh selector used by macOS shell launch behavior.
     (literal "/private/var/select/developer_dir")                     ;; xcode-select developer dir pointer used by build CLIs.
     (literal "/var/select/developer_dir")                             ;; Compatibility alias for developer dir pointer.
@@ -188,7 +188,6 @@
     (global-name "com.apple.analyticsd.messagetracer")                ;; Analytics message tracer probed by frameworks during init.
     (global-name "com.apple.system.logger")                           ;; Legacy system logger endpoint used by some CLIs.
     (global-name "com.apple.coreservices.launchservicesd")            ;; Launch Services daemon for app registration and UTI resolution.
-    (global-name "com.apple.pasteboard.1")                            ;; Pasteboard service used by pbcopy/pbpaste for clipboard access.
 )
 
 (allow system-socket)                                                 ;; AF_SYSTEM sockets used by network stack for kernel event monitoring.
@@ -572,7 +571,7 @@
 
 ;; Optional integrations explicitly enabled: macos-gui electron
 ;; Optional integrations implicitly injected: (none)
-;; Optional integrations not included: docker kubectl ssh spotlight cleanshot 1password cloud-credentials browser-native-messaging
+;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials browser-native-messaging
 ;; Keychain integration (auto-injected from profile requirements): included
 ;; Use --enable=<feature> (comma-separated) to include optional integrations explicitly.
 ;; Note: selected app/agent profiles and enabled integrations can inject dependencies via $$require=<integration-profile-path>$$ metadata.
@@ -965,7 +964,8 @@
 (allow file-read* file-write*
     (home-prefix "/.local/bin/claude")
     (home-subpath "/.cache/claude")
-    (home-prefix "/.claude") ; this include .claude folder, as well as .claude.json and .claude.lock.json etc files
+    (home-subpath "/.claude")
+    (home-prefix "/.claude.json")
     (home-subpath "/.config/claude")
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")
@@ -1300,7 +1300,7 @@
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: /tmp/agent-safehouse-static-template/workspace
+;; Generated ancestor directory literals for selected workdir: /Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace
 ;;
 ;; Why file-read* (not file-read-metadata) with literal (not subpath):
 ;; Agents (notably Claude Code) call readdir() on every ancestor of the working
@@ -1311,10 +1311,14 @@
 ;; grant recursive read access to files or subdirectories under it.
 (allow file-read*
     (literal "/")
-    (literal "/tmp")
-    (literal "/tmp/agent-safehouse-static-template")
-    (literal "/tmp/agent-safehouse-static-template/workspace")
+    (literal "/Users")
+    (literal "/Users/eugene")
+    (literal "/Users/eugene/server")
+    (literal "/Users/eugene/server/agent-safehouse")
+    (literal "/Users/eugene/server/agent-safehouse/dist")
+    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template")
+    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace")
 )
 
-(allow file-read* file-write* (subpath "/tmp/agent-safehouse-static-template/workspace"))
+(allow file-read* file-write* (subpath "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace"))
 

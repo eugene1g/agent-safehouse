@@ -164,8 +164,20 @@ resolve_default_workdir() {
   printf '%s\n' "$cwd"
 }
 
+validate_sb_string() {
+  local value="$1"
+  local label="${2:-SBPL string}"
+
+  if [[ "$value" =~ [[:cntrl:]] ]]; then
+    echo "Invalid ${label}: contains control characters and cannot be emitted into SBPL." >&2
+    return 1
+  fi
+}
+
 escape_for_sb() {
   local val="$1"
+
+  validate_sb_string "$val" "SBPL string" || exit 1
   val="${val//\\/\\\\}"
   val="${val//\"/\\\"}"
   printf '%s' "$val"

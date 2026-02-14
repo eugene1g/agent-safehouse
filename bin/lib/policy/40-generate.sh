@@ -1,5 +1,25 @@
 # Top-level policy generation flow.
 
+validate_sb_input() {
+  local label="$1"
+  local value="$2"
+
+  if [[ -z "$value" ]]; then
+    echo "Missing or empty value for ${label}" >&2
+    exit 1
+  fi
+
+  validate_sb_string "$value" "${label} value" || exit 1
+}
+
+validate_optional_sb_input() {
+  local label="$1"
+  local value="$2"
+
+  [[ -n "$value" ]] || return 0
+  validate_sb_string "$value" "${label} value" || exit 1
+}
+
 generate_policy_file() {
   optional_integrations_classified=0
   optional_integrations_explicit_included=()
@@ -7,7 +27,7 @@ generate_policy_file() {
   optional_integrations_not_included=()
 
   while [[ $# -gt 0 ]]; do
-    case "$1" in
+  case "$1" in
       --enable)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
         append_csv_values "$2"
@@ -19,6 +39,7 @@ generate_policy_file() {
         ;;
       --add-dirs-ro)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--add-dirs-ro" "$2"
         if [[ -n "$add_dirs_ro_list_cli" ]]; then
           add_dirs_ro_list_cli+=":${2}"
         else
@@ -27,6 +48,7 @@ generate_policy_file() {
         shift 2
         ;;
       --add-dirs-ro=*)
+        validate_sb_input "--add-dirs-ro" "${1#*=}"
         if [[ -n "$add_dirs_ro_list_cli" ]]; then
           add_dirs_ro_list_cli+=":${1#*=}"
         else
@@ -36,6 +58,7 @@ generate_policy_file() {
         ;;
       --add-dirs)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--add-dirs" "$2"
         if [[ -n "$add_dirs_list_cli" ]]; then
           add_dirs_list_cli+=":${2}"
         else
@@ -44,6 +67,7 @@ generate_policy_file() {
         shift 2
         ;;
       --add-dirs=*)
+        validate_sb_input "--add-dirs" "${1#*=}"
         if [[ -n "$add_dirs_list_cli" ]]; then
           add_dirs_list_cli+=":${1#*=}"
         else
@@ -54,11 +78,13 @@ generate_policy_file() {
       --workdir)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
         workdir_value="$2"
+        validate_optional_sb_input "--workdir" "$workdir_value"
         workdir_flag_set=1
         shift 2
         ;;
       --workdir=*)
         workdir_value="${1#*=}"
+        validate_optional_sb_input "--workdir" "$workdir_value"
         workdir_flag_set=1
         shift
         ;;
@@ -84,19 +110,23 @@ generate_policy_file() {
         ;;
       --append-profile)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--append-profile" "$2"
         append_profile_paths+=("$2")
         shift 2
         ;;
       --append-profile=*)
+        validate_sb_input "--append-profile" "${1#*=}"
         append_profile_paths+=("${1#*=}")
         shift
         ;;
       --output)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        validate_sb_input "--output" "$2"
         output_path="$2"
         shift 2
         ;;
       --output=*)
+        validate_sb_input "--output" "${1#*=}"
         output_path="${1#*=}"
         shift
         ;;
@@ -129,12 +159,25 @@ generate_policy_file() {
   home_dir="$(normalize_abs_path "$home_dir")"
 
   if [[ -n "$output_path" ]]; then
+    validate_sb_string "$output_path" "--output path" || exit 1
     output_path="$(expand_tilde "$output_path")"
   fi
 
   if [[ ! -d "$invocation_cwd" ]]; then
     echo "Invocation CWD does not exist or is not a directory: $invocation_cwd" >&2
     exit 1
+  fi
+
+  if [[ "$workdir_env_set" -eq 1 && -n "$workdir_env_value" ]]; then
+    validate_sb_string "$workdir_env_value" "SAFEHOUSE_WORKDIR" || exit 1
+  fi
+
+  if [[ -n "$env_add_dirs_ro_list" ]]; then
+    validate_sb_string "$env_add_dirs_ro_list" "SAFEHOUSE_ADD_DIRS_RO" || exit 1
+  fi
+
+  if [[ -n "$env_add_dirs_list" ]]; then
+    validate_sb_string "$env_add_dirs_list" "SAFEHOUSE_ADD_DIRS" || exit 1
   fi
 
   if [[ "$trust_workdir_config_flag_set" -eq 0 ]]; then
@@ -160,6 +203,7 @@ generate_policy_file() {
     local -a normalized_append_profile_paths=()
 
     for raw_profile_path in "${append_profile_paths[@]}"; do
+      validate_sb_string "$raw_profile_path" "--append-profile path" || exit 1
       if [[ -z "$raw_profile_path" ]]; then
         echo "Appended profile path cannot be empty." >&2
         exit 1

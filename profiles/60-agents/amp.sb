@@ -19,4 +19,9 @@
     (home-subpath "/.cache/amp")
     (home-subpath "/.local/share/amp")
     (home-subpath "/.local/state/amp")
+    (home-subpath "/Library/Application Support/Zed/db")
+)
+
+(allow file-read*
+    (home-prefix "/.claude")
 )

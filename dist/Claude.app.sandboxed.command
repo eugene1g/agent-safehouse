@@ -12,11 +12,54 @@ claude_desktop_binary="/Applications/Claude.app/Contents/MacOS/Claude"
 default_policy_url="https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/profiles/safehouse-for-apps.generated.sb"
 project_url="https://agent-safehouse.dev"
 
+validate_sb_string() {
+  local value="$1"
+  local label="${2:-SBPL string}"
+
+  if [[ "$value" =~ [[:cntrl:]] ]]; then
+    echo "Invalid ${label}: contains control characters and cannot be emitted into SBPL." >&2
+    exit 1
+  fi
+}
+
 escape_for_sb() {
   local value="$1"
+
+  validate_sb_string "$value" "policy token" || exit 1
   value="${value//\\/\\\\}"
-  value="${value//\\"/\\\\"}"
+  value="${value//\"/\\\"}"
   printf '%s' "$value"
+}
+
+policy_checksum_256() {
+  local path="$1"
+
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$path" | awk '{print $1}'
+    return 0
+  fi
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$path" | awk '{print $1}'
+    return 0
+  fi
+
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$path" | awk '{print $NF}'
+    return 0
+  fi
+
+  return 1
+}
+
+policy_checksum_matches() {
+  local policy_path="$1"
+  local expected="$2"
+  local actual
+
+  actual="$(policy_checksum_256 "$policy_path")" || return 1
+
+  [[ "$actual" == "$expected" ]]
 }
 
 replace_literal_stream() {
@@ -25,11 +68,20 @@ replace_literal_stream() {
 
   awk -v from="$from" -v to="$to" '
     {
-      line = $0
-      while ((idx = index(line, from)) > 0) {
-        line = substr(line, 1, idx - 1) to substr(line, idx + length(from))
+      if (from == "") {
+        print $0
+        next
       }
-      print line
+
+      line = $0
+      out = ""
+      from_len = length(from)
+      while ((idx = index(line, from)) > 0) {
+        out = out substr(line, 1, idx - 1) to
+        line = substr(line, idx + from_len)
+      }
+
+      print out line
     }
   '
 }
@@ -85,7 +137,7 @@ emit_path_ancestor_literals() {
 
 main() {
   local home_dir launcher_workdir escaped_home escaped_workdir policy_source_path policy_path
-  local remote_policy_url template_home_path
+  local remote_policy_url template_home_path policy_expected_sha256
 
   if [[ ! -x "$claude_desktop_binary" ]]; then
     echo "Claude Desktop binary not found at ${claude_desktop_binary}" >&2
@@ -115,6 +167,12 @@ main() {
   trap cleanup_policy EXIT
 
   remote_policy_url="${SAFEHOUSE_CLAUDE_POLICY_URL:-$default_policy_url}"
+  validate_sb_string "$remote_policy_url" "policy URL" || exit 1
+  policy_expected_sha256="${SAFEHOUSE_CLAUDE_POLICY_SHA256:-}"
+  if [[ -n "$policy_expected_sha256" ]]; then
+    validate_sb_string "$policy_expected_sha256" "policy SHA-256" || exit 1
+  fi
+
   if ! fetch_remote_policy "$remote_policy_url" "$policy_source_path"; then
     echo "Failed to download sandbox policy from ${remote_policy_url}" >&2
     echo "Install curl or wget, or set SAFEHOUSE_CLAUDE_POLICY_URL to a reachable policy URL." >&2
@@ -127,6 +185,15 @@ main() {
     exit 1
   fi
 
+  if [[ -n "$policy_expected_sha256" ]]; then
+    if ! policy_checksum_matches "$policy_source_path" "$policy_expected_sha256"; then
+      echo "Downloaded policy SHA-256 does not match SAFEHOUSE_CLAUDE_POLICY_SHA256." >&2
+      echo "Expected: ${policy_expected_sha256}" >&2
+      echo "Could not verify: install one of shasum/sha256sum/openssl." >&2
+      exit 1
+    fi
+  fi
+
   template_home_path="$(awk -F'"' '/^\(define HOME_DIR "/ { print $2; exit }' "$policy_source_path")"
   if [[ -z "${template_home_path:-}" ]]; then
     echo "Failed to parse HOME_DIR from launcher policy source (${remote_policy_url})" >&2
@@ -135,7 +202,7 @@ main() {
 
   {
     replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<POLICY
+    cat <<'POLICY'
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
 ;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}
@@ -153,6 +220,7 @@ $(emit_path_ancestor_literals "$launcher_workdir")
 POLICY
   } > "$policy_path"
 
+  cd "$launcher_workdir"
   sandbox-exec -f "$policy_path" -- "$claude_desktop_binary" --no-sandbox "$@"
 }
 

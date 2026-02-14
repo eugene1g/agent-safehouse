@@ -2,6 +2,7 @@
 
 run_section_policy_behavior() {
   local policy_all_agents
+  local policy_clipboard
   local policy_browser_native_messaging policy_cloud_credentials policy_onepassword
   local policy_ssh policy_spotlight policy_cleanshot
   local policy_docker_wide_read policy_docker_workdir_root policy_docker_append_allow
@@ -45,6 +46,9 @@ run_section_policy_behavior() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits SSH integration profile" ";; Integration: SSH"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Spotlight integration profile" ";; Integration: Spotlight"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits CleanShot integration profile" ";; Integration: CleanShot"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits clipboard pasteboard access" "(global-name \"com.apple.pasteboard.1\")"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy no longer grants broad file-read* access to /private/var/run" "Resolver/daemon sockets and pid files used by networking flows."
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes metadata-only /private/var/run grant" "Metadata traversal for /private/var/run socket namespace."
 
   policy_browser_native_messaging="${TEST_CWD}/policy-feature-browser-native-messaging.sb"
   policy_cloud_credentials="${TEST_CWD}/policy-feature-cloud-credentials.sb"
@@ -52,6 +56,7 @@ run_section_policy_behavior() {
   policy_ssh="${TEST_CWD}/policy-feature-ssh.sb"
   policy_spotlight="${TEST_CWD}/policy-feature-spotlight.sb"
   policy_cleanshot="${TEST_CWD}/policy-feature-cleanshot.sb"
+  policy_clipboard="${TEST_CWD}/policy-feature-clipboard.sb"
 
   assert_command_succeeds "--enable=browser-native-messaging includes browser native messaging profile" "$GENERATOR" --output "$policy_browser_native_messaging" --enable=browser-native-messaging
   assert_command_succeeds "--enable=cloud-credentials includes cloud credentials profile" "$GENERATOR" --output "$policy_cloud_credentials" --enable=cloud-credentials
@@ -59,6 +64,7 @@ run_section_policy_behavior() {
   assert_command_succeeds "--enable=ssh includes SSH profile" "$GENERATOR" --output "$policy_ssh" --enable=ssh
   assert_command_succeeds "--enable=spotlight includes Spotlight profile" "$GENERATOR" --output "$policy_spotlight" --enable=spotlight
   assert_command_succeeds "--enable=cleanshot includes CleanShot profile" "$GENERATOR" --output "$policy_cleanshot" --enable=cleanshot
+  assert_command_succeeds "--enable=clipboard includes Clipboard profile" "$GENERATOR" --output "$policy_clipboard" --enable=clipboard
 
   assert_policy_contains "$policy_browser_native_messaging" "--enable=browser-native-messaging includes browser native messaging grants" "/NativeMessagingHosts"
   assert_policy_contains "$policy_browser_native_messaging" "--enable=browser-native-messaging includes Firefox native messaging grants" "/Mozilla/NativeMessagingHosts"
@@ -82,6 +88,7 @@ run_section_policy_behavior() {
 
   assert_policy_contains "$policy_cleanshot" "--enable=cleanshot includes CleanShot profile marker" ";; Integration: CleanShot"
   assert_policy_contains "$policy_cleanshot" "--enable=cleanshot includes CleanShot media grant" "/Library/Application Support/CleanShot/media"
+  assert_policy_contains "$policy_clipboard" "--enable=clipboard includes pasteboard service grant" "(global-name \"com.apple.pasteboard.1\")"
 
   policy_all_agents="${TEST_CWD}/policy-all-agents-feature-toggle.sb"
   assert_command_succeeds "--enable=all-agents restores legacy agent-specific grants in policy mode" "$GENERATOR" --output "$policy_all_agents" --enable=all-agents
@@ -89,7 +96,7 @@ run_section_policy_behavior() {
   assert_policy_contains "$policy_all_agents" "all-agents policy includes opentui data grant" "/.local/share/opentui"
   assert_policy_contains "$policy_all_agents" "all-agents policy includes goose config grant" "/.config/goose"
   assert_policy_contains "$policy_all_agents" "all-agents policy includes kilocode binary grant" "/.local/bin/kilocode"
-  rm -f "$policy_all_agents"
+  rm -f "$policy_all_agents" "$policy_clipboard"
 
   for docker_sock in \
     "/var/run/docker.sock" \

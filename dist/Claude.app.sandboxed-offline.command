@@ -11,10 +11,22 @@ set -euo pipefail
 claude_desktop_binary="/Applications/Claude.app/Contents/MacOS/Claude"
 project_url="https://agent-safehouse.dev"
 
+validate_sb_string() {
+  local value="$1"
+  local label="${2:-SBPL string}"
+
+  if [[ "$value" =~ [[:cntrl:]] ]]; then
+    echo "Invalid ${label}: contains control characters and cannot be emitted into SBPL." >&2
+    exit 1
+  fi
+}
+
 escape_for_sb() {
   local value="$1"
+
+  validate_sb_string "$value" "policy token" || exit 1
   value="${value//\\/\\\\}"
-  value="${value//\\"/\\\\"}"
+  value="${value//\"/\\\"}"
   printf '%s' "$value"
 }
 
@@ -24,11 +36,20 @@ replace_literal_stream() {
 
   awk -v from="$from" -v to="$to" '
     {
-      line = $0
-      while ((idx = index(line, from)) > 0) {
-        line = substr(line, 1, idx - 1) to substr(line, idx + length(from))
+      if (from == "") {
+        print $0
+        next
       }
-      print line
+
+      line = $0
+      out = ""
+      from_len = length(from)
+      while ((idx = index(line, from)) > 0) {
+        out = out substr(line, 1, idx - 1) to
+        line = substr(line, idx + from_len)
+      }
+
+      print out line
     }
   '
 }
@@ -73,7 +94,7 @@ emit_embedded_policy_template() {
 ;; Manual policy-only example (no generator):
 ;;   Replace the next line with:
 ;;     (define HOME_DIR "/Users/alice")
-(define HOME_DIR "/tmp/agent-safehouse-static-template/home")
+(define HOME_DIR "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/home")
 
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
 (define (home-literal rel) (literal (string-append HOME_DIR rel)))
@@ -109,6 +130,7 @@ emit_embedded_policy_template() {
 
 (allow file-read-metadata
    (subpath "/System")
+   (subpath "/private/var/run")                                      ;; Metadata traversal for /private/var/run socket namespace.
 )
 
 ;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to common runtime needs.
@@ -116,7 +138,6 @@ emit_embedded_policy_template() {
     (literal "/private")                                              ;; Required for symlink traversal under macOS /private namespace.
     (literal "/private/var")                                          ;; Required for symlink traversal to /var-backed paths.
     (subpath "/private/var/db/timezone")                              ;; Timezone DB reads used by language date/time formatting.
-    (subpath "/private/var/run")                                      ;; Resolver/daemon sockets and pid files used by networking flows.
     (literal "/private/var/select/sh")                                ;; /bin/sh selector used by macOS shell launch behavior.
     (literal "/private/var/select/developer_dir")                     ;; xcode-select developer dir pointer used by build CLIs.
     (literal "/var/select/developer_dir")                             ;; Compatibility alias for developer dir pointer.
@@ -236,7 +257,6 @@ emit_embedded_policy_template() {
     (global-name "com.apple.analyticsd.messagetracer")                ;; Analytics message tracer probed by frameworks during init.
     (global-name "com.apple.system.logger")                           ;; Legacy system logger endpoint used by some CLIs.
     (global-name "com.apple.coreservices.launchservicesd")            ;; Launch Services daemon for app registration and UTI resolution.
-    (global-name "com.apple.pasteboard.1")                            ;; Pasteboard service used by pbcopy/pbpaste for clipboard access.
 )
 
 (allow system-socket)                                                 ;; AF_SYSTEM sockets used by network stack for kernel event monitoring.
@@ -620,7 +640,7 @@ emit_embedded_policy_template() {
 
 ;; Optional integrations explicitly enabled: macos-gui electron
 ;; Optional integrations implicitly injected: (none)
-;; Optional integrations not included: docker kubectl ssh spotlight cleanshot 1password cloud-credentials browser-native-messaging
+;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials browser-native-messaging
 ;; Keychain integration (auto-injected from profile requirements): included
 ;; Use --enable=<feature> (comma-separated) to include optional integrations explicitly.
 ;; Note: selected app/agent profiles and enabled integrations can inject dependencies via $$require=<integration-profile-path>$$ metadata.
@@ -1013,7 +1033,8 @@ emit_embedded_policy_template() {
 (allow file-read* file-write*
     (home-prefix "/.local/bin/claude")
     (home-subpath "/.cache/claude")
-    (home-prefix "/.claude") ; this include .claude folder, as well as .claude.json and .claude.lock.json etc files
+    (home-subpath "/.claude")
+    (home-prefix "/.claude.json")
     (home-subpath "/.config/claude")
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")
@@ -1348,7 +1369,7 @@ emit_embedded_policy_template() {
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: /tmp/agent-safehouse-static-template/workspace
+;; Generated ancestor directory literals for selected workdir: /Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace
 ;;
 ;; Why file-read* (not file-read-metadata) with literal (not subpath):
 ;; Agents (notably Claude Code) call readdir() on every ancestor of the working
@@ -1359,12 +1380,16 @@ emit_embedded_policy_template() {
 ;; grant recursive read access to files or subdirectories under it.
 (allow file-read*
     (literal "/")
-    (literal "/tmp")
-    (literal "/tmp/agent-safehouse-static-template")
-    (literal "/tmp/agent-safehouse-static-template/workspace")
+    (literal "/Users")
+    (literal "/Users/eugene")
+    (literal "/Users/eugene/server")
+    (literal "/Users/eugene/server/agent-safehouse")
+    (literal "/Users/eugene/server/agent-safehouse/dist")
+    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template")
+    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace")
 )
 
-(allow file-read* file-write* (subpath "/tmp/agent-safehouse-static-template/workspace"))
+(allow file-read* file-write* (subpath "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace"))
 
 SAFEHOUSE_EMBEDDED_APPS_POLICY
 }
@@ -1427,7 +1452,7 @@ main() {
     exit 1
   fi
 
-  template_home_path="$(awk -F'"' '/^\(define HOME_DIR "/ { print $2; exit }' "$policy_source_path")"
+  template_home_path="$(awk -F'"' '/^\(define HOME_DIR \"/ { print $2; exit }' "$policy_source_path")"
   if [[ -z "${template_home_path:-}" ]]; then
     echo "Failed to parse HOME_DIR from embedded launcher policy template" >&2
     echo "Help: ${project_url}" >&2
@@ -1436,7 +1461,7 @@ main() {
 
   {
     replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<POLICY
+    cat <<'POLICY'
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
 ;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}
@@ -1454,6 +1479,7 @@ $(emit_path_ancestor_literals "$launcher_workdir")
 POLICY
   } > "$policy_path"
 
+  cd "$launcher_workdir"
   sandbox-exec -f "$policy_path" -- "$claude_desktop_binary" --no-sandbox "$@"
 }
 
