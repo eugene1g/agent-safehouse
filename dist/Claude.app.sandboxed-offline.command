@@ -1040,6 +1040,7 @@ emit_embedded_policy_template() {
     (home-subpath "/.cache/claude")
     (home-subpath "/.claude")
     (home-prefix "/.claude.json")
+    (home-literal "/.claude.lock")
     (home-subpath "/.config/claude")
     (home-subpath "/.local/state/claude")
     (home-subpath "/.local/share/claude")
