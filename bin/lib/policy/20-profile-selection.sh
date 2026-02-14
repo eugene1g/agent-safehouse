@@ -97,7 +97,11 @@ should_include_agent_profile_file() {
   local file_path="$1"
   local selected_profile base_name
 
-  if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+  if [[ "$file_path" == *"/60-agents/"* && "$enable_all_agents_profiles" -eq 1 ]]; then
+    return 0
+  fi
+
+  if [[ "$file_path" == *"/65-apps/"* && "$enable_all_apps_profiles" -eq 1 ]]; then
     return 0
   fi
 
@@ -149,7 +153,7 @@ profile_declares_requirement() {
 
 selected_profiles_require_integration() {
   local integration="$1"
-  local integration_normalized selected_profile profile_path file
+  local integration_normalized file
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
@@ -159,32 +163,14 @@ selected_profiles_require_integration() {
     return
   fi
 
-  if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-    while IFS= read -r file; do
-      [[ -n "$file" ]] || continue
-      if profile_declares_requirement "$file" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
-    done < <(find "${PROFILES_DIR}/60-agents" "${PROFILES_DIR}/65-apps" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
-  else
-    resolve_selected_agent_profiles
-    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
-      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
-        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-          requires_integration=1
-          break
-        fi
-
-        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-          requires_integration=1
-          break
-        fi
-      done
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    should_include_agent_profile_file "$file" || continue
+    if profile_declares_requirement "$file" "$integration_normalized"; then
+      requires_integration=1
+      break
     fi
-  fi
+  done < <(find "${PROFILES_DIR}/60-agents" "${PROFILES_DIR}/65-apps" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
 
   if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"

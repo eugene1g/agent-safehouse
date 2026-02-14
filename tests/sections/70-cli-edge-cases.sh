@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_dedup_paths
+  local policy_reentrant_first policy_reentrant_second
   local bad_path_with_newline
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config policy_workdir_config_ignored policy_workdir_config_env_trust missing_path home_not_dir
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
   local policy_explain explain_output_file
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
-  local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents
+  local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents policy_agent_all_scoped
   local policy_agent_runner_npx policy_agent_runner_bunx policy_agent_runner_uvx policy_agent_runner_pipx policy_agent_runner_xcrun
   local output_space output_nested args_file workdir_config_file safehouse_env_policy safehouse_env_status
   local fake_codex_bin fake_goose_bin fake_unknown_bin fake_claude_app_dir fake_claude_app_bin fake_vscode_app_dir fake_vscode_app_bin kilo_cmd
@@ -65,23 +66,53 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_electron" "--enable=electron includes electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "$policy_enable_electron" "--enable=electron implies macOS GUI integration profile" ";; Integration: macOS GUI"
   policy_enable_all_agents="${TEST_CWD}/policy-enable-all-agents.sb"
-  assert_command_succeeds "--enable=all-agents restores full scoped profile inclusion (60-agents + 65-apps)" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
+  assert_command_succeeds "--enable=all-agents loads all 60-agents profiles" "$GENERATOR" --output "$policy_enable_all_agents" --enable=all-agents
   for policy_marker in \
-    ";; Source: 65-apps/claude-app.sb" \
-    ";; Source: 65-apps/vscode-app.sb" \
     ";; Source: 60-agents/claude-code.sb" \
     ";; Source: 60-agents/codex.sb" \
     ";; Source: 60-agents/goose.sb" \
     ";; Source: 60-agents/kilo-code.sb"; do
     assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes expected marker (${policy_marker})" "$policy_marker"
   done
+  assert_policy_not_contains "$policy_enable_all_agents" "--enable=all-agents does not include 65-apps profiles" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_not_contains "$policy_enable_all_agents" "--enable=all-agents does not include 65-apps profiles (vscode)" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "$policy_enable_all_agents" "all-agents policy grants ~/.claude directory with subpath scope" "(home-subpath \"/.claude\")"
   assert_policy_contains "$policy_enable_all_agents" "all-agents policy grants ~/.claude.json with file-prefix scope" "(home-prefix \"/.claude.json\")"
   assert_policy_not_contains "$policy_enable_all_agents" "all-agents policy avoids over-broad ~/.claude prefix scope" "(home-prefix \"/.claude\")"
+  policy_enable_all_apps="${TEST_CWD}/policy-enable-all-apps.sb"
+  assert_command_succeeds "--enable=all-apps loads all 65-apps profiles" "$GENERATOR" --output "$policy_enable_all_apps" --enable=all-apps
+  assert_policy_contains "$policy_enable_all_apps" "--enable=all-apps includes claude desktop app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$policy_enable_all_apps" "--enable=all-apps includes vscode app profile" ";; Source: 65-apps/vscode-app.sb"
+  assert_policy_not_contains "$policy_enable_all_apps" "--enable=all-apps does not include unrelated 60-agents profile by default" ";; Source: 60-agents/codex.sb"
+  policy_enable_all_scoped="${TEST_CWD}/policy-enable-all-scoped.sb"
+  assert_command_succeeds "--enable=all-agents,all-apps restores legacy full scoped profile inclusion" "$GENERATOR" --output "$policy_enable_all_scoped" --enable=all-agents,all-apps
+  assert_policy_contains "$policy_enable_all_scoped" "--enable=all-agents,all-apps includes 60-agents profile marker" ";; Source: 60-agents/codex.sb"
+  assert_policy_contains "$policy_enable_all_scoped" "--enable=all-agents,all-apps includes 65-apps profile marker" ";; Source: 65-apps/claude-app.sb"
   policy_enable_wide_read="${TEST_CWD}/policy-enable-wide-read.sb"
   assert_command_succeeds "--enable=wide-read adds broad read-only filesystem visibility" "$GENERATOR" --output "$policy_enable_wide_read" --enable=wide-read
   assert_policy_contains "$policy_enable_wide_read" "--enable=wide-read emits wide-read marker" "#safehouse-test-id:wide-read#"
   assert_policy_contains "$policy_enable_wide_read" "--enable=wide-read emits recursive read grant for /" "(allow file-read* (subpath \"/\"))"
+
+  section_begin "Reentrant Policy Generation"
+  policy_reentrant_first="${TEST_CWD}/policy-reentrant-first.sb"
+  policy_reentrant_second="${TEST_CWD}/policy-reentrant-second.sb"
+  assert_command_succeeds "generate_policy_file can run twice in-process without leaking state" /bin/bash -c '
+    set -euo pipefail
+    repo_root="$1"
+    policy_one="$2"
+    policy_two="$3"
+    test_ro_dir="$4"
+    safehouse_src="$(mktemp "${repo_root}/bin/safehouse-reentrant.XXXXXX.sh")"
+    trap '"'"'rm -f "$safehouse_src"'"'"' EXIT
+    sed '"'"'$d'"'"' "${repo_root}/bin/safehouse.sh" > "$safehouse_src"
+    source "$safehouse_src"
+    generate_policy_file --output "$policy_one" --enable=docker --add-dirs-ro="$test_ro_dir" >/dev/null
+    generate_policy_file --output "$policy_two" >/dev/null
+  ' _ "$REPO_ROOT" "$policy_reentrant_first" "$policy_reentrant_second" "$TEST_RO_DIR"
+  assert_policy_contains "$policy_reentrant_first" "first in-process generation includes explicit docker feature" ";; Integration: Docker"
+  assert_policy_contains "$policy_reentrant_first" "first in-process generation includes explicit add-dirs-ro grant" "(subpath \"${resolved_test_ro_dir}\")"
+  assert_policy_not_contains "$policy_reentrant_second" "second in-process generation does not leak docker feature from first call" ";; Integration: Docker"
+  assert_policy_not_contains "$policy_reentrant_second" "second in-process generation does not leak add-dirs-ro paths from first call" "(subpath \"${resolved_test_ro_dir}\")"
 
   section_begin "Workdir Flag Parsing"
   policy_workdir_empty_eq="${TEST_CWD}/policy-workdir-empty-equals.sb"
@@ -230,6 +261,7 @@ EOF
   policy_agent_claude_app="${TEST_CWD}/policy-agent-claude-app.sb"
   policy_agent_vscode_app="${TEST_CWD}/policy-agent-vscode-app.sb"
   policy_agent_all_agents="${TEST_CWD}/policy-agent-all-agents.sb"
+  policy_agent_all_scoped="${TEST_CWD}/policy-agent-all-scoped.sb"
   policy_agent_runner_npx="${TEST_CWD}/policy-agent-runner-npx.sb"
   policy_agent_runner_bunx="${TEST_CWD}/policy-agent-runner-bunx.sb"
   policy_agent_runner_uvx="${TEST_CWD}/policy-agent-runner-uvx.sb"
@@ -331,7 +363,20 @@ EOF
   assert_policy_contains "$policy_agent_vscode_app" "Visual Studio Code.app policy includes VSCode preference plist literal for direct write/unlink flows" "(home-literal \"/Library/Preferences/com.microsoft.VSCode.plist\")"
   assert_policy_not_contains "$policy_agent_vscode_app" "Visual Studio Code.app command omits claude-app app profile" ";; Source: 65-apps/claude-app.sb"
 
-  assert_command_succeeds "--enable=all-agents in execute mode restores full scoped profile inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
+  assert_command_succeeds "--enable=all-agents in execute mode restores full 60-agents profile inclusion" "$SAFEHOUSE" --enable=all-agents --output "$policy_agent_all_agents" -- "$fake_unknown_bin"
+  for policy_marker in \
+    ";; Source: 60-agents/codex.sb" \
+    ";; Source: 60-agents/claude-code.sb" \
+    ";; Source: 60-agents/goose.sb" \
+    ";; Source: 60-agents/kilo-code.sb" \
+    ";; Integration: Keychain"; do
+    assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes expected marker (${policy_marker})" "$policy_marker"
+  done
+  assert_policy_not_contains "$policy_agent_all_agents" "all-agents execute mode omits 65-apps Claude profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_not_contains "$policy_agent_all_agents" "all-agents execute mode omits 65-apps VS Code profile" ";; Source: 65-apps/vscode-app.sb"
+  assert_policy_not_contains "$policy_agent_all_agents" "all-agents execute mode omits app-driven Electron integration" "#safehouse-test-id:electron-integration#"
+
+  assert_command_succeeds "--enable=all-agents,all-apps in execute mode restores full legacy scoped profile inclusion" "$SAFEHOUSE" --enable=all-agents,all-apps --output "$policy_agent_all_scoped" -- "$fake_unknown_bin"
   for policy_marker in \
     ";; Source: 65-apps/claude-app.sb" \
     "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
@@ -343,12 +388,12 @@ EOF
     ";; Integration: Keychain" \
     ";; Integration: macOS GUI" \
     "#safehouse-test-id:electron-integration#"; do
-    assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes expected marker (${policy_marker})" "$policy_marker"
+    assert_policy_contains "$policy_agent_all_scoped" "all-scoped execute mode includes expected marker (${policy_marker})" "$policy_marker"
   done
 
   rm -f "$fake_codex_bin" "$fake_goose_bin" "$fake_unknown_bin" "$fake_cline_bin" "$fake_aider_bin" "$kilo_cmd"
   rm -f "$fake_npx_bin" "$fake_bunx_bin" "$fake_uvx_bin" "$fake_pipx_bin" "$fake_xcrun_bin"
-  rm -f "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents"
+  rm -f "$policy_agent_codex" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents" "$policy_agent_all_scoped"
   rm -f "$policy_agent_runner_npx" "$policy_agent_runner_bunx" "$policy_agent_runner_uvx" "$policy_agent_runner_pipx" "$policy_agent_runner_xcrun"
   rm -rf "$fake_claude_app_dir" "$fake_vscode_app_dir"
 
@@ -387,7 +432,8 @@ ${TEST_RW_DIR}'
   assert_policy_order_literal "$POLICY_DEFAULT" "toolchain modules are emitted in deterministic lexical order" ";; Source: 30-toolchains/bun.sb" ";; Source: 30-toolchains/deno.sb"
   assert_policy_order_literal "$POLICY_DEFAULT" "core integration modules are emitted in deterministic lexical order" ";; Source: 50-integrations-core/git.sb" ";; Source: 50-integrations-core/scm-clis.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic agent module order" ";; Source: 60-agents/aider.sb" ";; Source: 60-agents/amp.sb"
-  assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Claude module order across agent/app layers" ";; Source: 60-agents/claude-code.sb" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_not_contains "$policy_enable_all_agents" "all-agents emission omits app layers without --enable=all-apps" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_order_literal "$policy_enable_all_scoped" "all-scoped emission keeps deterministic Claude module order across agent/app layers" ";; Source: 60-agents/claude-code.sb" ";; Source: 65-apps/claude-app.sb"
   assert_policy_order_literal "$policy_enable_all_agents" "all-agents emission keeps deterministic Goose module order" ";; Source: 60-agents/gemini.sb" ";; Source: 60-agents/goose.sb"
 
   section_begin "Append Profile Option"

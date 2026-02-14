@@ -138,7 +138,11 @@ append_all_module_profiles() {
 	fi
 
 	if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
-		if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+		if [[ ( "$base_dir" == "${PROFILES_DIR}/60-agents" || "$base_dir" == "profiles/60-agents" ) && "$enable_all_agents_profiles" -eq 1 ]]; then
+			return 0
+		fi
+
+		if [[ ( "$base_dir" == "${PROFILES_DIR}/65-apps" || "$base_dir" == "profiles/65-apps" ) && "$enable_all_apps_profiles" -eq 1 ]]; then
 			return 0
 		fi
 
@@ -146,7 +150,7 @@ append_all_module_profiles() {
 			resolve_selected_agent_profiles
 			if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
 				append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-				append_policy_chunk ";; Use --enable=all-agents to restore legacy all-profile behavior."
+				append_policy_chunk ";; Use --enable=all-agents,all-apps to restore legacy all-profile behavior."
 				append_policy_chunk ""
 			fi
 		fi
@@ -510,11 +514,15 @@ emit_explain_summary() {
 		if [[ -n "${invoked_command_app_bundle:-}" ]]; then
 			echo "  detected app bundle: ${invoked_command_app_bundle}"
 		fi
-		if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-			echo "  selected scoped profiles: all (via --enable=all-agents)"
-		elif [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
-			echo "  selected scoped profiles: (none)"
-		else
+			if [[ "$enable_all_agents_profiles" -eq 1 && "$enable_all_apps_profiles" -eq 1 ]]; then
+				echo "  selected scoped profiles: all agents + all apps (via --enable=all-agents,all-apps)"
+			elif [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+				echo "  selected scoped profiles: all agents (via --enable=all-agents)"
+			elif [[ "$enable_all_apps_profiles" -eq 1 ]]; then
+				echo "  selected scoped profiles: all apps (via --enable=all-apps)"
+			elif [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
+				echo "  selected scoped profiles: (none)"
+			else
 			for idx in "${!selected_agent_profile_basenames[@]}"; do
 				profile="${selected_agent_profile_basenames[$idx]}"
 				reason="${selected_agent_profile_reasons[$idx]:-selected}"

@@ -1273,18 +1273,18 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_aider_sb__
 ;;   (not macOS Keychain)
 
 (allow file-read* file-write*
-    (home-prefix "/.amp/bin/amp")
-    (home-prefix "/.local/bin/amp")
+    (home-literal "/.amp/bin/amp")
+    (home-literal "/.local/bin/amp")
     (home-subpath "/.amp")
     (home-subpath "/.config/amp")
     (home-subpath "/.cache/amp")
     (home-subpath "/.local/share/amp")
     (home-subpath "/.local/state/amp")
-    (home-subpath "/Library/Application Support/Zed/db")
+    (home-literal "/Library/Application Support/Zed/db")
 )
 
 (allow file-read*
-    (home-prefix "/.claude")
+    (home-subpath "/.claude")
 )
 __SAFEHOUSE_EMBEDDED_profiles_60_agents_amp_sb__
       ;;
@@ -1737,8 +1737,9 @@ optional_integration_features=(
   cloud-credentials
   browser-native-messaging
 )
-supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, all-agents, wide-read"
+supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, all-agents, all-apps, wide-read"
 enable_all_agents_profiles=0
+enable_all_apps_profiles=0
 enable_wide_read_access=0
 output_path=""
 add_dirs_ro_list_cli=""
@@ -2107,6 +2108,9 @@ parse_enabled_features() {
       all-agents)
         enable_all_agents_profiles=1
         ;;
+      all-apps)
+        enable_all_apps_profiles=1
+        ;;
       wide-read)
         enable_wide_read_access=1
         ;;
@@ -2306,7 +2310,11 @@ should_include_agent_profile_file() {
   local file_path="$1"
   local selected_profile base_name
 
-  if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+  if [[ "$file_path" == *"/60-agents/"* && "$enable_all_agents_profiles" -eq 1 ]]; then
+    return 0
+  fi
+
+  if [[ "$file_path" == *"/65-apps/"* && "$enable_all_apps_profiles" -eq 1 ]]; then
     return 0
   fi
 
@@ -2358,7 +2366,7 @@ profile_declares_requirement() {
 
 selected_profiles_require_integration() {
   local integration="$1"
-  local integration_normalized selected_profile profile_path file
+  local integration_normalized file
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
@@ -2368,32 +2376,14 @@ selected_profiles_require_integration() {
     return
   fi
 
-  if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-    while IFS= read -r file; do
-      [[ -n "$file" ]] || continue
-      if profile_declares_requirement "$file" "$integration_normalized"; then
-        requires_integration=1
-        break
-      fi
-    done < <(find "${PROFILES_DIR}/60-agents" "${PROFILES_DIR}/65-apps" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
-  else
-    resolve_selected_agent_profiles
-    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
-      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
-        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-          requires_integration=1
-          break
-        fi
-
-        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-          requires_integration=1
-          break
-        fi
-      done
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    should_include_agent_profile_file "$file" || continue
+    if profile_declares_requirement "$file" "$integration_normalized"; then
+      requires_integration=1
+      break
     fi
-  fi
+  done < <(find "${PROFILES_DIR}/60-agents" "${PROFILES_DIR}/65-apps" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
 
   if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"
@@ -2543,7 +2533,11 @@ append_all_module_profiles() {
 	fi
 
 	if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
-		if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+		if [[ ( "$base_dir" == "${PROFILES_DIR}/60-agents" || "$base_dir" == "profiles/60-agents" ) && "$enable_all_agents_profiles" -eq 1 ]]; then
+			return 0
+		fi
+
+		if [[ ( "$base_dir" == "${PROFILES_DIR}/65-apps" || "$base_dir" == "profiles/65-apps" ) && "$enable_all_apps_profiles" -eq 1 ]]; then
 			return 0
 		fi
 
@@ -2551,7 +2545,7 @@ append_all_module_profiles() {
 			resolve_selected_agent_profiles
 			if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
 				append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-				append_policy_chunk ";; Use --enable=all-agents to restore legacy all-profile behavior."
+				append_policy_chunk ";; Use --enable=all-agents,all-apps to restore legacy all-profile behavior."
 				append_policy_chunk ""
 			fi
 		fi
@@ -2915,11 +2909,15 @@ emit_explain_summary() {
 		if [[ -n "${invoked_command_app_bundle:-}" ]]; then
 			echo "  detected app bundle: ${invoked_command_app_bundle}"
 		fi
-		if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-			echo "  selected scoped profiles: all (via --enable=all-agents)"
-		elif [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
-			echo "  selected scoped profiles: (none)"
-		else
+			if [[ "$enable_all_agents_profiles" -eq 1 && "$enable_all_apps_profiles" -eq 1 ]]; then
+				echo "  selected scoped profiles: all agents + all apps (via --enable=all-agents,all-apps)"
+			elif [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+				echo "  selected scoped profiles: all agents (via --enable=all-agents)"
+			elif [[ "$enable_all_apps_profiles" -eq 1 ]]; then
+				echo "  selected scoped profiles: all apps (via --enable=all-apps)"
+			elif [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
+				echo "  selected scoped profiles: (none)"
+			else
 			for idx in "${!selected_agent_profile_basenames[@]}"; do
 				profile="${selected_agent_profile_basenames[$idx]}"
 				reason="${selected_agent_profile_reasons[$idx]:-selected}"
@@ -3019,11 +3017,83 @@ validate_optional_sb_input() {
   validate_sb_string "$value" "${label} value" || exit 1
 }
 
-generate_policy_file() {
-  optional_integrations_classified=0
+reset_policy_generation_state() {
+  local feature var_name
+
+  home_dir="${HOME:-}"
+  enable_csv_list=""
+
+  for feature in "${optional_integration_features[@]-}"; do
+    var_name="$(optional_integration_feature_flag_var "$feature")" || continue
+    printf -v "$var_name" '%s' "0"
+  done
+
+  enable_all_agents_profiles=0
+  enable_all_apps_profiles=0
+  enable_wide_read_access=0
+
+  output_path=""
+  add_dirs_ro_list_cli=""
+  add_dirs_list_cli=""
+  config_add_dirs_ro_list=""
+  config_add_dirs_list=""
+  combined_add_dirs_ro_list=""
+  combined_add_dirs_list=""
+  append_profile_paths=()
+
+  env_add_dirs_ro_list="${SAFEHOUSE_ADD_DIRS_RO:-}"
+  env_add_dirs_list="${SAFEHOUSE_ADD_DIRS:-}"
+
+  workdir_value=""
+  workdir_flag_set=0
+  invocation_cwd="$(pwd -P)"
+  effective_workdir=""
+  effective_workdir_source=""
+  workdir_config_path=""
+  workdir_config_loaded=0
+  workdir_config_found=0
+  workdir_config_ignored_untrusted=0
+
+  if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
+    workdir_env_set=1
+    workdir_env_value="${SAFEHOUSE_WORKDIR}"
+  else
+    workdir_env_set=0
+    workdir_env_value=""
+  fi
+
+  trust_workdir_config=0
+  trust_workdir_config_flag_set=0
+  trust_workdir_config_source="default"
+  if [[ "${SAFEHOUSE_TRUST_WORKDIR_CONFIG+x}" == "x" ]]; then
+    trust_workdir_config_env_set=1
+    trust_workdir_config_env_value="${SAFEHOUSE_TRUST_WORKDIR_CONFIG}"
+  else
+    trust_workdir_config_env_set=0
+    trust_workdir_config_env_value=""
+  fi
+
+  selected_agent_profile_basenames=()
+  selected_agent_profile_reasons=()
+  selected_agent_profiles_resolved=0
+  selected_profiles_require_keychain=0
+  selected_profiles_require_keychain_resolved=0
+
   optional_integrations_explicit_included=()
   optional_integrations_implicit_included=()
   optional_integrations_not_included=()
+  optional_integrations_classified=0
+
+  readonly_paths=()
+  rw_paths=()
+  readonly_count=0
+  rw_count=0
+
+  explain_mode=0
+}
+
+generate_policy_file() {
+  reset_policy_generation_state
 
   while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -3348,7 +3418,8 @@ Policy scope options:
       Comma-separated optional features to enable
       Supported values: ${supported_enable_features}
       Note: electron implies macos-gui
-      Note: all-agents restores legacy behavior by loading every 60-agents and 65-apps profile
+      Note: all-agents loads every 60-agents profile
+      Note: all-apps loads every 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)
 
   --add-dirs-ro PATHS
@@ -3634,7 +3705,7 @@ profile_declares_requirement() {
 
 selected_profiles_require_integration() {
   local integration="$1"
-  local integration_normalized selected_profile profile_path profile_key
+  local integration_normalized profile_key
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
@@ -3644,35 +3715,17 @@ selected_profiles_require_integration() {
     return
   fi
 
-  if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-    for profile_key in "${PROFILE_KEYS[@]}"; do
-      case "$profile_key" in
-        profiles/60-agents/*.sb|profiles/65-apps/*.sb)
-          if profile_declares_requirement "$profile_key" "$integration_normalized"; then
-            requires_integration=1
-            break
-          fi
-          ;;
-      esac
-    done
-  else
-    resolve_selected_agent_profiles
-    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
-      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
-        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+  for profile_key in "${PROFILE_KEYS[@]}"; do
+    case "$profile_key" in
+      profiles/60-agents/*.sb|profiles/65-apps/*.sb)
+        should_include_agent_profile_file "$profile_key" || continue
+        if profile_declares_requirement "$profile_key" "$integration_normalized"; then
           requires_integration=1
           break
         fi
-
-        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-          requires_integration=1
-          break
-        fi
-      done
-    fi
-  fi
+        ;;
+    esac
+  done
 
   if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"
@@ -3785,7 +3838,11 @@ append_all_module_profiles() {
   fi
 
   if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
-    if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+    if [[ ( "$base_dir" == "${PROFILES_DIR}/60-agents" || "$base_dir" == "profiles/60-agents" ) && "$enable_all_agents_profiles" -eq 1 ]]; then
+      return 0
+    fi
+
+    if [[ ( "$base_dir" == "${PROFILES_DIR}/65-apps" || "$base_dir" == "profiles/65-apps" ) && "$enable_all_apps_profiles" -eq 1 ]]; then
       return 0
     fi
 
@@ -3793,7 +3850,7 @@ append_all_module_profiles() {
       resolve_selected_agent_profiles
       if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
         append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-        append_policy_chunk ";; Use --enable=all-agents to restore legacy all-profile behavior."
+        append_policy_chunk ";; Use --enable=all-agents,all-apps to restore legacy all-profile behavior."
         append_policy_chunk ""
       fi
     fi

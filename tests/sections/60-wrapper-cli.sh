@@ -135,6 +135,9 @@ EOF
     assert_policy_contains "$static_policy_path" "${static_policy_label} includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"
     assert_policy_not_contains "$static_policy_path" "${static_policy_label} omits legacy agent common profile path" ";; Source: 60-agents/__common.sb"
   done
+  assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy excludes app profile layers without --enable=all-apps" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes Claude desktop app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes VS Code app profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes usymptomsd mach-lookup grant" "(global-name \"com.apple.usymptomsd\")"

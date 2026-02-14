@@ -19,7 +19,7 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 
 - **Filesystem reads for system paths**  - `/usr`, `/bin`, `/opt`, `/System`, `/Library/Frameworks`, etc. Agents spawn shells, compilers, and package managers that link against system libraries. Denying these breaks everything.
 - **Full process exec/fork**  - agents orchestrate deep subprocess trees (shell > git > ssh > credential-helper). Restricting process creation is impractical.
-- **Toolchain and app/agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and app/agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`, and `Visual Studio Code.app` loads `vscode-app`). Use `--enable=all-agents` to restore legacy behavior and load every scoped app/agent profile.
+- **Toolchain and app/agent config directories**  - each toolchain (`~/.cargo`, `~/.npm`, `~/.cache/uv`, etc.) gets scoped access, and app/agent-specific profile grants are loaded only for the wrapped command by default (for example `codex` loads `~/.codex`, `claude` loads `~/.claude`, and `Visual Studio Code.app` loads `vscode-app`). Use `--enable=all-agents` to load every `60-agents` profile, `--enable=all-apps` to load every `65-apps` profile, or both for legacy all-profile behavior.
 - **Keychain and Security framework** (auto-injected for keychain-dependent profiles)  - profiles can declare `$$require=55-integrations-optional/keychain.sb$$`, and Safehouse injects shared keychain/security rules automatically for those agents/apps. This avoids duplicating keychain rules across many profile files while keeping non-keychain agents on a tighter baseline.
 - **SCM credential stores** (always-on)  - `gh` and `glab` integrations are always enabled via core profile: `~/.config/gh`, `~/.cache/gh`, `~/.local/share/gh`, and `~/.config/glab-cli` paths are writable so git and issue workflows keep working. This intentionally allows agent and tool access to repo auth state.
 - **Clipboard access** (opt-in)  - `pbcopy`/`pbpaste` and other pb* workflows remain denied unless you explicitly add `--enable=clipboard` to your invocation. This is deliberate because clipboard contents can include secrets.
@@ -183,7 +183,7 @@ safehouse --enable=docker -- docker ps
 safehouse --enable=kubectl -- kubectl get pods -A
 
 # Restore legacy behavior and include all scoped app/agent profiles
-safehouse --enable=all-agents codex
+safehouse --enable=all-agents,all-apps codex
 
 # Big-hammer mode: read-only visibility across / (use cautiously)
 safehouse --enable=wide-read -- claude --dangerously-skip-permissions
@@ -200,7 +200,7 @@ safehouse --enable=electron -- /Applications/Claude.app/Contents/MacOS/Claude --
 # Run Visual Studio Code sandboxed (loads the 65-apps/vscode-app profile)
 safehouse --enable=electron -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 
-# If VS Code may launch multiple agent CLIs from extensions, include all scoped app/agent profiles
+# If VS Code may launch multiple agent CLIs from extensions, include all agent profiles
 safehouse --enable=electron,all-agents -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 
 # VS Code as a contained "agent host": broad read visibility + scoped writes
@@ -248,7 +248,9 @@ If you want static policy files without using the wrapper scripts, use:
 - `dist/profiles/safehouse.generated.sb` (default policy)
 - `dist/profiles/safehouse-for-apps.generated.sb` (includes `macos-gui` and `electron` integrations)
 
-Committed `dist/profiles/*.generated.sb` artifacts are generated with `--enable=all-agents` (all `60-agents` + `65-apps` profiles) for broad compatibility when used directly.
+Committed static policies are generated as:
+- `safehouse.generated.sb`: `--enable=all-agents` (all `60-agents` profiles)
+- `safehouse-for-apps.generated.sb`: `--enable=macos-gui,electron,all-agents,all-apps` (all `60-agents` + `65-apps` profiles)
 
 Regenerate them after profile or runtime changes:
 
@@ -297,7 +299,7 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 | `50-integrations-core/*.sb` | Always-on core integrations: `container-runtime-default-deny`, `git`, and `scm-clis` |
 | `55-integrations-optional/*.sb` | Opt-in integrations enabled via `--enable`: `clipboard`, `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging` (`electron` also enables `macos-gui`; keychain is auto-injected for profiles that declare `$$require=55-integrations-optional/keychain.sb$$`) |
 | `60-agents/*.sb` | Product-specific per-agent config/state paths selected by wrapped command basename |
-| `65-apps/*.sb` | Desktop app bundle profiles selected by known app bundles (`Claude.app`, `Visual Studio Code.app`) (`--enable=all-agents` loads all `60-agents` + `65-apps` profiles) |
+| `65-apps/*.sb` | Desktop app bundle profiles selected by known app bundles (`Claude.app`, `Visual Studio Code.app`) (`--enable=all-apps` loads all `65-apps` profiles) |
 | Config/env/CLI path grants | Trusted `<workdir>/.safehouse` (`add-dirs-ro`, `add-dirs`; loaded only with `--trust-workdir-config` or `SAFEHOUSE_TRUST_WORKDIR_CONFIG`), then `SAFEHOUSE_ADD_DIRS_RO`/`SAFEHOUSE_ADD_DIRS`, then CLI flags, then selected workdir (unless disabled) |
 | Appended profile(s) | Optional extra profile files appended last via `--append-profile=PATH` (repeatable) |
 
@@ -312,7 +314,7 @@ SBPL rule interactions are matcher-dependent. Safehouse tests currently verify t
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
-| `--enable=FEATURES` | Enable optional features: `clipboard`, `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` + `65-apps` profiles; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
+| `--enable=FEATURES` | Enable optional features: `clipboard`, `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `all-agents`, `all-apps`, `wide-read` (`electron` also enables `macos-gui`; `all-agents` loads all `60-agents` profiles; `all-apps` loads all `65-apps` profiles; combine both for legacy all-profile behavior; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 | `--explain` | Print effective workdir, grant, and profile-selection summary to stderr |

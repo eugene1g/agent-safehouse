@@ -119,6 +119,9 @@ parse_enabled_features() {
       all-agents)
         enable_all_agents_profiles=1
         ;;
+      all-apps)
+        enable_all_apps_profiles=1
+        ;;
       wide-read)
         enable_wide_read_access=1
         ;;

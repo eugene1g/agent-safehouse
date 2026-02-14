@@ -924,18 +924,18 @@
 ;;   (not macOS Keychain)
 
 (allow file-read* file-write*
-    (home-prefix "/.amp/bin/amp")
-    (home-prefix "/.local/bin/amp")
+    (home-literal "/.amp/bin/amp")
+    (home-literal "/.local/bin/amp")
     (home-subpath "/.amp")
     (home-subpath "/.config/amp")
     (home-subpath "/.cache/amp")
     (home-subpath "/.local/share/amp")
     (home-subpath "/.local/state/amp")
-    (home-subpath "/Library/Application Support/Zed/db")
+    (home-literal "/Library/Application Support/Zed/db")
 )
 
 (allow file-read*
-    (home-prefix "/.claude")
+    (home-subpath "/.claude")
 )
 
 ;; ---------------------------------------------------------------------------

@@ -570,8 +570,8 @@
 )
 
 ;; Optional integrations explicitly enabled: (none)
-;; Optional integrations implicitly injected: macos-gui electron
-;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials browser-native-messaging
+;; Optional integrations implicitly injected: (none)
+;; Optional integrations not included: docker kubectl macos-gui electron ssh spotlight cleanshot clipboard 1password cloud-credentials browser-native-messaging
 ;; Keychain integration (auto-injected from profile requirements): included
 ;; Use --enable=<feature> (comma-separated) to include optional integrations explicitly.
 ;; Note: selected app/agent profiles and enabled integrations can inject dependencies via $$require=<integration-profile-path>$$ metadata.
@@ -635,56 +635,6 @@
 )
 
 ;; ---------------------------------------------------------------------------
-;; Integration: Electron
-;; Chromium/Electron runtime: GPU, Metal shaders, crashpad, and WebView.
-;; Source: 55-integrations-optional/electron.sb
-;; $$require=55-integrations-optional/macos-gui.sb$$
-;; #safehouse-test-id:electron-integration#
-;; ---------------------------------------------------------------------------
-
-;; Chromium/Electron attempts to initialize an internal sandbox for helper
-;; processes (GPU, Renderer, Utility, Network). Under safehouse, the process
-;; tree is already inside macOS Seatbelt via sandbox-exec.
-;;
-;; Re-initializing Seatbelt from inside an existing Seatbelt sandbox is blocked
-;; by the OS (sandbox_init returns EPERM / "Operation not permitted"). This is
-;; not fixable with additional allow rules in this profile.
-;;
-;; Primary workaround under Safehouse: launch Electron with --no-sandbox.
-;; Compatibility fallback: ELECTRON_DISABLE_SANDBOX=1.
-;; Safehouse's outer sandbox still applies to the full process tree.
-
-;; -- GPU / Metal shader compilation --------------------------------------------
-;; #safehouse-test-id:electron-gpu-metal#
-
-(allow mach-lookup
-    (global-name "com.apple.MTLCompilerService")
-    (global-name "com.apple.SafariPlatformSupport.Helper")
-)
-
-(allow iokit-open
-    (iokit-user-client-class "IOSurfaceRootUserClient")
-    (iokit-user-client-class "AGXDeviceUserClient")
-)
-
-(allow file-read-metadata
-    (literal "/private/var/db/.AppleSetupDone")
-)
-
-;; -- Chromium crashpad crash reporting -----------------------------------------
-;; #safehouse-test-id:electron-crashpad#
-;; #safehouse-test-id:electron-crashpad-lookup#
-
-(allow mach-lookup
-    (global-name-regex #"^org\.chromium\.crashpad\.child_port_handshake\.")
-)
-
-;; #safehouse-test-id:electron-crashpad-register#
-(allow mach-register
-    (global-name-regex #"^org\.chromium\.crashpad\.child_port_handshake\.")
-)
-
-;; ---------------------------------------------------------------------------
 ;; Integration: Keychain
 ;; macOS Keychain and Security framework for agent authentication/credential storage.
 ;; Source: 55-integrations-optional/keychain.sb
@@ -724,170 +674,6 @@
 )
 
 ;; ---------------------------------------------------------------------------
-;; Integration: macOS GUI
-;; Window server, AppKit, accessibility, input, and framework services
-;; needed by any graphical macOS application running under sandbox.
-;; Source: 55-integrations-optional/macos-gui.sb
-;; ---------------------------------------------------------------------------
-
-;; -- System preferences and framework data -------------------------------------
-
-(allow file-read*
-    (literal "/private/etc")
-    (literal "/private/var/db/eligibilityd/eligibility.plist")
-    (literal "/private/var/db/nsurlstoraged/dafsaData.bin")
-    (literal "/Library/Application Support/Apple/Spotlight/MailUsesCoreSpotlight")
-    (home-literal "/Library/Preferences/com.apple.universalaccess.plist")
-    (home-literal "/Library/Preferences/com.apple.Accessibility.plist")
-    (home-literal "/Library/Preferences/com.apple.CoreGraphics.plist")
-    (home-literal "/Library/Preferences/com.apple.symbolichotkeys.plist")
-    (home-literal "/Library/Preferences/com.apple.ServicesMenu.Services.plist")
-    (home-literal "/Library/Preferences/com.apple.speech.recognition.AppleSpeechRecognition.prefs.plist")
-    (home-literal "/Library/Preferences/com.apple.SpeakSelection.plist")
-    (home-literal "/Library/Preferences/com.apple.assistant.support.plist")
-    (home-literal "/Library/Preferences/com.apple.assistant.backedup.plist")
-    (home-literal "/Library/Preferences/pbs.plist")
-    (home-literal "/Library/Preferences/com.apple.HIToolbox.plist")
-    (literal "/Library/Preferences/com.apple.HIToolbox.plist")
-    (home-subpath "/Library/Preferences/com.apple.LaunchServices")
-    (home-subpath "/Library/Application Support/CrashReporter")
-    (home-subpath "/Library/Spelling")
-    (home-literal "/Library/Keyboard Layouts")
-    (home-literal "/Library/Input Methods")
-)
-
-(allow file-read* file-write*
-    (home-subpath "/Library/Accessibility")
-)
-
-;; Directory metadata (stat/readdir) for standard user and system paths
-(allow file-read-metadata
-    (literal "/private/var/db")
-    (literal "/Volumes")
-    (subpath "/Volumes")
-    (home-literal "/Desktop")
-    (home-literal "/Documents")
-    (home-literal "/Downloads")
-    (home-literal "/Applications")
-    (home-literal "/Library")
-    (home-literal "/Library/Application Support")
-    (home-literal "/Library/Caches")
-    (home-literal "/Library/CloudStorage")
-    (home-literal "/Library/Containers")
-    (home-literal "/Library/HTTPStorages")
-    (home-literal "/Library/Logs")
-    (home-literal "/Library/Mobile Documents")
-    (home-subpath "/Library/Mobile Documents")
-    (home-literal "/Library/Spelling")
-    (home-literal "/.Trash")
-)
-
-(allow user-preference-read
-    (preference-domain "com.apple.hitoolbox")
-)
-
-;; -- Mach services -------------------------------------------------------------
-
-(allow mach-lookup
-    ;; Font services
-    (global-name "com.apple.fonts")
-    (global-name "com.apple.FontObjectsServer")
-    ;; Core rendering and window management
-    (global-name "com.apple.CARenderServer")
-    (global-name "com.apple.windowserver.active")
-    (global-name "com.apple.windowmanager.server")
-    (global-name "com.apple.window_proxies")
-    (global-name "com.apple.dock.server")
-    (global-name "com.apple.dock.fullscreen")
-    ;; TCC (permission) and security
-    (global-name "com.apple.tccd")
-    (global-name "com.apple.tccd.system")
-    (global-name "com.apple.universalaccessAuthWarn")
-    ;; Launch Services, Core Services, and icon resolution
-    (global-name "com.apple.lsd.mapdb")
-    (global-name "com.apple.lsd.modifydb")
-    (global-name "com.apple.lsd.advertisingidentifiers")
-    (global-name "com.apple.iconservices")
-    (global-name "com.apple.coreservices.appleevents")
-    (global-name "com.apple.coreservices.sharedfilelistd.xpc")
-    (global-name "com.apple.coreservices.quarantine-resolver")
-    ;; HI services, input, and accessibility
-    (global-name "com.apple.hiservices-xpcservice")
-    (global-name "com.apple.iohideventsystem")
-    (global-name "com.apple.tsm.uiserver")
-    (global-name "com.apple.touchbarserver.mig")
-    (global-name "com.apple.accessibility.voices")
-    (global-name "com.apple.backboard.hid-services.xpc")
-    (global-name "com.apple.backboard.BKSEndpointProviderService")
-    (global-name "com.apple.TextInputUI.xpc.CursorUIViewService")
-    (global-name "com.apple.inputmethodkit.launchagent")
-    (global-name "com.apple.inputmethodkit.launcher")
-    (global-name "com.apple.inputmethodkit.getxpcendpoint")
-    ;; AppKit and UI framework services
-    (global-name "com.apple.ViewBridgeAuxiliary")
-    (global-name "com.apple.appkit.restoration_storage")
-    (global-name "com.apple.appkit.xpc.openAndSavePanelService")
-    (global-name "com.apple.backgroundtaskmanagementagent")
-    (global-name "com.apple.pbs.fetch_services")
-    (global-name "com.apple.powerlog.plxpclogger.xpc")
-    (global-name "com.apple.FileCoordination")
-    (global-name "com.apple.security.syspolicy")
-    (global-name "com.apple.security.syspolicy.exec")
-    (global-name "com.apple.uiintelligencesupport.agent")
-    (global-name "com.apple.controlcenter.statusitems")
-    (global-name "com.apple.sidecar-relay")            ;; Sidecar/AirPlay display menu probing in AppKit.
-    (global-name "com.apple.storekitagent")
-    (global-name "com.apple.scopedbookmarksagent.xpc")
-    ;; XPC, directory, and system services
-    (global-name "com.apple.xpc.smd")
-    (global-name "com.apple.bsd.dirhelper")
-    (global-name "com.apple.system.opendirectoryd.membership")
-    (global-name "com.apple.logd.events")
-    (global-name "com.apple.usymptomsd")
-    (global-name "com.apple.spotlight.IndexAgent")
-    ;; Location services
-    (global-name "com.apple.CoreLocation.agent")
-    (global-name "com.apple.locationd.desktop.registration")
-    ;; Notifications and audio
-    (global-name "com.apple.usernotifications.listener")
-    (global-name "com.apple.audio.SystemSoundServer-OSX")
-    (global-name "com.apple.audio.audiohald")
-    (global-name "com.apple.cmio.registerassistantservice.system-extensions")
-    ;; Spell checking, grammar, and natural language
-    (global-name "mul-xpc (Apple)_OpenStep")
-    (global-name "com.apple.naturallanguaged")
-    (global-name "com.apple.inputanalyticsd")
-    ;; Backup
-    (global-name "com.apple.backupd.sandbox.xpc")
-    ;; SSO and Siri
-    (global-name "com.apple.AppSSO.service-xpc")
-    (global-name "com.apple.siri.VoiceShortcuts.xpc")
-    (global-name "com.apple.proactive.app-client.donation")
-    ;; Distributed notifications (per-user suffix varies)
-    (global-name-prefix "com.apple.distributed_notifications@")
-)
-
-;; Per-pid mach port registrations for accessibility, text input, and drag-and-drop
-(allow mach-register
-    (local-name "com.apple.axserver")
-    (local-name "com.apple.tsm.portname")
-    (local-name "com.apple.coredrag")
-)
-
-;; HFSIOC_SET_HOTFILE_STATE is occasionally probed during desktop app file flows.
-(allow system-fsctl
-    (fsctl-command (_IO "h" 47))
-)
-
-;; -- IOKit (power management, HID input, storage) ------------------------------
-
-(allow iokit-open
-    (iokit-user-client-class "RootDomainUserClient")
-    (iokit-user-client-class "IOHIDParamUserClient")
-    (iokit-user-client-class "AppleNVMeEANUC")
-)
-
-;; ---------------------------------------------------------------------------
 ;; Agent: Aider
 ;; Aider CLI binary, state, and config paths.
 ;; Source: 60-agents/aider.sb
@@ -924,18 +710,18 @@
 ;;   (not macOS Keychain)
 
 (allow file-read* file-write*
-    (home-prefix "/.amp/bin/amp")
-    (home-prefix "/.local/bin/amp")
+    (home-literal "/.amp/bin/amp")
+    (home-literal "/.local/bin/amp")
     (home-subpath "/.amp")
     (home-subpath "/.config/amp")
     (home-subpath "/.cache/amp")
     (home-subpath "/.local/share/amp")
     (home-subpath "/.local/state/amp")
-    (home-subpath "/Library/Application Support/Zed/db")
+    (home-literal "/Library/Application Support/Zed/db")
 )
 
 (allow file-read*
-    (home-prefix "/.claude")
+    (home-subpath "/.claude")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1200,108 +986,6 @@
 (allow file-read* file-write*
     (home-prefix "/.local/bin/pi")
     (home-subpath "/.pi")
-)
-
-;; ---------------------------------------------------------------------------
-;; App: Claude Desktop
-;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
-;; Source: 65-apps/claude-app.sb
-;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
-;; ---------------------------------------------------------------------------
-
-;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
-;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
-
-(allow file-read* file-write*
-    (home-subpath "/Library/Application Support/Claude")
-    (home-subpath "/Library/Logs/Claude")
-    (home-subpath "/Library/HTTPStorages/com.anthropic.claudefordesktop")
-    (home-subpath "/Library/Caches/Claude")
-    (home-prefix "/Library/Caches/com.anthropic.claudefordesktop")
-    (home-subpath "/Library/Saved Application State/com.anthropic.claudefordesktop.savedState")
-)
-
-(allow file-read*
-    (subpath "/Applications/Claude.app")
-    (home-literal "/Library/Preferences/com.anthropic.claudefordesktop.plist")
-)
-
-;; Claude Desktop persists app preferences via cfprefsd under its own domain.
-(allow user-preference-read user-preference-write
-    (preference-domain "com.anthropic.claudefordesktop")
-)
-
-;; Shared AppKit/Mach/fsctl allowances are provided by:
-;;   55-integrations-optional/macos-gui.sb
-;; This profile adds only app-specific MachPortRendezvousServer IPC grants.
-(allow mach-lookup
-    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
-)
-
-(allow mach-register
-    (global-name-regex #"^com\.anthropic\.claudefordesktop\.MachPortRendezvousServer\.")
-)
-
-;; ---------------------------------------------------------------------------
-;; App: Visual Studio Code
-;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
-;; including DeveloperTools state and optional extension pairing storage.
-;; Source: 65-apps/vscode-app.sb
-;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
-;; ---------------------------------------------------------------------------
-
-;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
-;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
-
-(allow file-read* file-write*
-    ;; Stable
-    (home-subpath "/Library/Application Support/Code")
-    (home-subpath "/Library/Logs/Code")
-    (home-subpath "/Library/HTTPStorages/com.microsoft.VSCode")
-    (home-subpath "/Library/Caches/com.microsoft.VSCode")
-    (home-subpath "/Library/Caches/com.microsoft.VSCode.ShipIt")
-    (home-subpath "/Library/Saved Application State/com.microsoft.VSCode.savedState")
-    (home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
-    (home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
-    (home-subpath "/.vscode")
-
-    ;; Direct plist writes/unlink probes used during some Electron preference sync flows.
-    (home-literal "/Library/Preferences/com.microsoft.VSCode.plist")
-    (home-literal "/Library/Preferences/com.microsoft.VSCodeInsiders.plist")
-
-    ;; Insiders
-    (home-subpath "/Library/Application Support/Code - Insiders")
-    (home-subpath "/Library/Logs/Code - Insiders")
-    (home-subpath "/Library/HTTPStorages/com.microsoft.VSCodeInsiders")
-    (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders")
-    (home-subpath "/Library/Caches/com.microsoft.VSCodeInsiders.ShipIt")
-    (home-subpath "/Library/Saved Application State/com.microsoft.VSCodeInsiders.savedState")
-    (home-subpath "/.vscode-insiders")
-)
-
-(allow file-read*
-    ;; Common install locations
-    (subpath "/Applications/Visual Studio Code.app")
-    (subpath "/Applications/Visual Studio Code - Insiders.app")
-)
-
-;; VS Code persists app preferences via cfprefsd under these domains.
-(allow user-preference-read user-preference-write
-    (preference-domain "com.microsoft.VSCode")
-    (preference-domain "com.microsoft.VSCodeInsiders")
-)
-
-;; Shared AppKit/Mach/fsctl allowances are provided by:
-;;   55-integrations-optional/macos-gui.sb
-;; This profile adds only app-specific MachPortRendezvousServer IPC grants.
-(allow mach-lookup
-    (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
-    (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
-)
-
-(allow mach-register
-    (global-name-regex #"^com\.microsoft\.VSCode\.MachPortRendezvousServer\.")
-    (global-name-regex #"^com\.microsoft\.VSCodeInsiders\.MachPortRendezvousServer\.")
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.

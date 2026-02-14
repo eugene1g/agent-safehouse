@@ -34,7 +34,7 @@ Description:
     - Claude.app.sandboxed.command (single-file launcher for Claude Desktop)
     - Claude.app.sandboxed-offline.command (single-file offline launcher for Claude Desktop)
     - profiles/safehouse.generated.sb (default static policy)
-    - profiles/safehouse-for-apps.generated.sb (--enable=macos-gui,electron)
+    - profiles/safehouse-for-apps.generated.sb (--enable=macos-gui,electron,all-agents,all-apps)
 
 Options:
   --output PATH
@@ -486,7 +486,7 @@ profile_declares_requirement() {
 
 selected_profiles_require_integration() {
   local integration="$1"
-  local integration_normalized selected_profile profile_path profile_key
+  local integration_normalized profile_key
   local requires_integration=0
 
   integration_normalized="$(to_lowercase "$integration")"
@@ -496,35 +496,17 @@ selected_profiles_require_integration() {
     return
   fi
 
-  if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
-    for profile_key in "${PROFILE_KEYS[@]}"; do
-      case "$profile_key" in
-        profiles/60-agents/*.sb|profiles/65-apps/*.sb)
-          if profile_declares_requirement "$profile_key" "$integration_normalized"; then
-            requires_integration=1
-            break
-          fi
-          ;;
-      esac
-    done
-  else
-    resolve_selected_agent_profiles
-    if [[ "${#selected_agent_profile_basenames[@]}" -gt 0 ]]; then
-      for selected_profile in "${selected_agent_profile_basenames[@]}"; do
-        profile_path="${PROFILES_DIR}/60-agents/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
+  for profile_key in "${PROFILE_KEYS[@]}"; do
+    case "$profile_key" in
+      profiles/60-agents/*.sb|profiles/65-apps/*.sb)
+        should_include_agent_profile_file "$profile_key" || continue
+        if profile_declares_requirement "$profile_key" "$integration_normalized"; then
           requires_integration=1
           break
         fi
-
-        profile_path="${PROFILES_DIR}/65-apps/${selected_profile}"
-        if profile_declares_requirement "$profile_path" "$integration_normalized"; then
-          requires_integration=1
-          break
-        fi
-      done
-    fi
-  fi
+        ;;
+    esac
+  done
 
   if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
     selected_profiles_require_keychain="$requires_integration"
@@ -637,7 +619,11 @@ append_all_module_profiles() {
   fi
 
   if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
-    if [[ "$enable_all_agents_profiles" -eq 1 ]]; then
+    if [[ ( "$base_dir" == "${PROFILES_DIR}/60-agents" || "$base_dir" == "profiles/60-agents" ) && "$enable_all_agents_profiles" -eq 1 ]]; then
+      return 0
+    fi
+
+    if [[ ( "$base_dir" == "${PROFILES_DIR}/65-apps" || "$base_dir" == "profiles/65-apps" ) && "$enable_all_apps_profiles" -eq 1 ]]; then
       return 0
     fi
 
@@ -645,7 +631,7 @@ append_all_module_profiles() {
       resolve_selected_agent_profiles
       if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
         append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-        append_policy_chunk ";; Use --enable=all-agents to restore legacy all-profile behavior."
+        append_policy_chunk ";; Use --enable=all-agents,all-apps to restore legacy all-profile behavior."
         append_policy_chunk ""
       fi
     fi
@@ -1167,7 +1153,7 @@ generate_static_policy_files() {
   (
     cd "$template_workdir"
     HOME="$template_home" "$GENERATOR" --enable=all-agents --workdir="" --output "$default_policy_path" >/dev/null
-    HOME="$template_home" "$GENERATOR" --enable=macos-gui,electron,all-agents --workdir="" --output "$apps_policy_path" >/dev/null
+    HOME="$template_home" "$GENERATOR" --enable=macos-gui,electron,all-agents,all-apps --workdir="" --output "$apps_policy_path" >/dev/null
   )
 
   rewrite_static_policy_home_dir_literal "$default_policy_path"

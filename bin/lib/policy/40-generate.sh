@@ -20,11 +20,83 @@ validate_optional_sb_input() {
   validate_sb_string "$value" "${label} value" || exit 1
 }
 
-generate_policy_file() {
-  optional_integrations_classified=0
+reset_policy_generation_state() {
+  local feature var_name
+
+  home_dir="${HOME:-}"
+  enable_csv_list=""
+
+  for feature in "${optional_integration_features[@]-}"; do
+    var_name="$(optional_integration_feature_flag_var "$feature")" || continue
+    printf -v "$var_name" '%s' "0"
+  done
+
+  enable_all_agents_profiles=0
+  enable_all_apps_profiles=0
+  enable_wide_read_access=0
+
+  output_path=""
+  add_dirs_ro_list_cli=""
+  add_dirs_list_cli=""
+  config_add_dirs_ro_list=""
+  config_add_dirs_list=""
+  combined_add_dirs_ro_list=""
+  combined_add_dirs_list=""
+  append_profile_paths=()
+
+  env_add_dirs_ro_list="${SAFEHOUSE_ADD_DIRS_RO:-}"
+  env_add_dirs_list="${SAFEHOUSE_ADD_DIRS:-}"
+
+  workdir_value=""
+  workdir_flag_set=0
+  invocation_cwd="$(pwd -P)"
+  effective_workdir=""
+  effective_workdir_source=""
+  workdir_config_path=""
+  workdir_config_loaded=0
+  workdir_config_found=0
+  workdir_config_ignored_untrusted=0
+
+  if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
+    workdir_env_set=1
+    workdir_env_value="${SAFEHOUSE_WORKDIR}"
+  else
+    workdir_env_set=0
+    workdir_env_value=""
+  fi
+
+  trust_workdir_config=0
+  trust_workdir_config_flag_set=0
+  trust_workdir_config_source="default"
+  if [[ "${SAFEHOUSE_TRUST_WORKDIR_CONFIG+x}" == "x" ]]; then
+    trust_workdir_config_env_set=1
+    trust_workdir_config_env_value="${SAFEHOUSE_TRUST_WORKDIR_CONFIG}"
+  else
+    trust_workdir_config_env_set=0
+    trust_workdir_config_env_value=""
+  fi
+
+  selected_agent_profile_basenames=()
+  selected_agent_profile_reasons=()
+  selected_agent_profiles_resolved=0
+  selected_profiles_require_keychain=0
+  selected_profiles_require_keychain_resolved=0
+
   optional_integrations_explicit_included=()
   optional_integrations_implicit_included=()
   optional_integrations_not_included=()
+  optional_integrations_classified=0
+
+  readonly_paths=()
+  rw_paths=()
+  readonly_count=0
+  rw_count=0
+
+  explain_mode=0
+}
+
+generate_policy_file() {
+  reset_policy_generation_state
 
   while [[ $# -gt 0 ]]; do
   case "$1" in

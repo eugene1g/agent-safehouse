@@ -36,7 +36,8 @@ Policy scope options:
       Comma-separated optional features to enable
       Supported values: ${supported_enable_features}
       Note: electron implies macos-gui
-      Note: all-agents restores legacy behavior by loading every 60-agents and 65-apps profile
+      Note: all-agents loads every 60-agents profile
+      Note: all-apps loads every 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)
 
   --add-dirs-ro PATHS
