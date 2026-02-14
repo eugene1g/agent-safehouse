@@ -202,7 +202,7 @@ main() {
 
   {
     replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<'POLICY'
+    cat <<POLICY
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
 ;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}

@@ -101,7 +101,7 @@ Run the real unsandboxed binary with `command claude` (or `command codex`, etc.)
 
 For non-technical users, Safehouse ships two self-contained launchers:
 - `Claude.app.sandboxed.command` (downloads latest apps policy at runtime)
-- `Claude.app.sandboxed-offline.command` (policy embedded, no network needed)
+- `Claude.app.sandboxed-offline.command` (embedded policy, no runtime policy download)
 
 ```bash
 # Online launcher (tracks latest policy)
@@ -109,7 +109,7 @@ curl -fsSL https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/
   -o ~/Downloads/Claude.app.sandboxed.command
 chmod +x ~/Downloads/Claude.app.sandboxed.command
 
-# Offline launcher (embedded policy)
+# Offline policy launcher (embedded policy; no runtime download)
 curl -fsSL https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/Claude.app.sandboxed-offline.command \
   -o ~/Downloads/Claude.app.sandboxed-offline.command
 chmod +x ~/Downloads/Claude.app.sandboxed-offline.command
@@ -256,7 +256,7 @@ Regenerate them after profile or runtime changes:
 ./scripts/generate-dist.sh
 ```
 
-The static generator now emits deterministic template paths under `dist/agent-safehouse-static-template` for `HOME` and invocation workdir so committed artifacts do not depend on a specific developer machine path. Before using the policy directly, update the `HOME_DIR` definition (or the `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__` placeholder in `profiles/00-base.sb`) and the final workdir grant block for your environment.
+The static generator emits fixed placeholder paths for `HOME` and invocation workdir (`/__SAFEHOUSE_TEMPLATE_HOME__`, `/__SAFEHOUSE_TEMPLATE_WORKDIR__`) so committed artifacts do not depend on a specific developer machine path. Before using the policy directly, replace the `HOME_DIR` definition and the final workdir grant block with paths for your environment.
 
 ## Single-File Distribution
 

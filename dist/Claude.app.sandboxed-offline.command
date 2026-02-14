@@ -94,7 +94,7 @@ emit_embedded_policy_template() {
 ;; Manual policy-only example (no generator):
 ;;   Replace the next line with:
 ;;     (define HOME_DIR "/Users/alice")
-(define HOME_DIR "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/home")
+(define HOME_DIR "/__SAFEHOUSE_TEMPLATE_HOME__")
 
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
 (define (home-literal rel) (literal (string-append HOME_DIR rel)))
@@ -1000,6 +1000,11 @@ emit_embedded_policy_template() {
     (home-subpath "/.cache/amp")
     (home-subpath "/.local/share/amp")
     (home-subpath "/.local/state/amp")
+    (home-subpath "/Library/Application Support/Zed/db")
+)
+
+(allow file-read*
+    (home-prefix "/.claude")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1369,7 +1374,7 @@ emit_embedded_policy_template() {
 )
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: /Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace
+;; Generated ancestor directory literals for selected workdir: /__SAFEHOUSE_TEMPLATE_WORKDIR__
 ;;
 ;; Why file-read* (not file-read-metadata) with literal (not subpath):
 ;; Agents (notably Claude Code) call readdir() on every ancestor of the working
@@ -1380,16 +1385,10 @@ emit_embedded_policy_template() {
 ;; grant recursive read access to files or subdirectories under it.
 (allow file-read*
     (literal "/")
-    (literal "/Users")
-    (literal "/Users/eugene")
-    (literal "/Users/eugene/server")
-    (literal "/Users/eugene/server/agent-safehouse")
-    (literal "/Users/eugene/server/agent-safehouse/dist")
-    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template")
-    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace")
+    (literal "/__SAFEHOUSE_TEMPLATE_WORKDIR__")
 )
 
-(allow file-read* file-write* (subpath "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/workspace"))
+(allow file-read* file-write* (subpath "/__SAFEHOUSE_TEMPLATE_WORKDIR__"))
 
 SAFEHOUSE_EMBEDDED_APPS_POLICY
 }
@@ -1461,7 +1460,7 @@ main() {
 
   {
     replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<'POLICY'
+    cat <<POLICY
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
 ;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}

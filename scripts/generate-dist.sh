@@ -18,6 +18,8 @@ GENERATOR="${ROOT_DIR}/bin/safehouse.sh"
 template_root=""
 template_home=""
 template_workdir=""
+static_home_placeholder="/__SAFEHOUSE_TEMPLATE_HOME__"
+static_workdir_placeholder="/__SAFEHOUSE_TEMPLATE_WORKDIR__"
 
 profile_files=()
 
@@ -268,11 +270,11 @@ rewrite_static_policy_home_dir_literal() {
   local tmp_policy
 
   tmp_policy="$(mktemp "${policy_path}.XXXXXX")"
-  awk -v template_home="$template_home" '
+  awk -v static_home_placeholder="$static_home_placeholder" '
     BEGIN { replaced = 0 }
     /^\(define HOME_DIR "/ {
       if (replaced == 0) {
-        print "(define HOME_DIR \"" template_home "\")"
+        print "(define HOME_DIR \"" static_home_placeholder "\")"
         replaced = 1
         next
       }
@@ -334,11 +336,11 @@ append_static_policy_workdir_grant() {
   local policy_path="$1"
   local escaped_workdir
 
-  escaped_workdir="$(escape_for_static_sb_literal "$template_workdir")"
+  escaped_workdir="$(escape_for_static_sb_literal "$static_workdir_placeholder")"
 
   {
     echo ";; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir."
-    emit_static_policy_path_ancestor_literals "$template_workdir" "selected workdir"
+    emit_static_policy_path_ancestor_literals "$static_workdir_placeholder" "selected workdir"
     echo "(allow file-read* file-write* (subpath \"${escaped_workdir}\"))"
     echo ""
   } >>"$policy_path"
@@ -933,7 +935,7 @@ main() {
 
   {
     replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<'POLICY'
+    cat <<POLICY
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
 ;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}
@@ -1123,7 +1125,7 @@ main() {
 
   {
     replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<'POLICY'
+    cat <<POLICY
 
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
 ;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}
