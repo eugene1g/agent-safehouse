@@ -1,0 +1,133 @@
+name: E2E (TUI Agent via tmux)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "bin/**"
+      - "profiles/**"
+      - "tests/**"
+      - ".github/workflows/e2e-agent-tui-macos.yml"
+  pull_request:
+    paths:
+      - "bin/**"
+      - "profiles/**"
+      - "tests/**"
+      - ".github/workflows/e2e-agent-tui-macos.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-tui-agent:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Prepare artifacts directory
+        run: |
+          mkdir -p artifacts/e2e
+
+      - name: Ensure tmux is available
+        run: |
+          if ! command -v tmux >/dev/null 2>&1; then
+            brew update
+            brew install tmux
+          fi
+
+      - name: Ensure rg/fd are available
+        run: |
+          missing=()
+          if ! command -v rg >/dev/null 2>&1; then
+            missing+=(ripgrep)
+          fi
+          if ! command -v fd >/dev/null 2>&1; then
+            missing+=(fd)
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            brew update
+            brew install "${missing[@]}"
+          fi
+
+      - name: Run tmux-driven TUI E2E checks
+        env:
+          SAFEHOUSE_E2E_TUI_JOBS: "4"
+        run: |
+          set -o pipefail
+          ./tests/e2e/run.sh 2>&1 | tee artifacts/e2e/tui.log
+
+      - name: Check whether to run live LLM E2E checks
+        id: live-llm-check
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ "${{ vars.SAFEHOUSE_E2E_LIVE }}" = "0" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "${OPENAI_API_KEY}" ] || [ -n "${ANTHROPIC_API_KEY}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node (for pnpm-installed agent CLIs)
+        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Set up Python (for aider)
+        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Enable corepack (pnpm)
+        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        run: |
+          corepack enable
+
+      - name: Install agent CLIs (repo-local)
+        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        env:
+          # Cursor agent requires a separate Cursor login/API token and is not
+          # testable with only OpenAI/Anthropic keys in CI.
+          SAFEHOUSE_E2E_INSTALL_CURSOR_AGENT: "0"
+        run: ./tests/e2e/agents/install.sh
+
+      - name: Run live LLM E2E checks (optional, requires configured agent/auth)
+        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        env:
+          SAFEHOUSE_E2E_USE_PNPM_AGENTS: "1"
+          SAFEHOUSE_E2E_ALLOW_GLOBAL_BIN: "0"
+          SAFEHOUSE_E2E_LIVE_JOBS: "15"
+          # In CI, unmet prerequisites should fail the job (auth/config/setup must be correct).
+          SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP: "0"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AMP_API_KEY: ${{ secrets.AMP_API_KEY }}
+          AUGMENT_API_TOKEN: ${{ secrets.AUGMENT_API_TOKEN }}
+          AUGMENT_API_URL: ${{ secrets.AUGMENT_API_URL }}
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+        run: |
+          set -o pipefail
+          ./tests/e2e/live/run.sh 2>&1 | tee artifacts/e2e/live.log
+
+      - name: Write E2E summary
+        if: always()
+        run: ./tests/e2e/ci/gha-summary.sh artifacts/e2e/tui.log artifacts/e2e/live.log
+
+      - name: Upload E2E logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safehouse-e2e-logs
+          path: artifacts/e2e
+          if-no-files-found: ignore

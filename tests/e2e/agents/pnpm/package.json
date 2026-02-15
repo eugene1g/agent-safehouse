@@ -1,0 +1,17 @@
+{
+  "name": "safehouse-e2e-agents",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "latest",
+    "@augmentcode/auggie": "latest",
+    "@google/gemini-cli": "latest",
+    "@kilocode/cli": "latest",
+    "@mariozechner/pi-coding-agent": "latest",
+    "@openai/codex": "latest",
+    "@sourcegraph/amp": "latest",
+    "droid": "latest",
+    "cline": "latest",
+    "opencode-ai": "latest"
+  }
+}

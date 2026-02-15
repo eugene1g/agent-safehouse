@@ -2,6 +2,8 @@ name: Shell Lint
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "bin/**"
       - "scripts/**"
@@ -14,6 +16,10 @@ on:
       - "tests/**"
       - ".github/workflows/shell-lint.yml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   lint-shell:
