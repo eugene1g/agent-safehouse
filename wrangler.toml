@@ -1,0 +1,22 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+
+# Default env: dev (safe for local deploy)
+name = "agent-safehouse-docs-dev"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-02-15"
+workers_dev = true
+
+[assets]
+directory = "docs/.vitepress/dist"
+binding = "ASSETS"
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"
+run_worker_first = ["/api/*"]
+
+[env.production]
+name = "agent-safehouse-docs"
+workers_dev = false
+
+[env.production.route]
+pattern = "agent-safehouse.dev/*"
+zone_name = "agent-safehouse.dev"

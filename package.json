@@ -4,9 +4,14 @@
   "scripts": {
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "cf:dev": "pnpm run docs:build && wrangler dev --env \"\" --local",
+    "cf:deploy": "pnpm run docs:build && wrangler deploy --env \"\"",
+    "cf:deploy:prod": "pnpm run docs:build && wrangler deploy --env production",
+    "cf:whoami": "wrangler whoami"
   },
   "devDependencies": {
-    "vitepress": "2.0.0-alpha.16"
+    "vitepress": "2.0.0-alpha.16",
+    "wrangler": "4.65.0"
   }
 }

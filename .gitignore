@@ -5,3 +5,10 @@ agent-sandbox-policy.*
 node_modules/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+telemetry-id
