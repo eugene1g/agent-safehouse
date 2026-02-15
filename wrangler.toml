@@ -13,6 +13,11 @@ html_handling = "auto-trailing-slash"
 not_found_handling = "404-page"
 run_worker_first = ["/api/*"]
 
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 [env.production]
 name = "agent-safehouse-docs"
 workers_dev = false
