@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run test suite
         run: ./tests/run.sh
