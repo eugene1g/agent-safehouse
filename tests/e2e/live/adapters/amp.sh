@@ -55,15 +55,20 @@ run_prompt() {
 			return 0
 		fi
 
-		# Amp CLI occasionally exits after a stalled stream; retry once to reduce flakiness.
-		if rg -qi -- "stream stalled|no data received|timed out|timeout" "${output_file}"; then
-			attempt=$((attempt + 1))
-			sleep 2
-			continue
-		fi
+			# Amp CLI occasionally exits after a stalled stream; retry once to reduce flakiness.
+			if rg -qi -- "stream stalled|no data received|timed out|timeout" "${output_file}"; then
+				attempt=$((attempt + 1))
+				sleep 2
+				continue
+			fi
 
-		return 1
-	done
+			# Some Amp builds emit the denial token but still exit non-zero on restricted paths.
+			if [[ "${prompt}" == *"${FORBIDDEN_FILE}"* ]] && rg -Fq "${DENIAL_TOKEN}" "${output_file}"; then
+				return 0
+			fi
+
+			return 1
+		done
 
 	return 1
 }

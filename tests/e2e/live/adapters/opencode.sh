@@ -23,6 +23,10 @@ DENIAL_PATTERNS=(
 	'not allowed'
 	'external_directory'
 	'outside the allowed workspace'
+	'can.t access or retrieve files'
+	'won.t read or disclose'
+	'outside the authorized working directory'
+	'outside .* local paths'
 )
 
 run_prompt() {
