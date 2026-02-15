@@ -23,13 +23,62 @@ AUTH_PATTERNS=(
 run_prompt() {
 	local prompt="$1"
 	local output_file="$2"
+	local claude_model="${SAFEHOUSE_E2E_CLAUDE_MODEL:-}"
+	local claude_fallback_model="${SAFEHOUSE_E2E_CLAUDE_FALLBACK_MODEL:-}"
+	local status=0
 
-	run_safehouse_command "${output_file}" \
-		"${AGENT_BIN}" \
-		--print \
-		--output-format json \
-		--permission-mode bypassPermissions \
-		"${prompt}"
+	if [[ -n "${claude_model}" ]]; then
+		set +e
+		run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			--model "${claude_model}" \
+			--print \
+			--output-format json \
+			--permission-mode bypassPermissions \
+			"${prompt}"
+		status=$?
+		set -e
+	else
+		run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			--print \
+			--output-format json \
+			--permission-mode bypassPermissions \
+			"${prompt}"
+		return $?
+	fi
+
+	if [[ "${status}" -eq 0 ]]; then
+		return 0
+	fi
+
+	if rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model|unknown option.*model' "${output_file}"; then
+		if [[ -n "${claude_fallback_model}" ]] && [[ "${claude_fallback_model}" != "${claude_model}" ]]; then
+			set +e
+			run_safehouse_command "${output_file}" \
+				"${AGENT_BIN}" \
+				--model "${claude_fallback_model}" \
+				--print \
+				--output-format json \
+				--permission-mode bypassPermissions \
+				"${prompt}"
+			status=$?
+			set -e
+			if [[ "${status}" -eq 0 ]]; then
+				return 0
+			fi
+		fi
+
+		run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			--print \
+			--output-format json \
+			--permission-mode bypassPermissions \
+			"${prompt}"
+		return $?
+	fi
+
+	return "${status}"
 }
 
 run_noninteractive_adapter

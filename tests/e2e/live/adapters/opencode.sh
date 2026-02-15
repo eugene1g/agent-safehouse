@@ -28,16 +28,60 @@ DENIAL_PATTERNS=(
 run_prompt() {
 	local prompt="$1"
 	local output_file="$2"
+	local opencode_model="${SAFEHOUSE_E2E_OPENCODE_MODEL:-}"
+	local opencode_fallback_model="${SAFEHOUSE_E2E_OPENCODE_FALLBACK_MODEL:-}"
+	local status=0
 
 	# OpenCode's Gemini provider expects the key under Google's env var name.
 	# --yolo bypasses opencode's internal approval prompts so the macOS sandbox
 	# is the sole enforcement layer.
-	GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
-		run_safehouse_command "${output_file}" \
-		"${AGENT_BIN}" \
-		run \
-		--format default \
-		"${prompt}"
+	if [[ -n "${opencode_model}" ]]; then
+		set +e
+		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+			run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			run \
+			--model "${opencode_model}" \
+			--format default \
+			"${prompt}"
+		status=$?
+		set -e
+	else
+		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+			run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			run \
+			--format default \
+			"${prompt}"
+		return $?
+	fi
+
+	if [[ "${status}" -eq 0 ]]; then
+		return 0
+	fi
+
+	if [[ -n "${opencode_fallback_model}" ]] && [[ "${opencode_fallback_model}" != "${opencode_model}" ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
+		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+			run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			run \
+			--model "${opencode_fallback_model}" \
+			--format default \
+			"${prompt}"
+		return $?
+	fi
+
+	if rg -qi -- 'unknown option.*model' "${output_file}"; then
+		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+			run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			run \
+			--format default \
+			"${prompt}"
+		return $?
+	fi
+
+	return "${status}"
 }
 
 run_noninteractive_adapter

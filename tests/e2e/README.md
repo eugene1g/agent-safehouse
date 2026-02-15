@@ -106,6 +106,22 @@ In CI you typically want skips rather than red builds for agents that require ex
 SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP=1 ./tests/e2e/live/run.sh
 ```
 
+### Model Cost Controls
+
+Live-model defaults are centralized in:
+
+- `tests/e2e/live/model-defaults.sh`
+
+`./tests/e2e/live/run.sh` loads this file and applies defaults once for all adapters.
+This keeps cost/latency tuning in one place because live E2E checks are ping-style
+behavior checks (token echo + forbidden-read denial), not quality benchmarks.
+
+You can still override any specific adapter model via env vars:
+
+```bash
+SAFEHOUSE_E2E_AMP_MODE=smart SAFEHOUSE_E2E_CODEX_MODEL=gpt-5.2-codex ./tests/e2e/live/run.sh --profile codex
+```
+
 ## Adding/Updating Live Agent Support
 
 Live testing is adapter-based:

@@ -5,11 +5,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd -P)"
 SAFEHOUSE="${REPO_ROOT}/bin/safehouse.sh"
 ADAPTER_DIR="${SCRIPT_DIR}/adapters"
+MODEL_DEFAULTS_FILE="${SCRIPT_DIR}/model-defaults.sh"
 AGENT_PROFILES_DIR="${REPO_ROOT}/profiles/60-agents"
 PNPM_AGENTS_DIR="${REPO_ROOT}/tests/e2e/agents/pnpm"
 PNPM_AGENTS_BIN_DIR="${PNPM_AGENTS_DIR}/node_modules/.bin"
 LOCAL_AGENTS_ROOT="${REPO_ROOT}/tests/e2e/agents"
 LOCAL_AGENTS_BIN_DIR="${LOCAL_AGENTS_ROOT}/bin"
+
+if [[ -f "${MODEL_DEFAULTS_FILE}" ]]; then
+	# shellcheck source=tests/e2e/live/model-defaults.sh
+	source "${MODEL_DEFAULTS_FILE}"
+fi
 
 STRICT_MODE="${SAFEHOUSE_E2E_LIVE_STRICT:-1}"
 ALLOW_PREREQ_SKIP="${SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP:-0}"
@@ -61,6 +67,9 @@ Environment:
   SAFEHOUSE_E2E_LIVE_JOBS
   SAFEHOUSE_E2E_USE_PNPM_AGENTS
   SAFEHOUSE_E2E_ALLOW_GLOBAL_BIN
+
+Model defaults:
+  tests/e2e/live/model-defaults.sh
 EOF
 }
 
@@ -323,6 +332,10 @@ main() {
 	require_command rg
 	require_command fd
 	require_command perl
+
+	if declare -F safehouse_e2e_apply_model_defaults >/dev/null 2>&1; then
+		safehouse_e2e_apply_model_defaults
+	fi
 
 	if [[ ! -x "${SAFEHOUSE}" ]]; then
 		echo "ERROR: safehouse wrapper is missing or not executable: ${SAFEHOUSE}" >&2

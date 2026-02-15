@@ -23,10 +23,25 @@ DENIAL_PATTERNS=(
 	'sandbox.*deny'
 )
 
+detect_aider_model() {
+	if [[ -n "${SAFEHOUSE_E2E_AIDER_MODEL:-}" ]]; then
+		printf '%s' "${SAFEHOUSE_E2E_AIDER_MODEL}"
+	fi
+}
+
 run_prompt() {
 	local prompt="$1"
 	local output_file="$2"
+	local status=0
 	local extra_args=()
+	local model_args=()
+	local aider_model=""
+	local cmd_args=()
+
+	aider_model="$(detect_aider_model || true)"
+	if [[ -n "${aider_model}" ]]; then
+		model_args+=(--model "${aider_model}")
+	fi
 
 	# For the negative test: force aider to attempt an OS-level read of the
 	# forbidden file via --read, so the sandbox (not aider's LLM) blocks it.
@@ -34,25 +49,44 @@ run_prompt() {
 		extra_args+=(--read "${FORBIDDEN_FILE}")
 	fi
 
-	if [[ ${#extra_args[@]} -gt 0 ]]; then
-		# Negative test: aider may exit non-zero when the sandbox blocks --read.
-		# Suppress the exit code so the common library checks the output for
-		# denial evidence instead of treating it as an unexpected crash.
+	cmd_args=("${model_args[@]}" "${extra_args[@]}" --message "${prompt}")
+	set +e
+	run_safehouse_command "${output_file}" \
+		"${AGENT_BIN}" \
+		--yes-always \
+		--no-pretty \
+		--no-check-update \
+		"${cmd_args[@]}"
+	status=$?
+	set -e
+
+	# Fallback for older/newer aider model catalogs if the preferred cheap model
+	# alias is unavailable in a given environment.
+	if [[ "${status}" -ne 0 ]] && [[ ${#model_args[@]} -gt 0 ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model|unknown option.*model' "${output_file}"; then
+		set +e
 		run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			--yes-always \
 			--no-pretty \
 			--no-check-update \
 			"${extra_args[@]}" \
-			--message "${prompt}" || true
-	else
-		run_safehouse_command "${output_file}" \
-			"${AGENT_BIN}" \
-			--yes-always \
-			--no-pretty \
-			--no-check-update \
 			--message "${prompt}"
+		status=$?
+		set -e
 	fi
+
+	if [[ "${status}" -eq 0 ]]; then
+		return 0
+	fi
+
+	if [[ ${#extra_args[@]} -gt 0 ]]; then
+		# Negative test: aider may exit non-zero when the sandbox blocks --read.
+		# Suppress the exit code so the common library checks the output for
+		# denial evidence instead of treating it as an unexpected crash.
+		return 0
+	fi
+
+	return "${status}"
 }
 
 run_noninteractive_adapter

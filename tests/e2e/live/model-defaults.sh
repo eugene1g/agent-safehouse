@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+# Central model defaults for live E2E.
+# Rationale:
+# - These checks only verify a token echo + forbidden-read denial behavior.
+# - We prefer the cheapest reliable models to keep CI cost/latency down.
+# - Values are set only when unset so callers can override any value.
+
+safehouse_e2e_apply_model_defaults() {
+	: "${SAFEHOUSE_E2E_AIDER_MODEL:=gpt-5-mini}"
+	: "${SAFEHOUSE_E2E_AMP_MODE:=free}"
+
+	: "${SAFEHOUSE_E2E_CLAUDE_MODEL:=claude-4-haiku}"
+	: "${SAFEHOUSE_E2E_CLAUDE_FALLBACK_MODEL:=claude-haiku-4-5}"
+
+	: "${SAFEHOUSE_E2E_GEMINI_MODEL:=gemini-3-flash-preview}"
+	: "${SAFEHOUSE_E2E_GEMINI_FALLBACK_MODEL:=gemini-2.5-flash}"
+
+	: "${SAFEHOUSE_E2E_CLINE_OPENAI_MODEL:=gpt-5-mini}"
+	: "${SAFEHOUSE_E2E_CLINE_OPENAI_FALLBACK_MODEL:=gpt-4o}"
+	: "${SAFEHOUSE_E2E_CLINE_ANTHROPIC_MODEL:=claude-4-haiku}"
+	: "${SAFEHOUSE_E2E_CLINE_ANTHROPIC_FALLBACK_MODEL:=claude-3-5-haiku-latest}"
+
+	: "${SAFEHOUSE_E2E_CODEX_MODEL:=gpt-5-mini}"
+
+	: "${SAFEHOUSE_E2E_KILO_MODEL:=openai/gpt-5-mini}"
+	: "${SAFEHOUSE_E2E_KILO_FALLBACK_MODEL:=google/gemini-3-flash-preview}"
+
+	: "${SAFEHOUSE_E2E_OPENCODE_MODEL:=openai/gpt-5-mini}"
+	: "${SAFEHOUSE_E2E_OPENCODE_FALLBACK_MODEL:=google/gemini-3-flash-preview}"
+
+	: "${SAFEHOUSE_E2E_GOOSE_PROVIDER:=openai}"
+	: "${SAFEHOUSE_E2E_GOOSE_MODEL:=gpt-5-mini}"
+
+	: "${SAFEHOUSE_E2E_PI_PROVIDER:=openai}"
+	: "${SAFEHOUSE_E2E_PI_MODEL:=gpt-5-mini}"
+
+	export \
+		SAFEHOUSE_E2E_AIDER_MODEL \
+		SAFEHOUSE_E2E_AMP_MODE \
+		SAFEHOUSE_E2E_CLAUDE_MODEL \
+		SAFEHOUSE_E2E_CLAUDE_FALLBACK_MODEL \
+		SAFEHOUSE_E2E_GEMINI_MODEL \
+		SAFEHOUSE_E2E_GEMINI_FALLBACK_MODEL \
+		SAFEHOUSE_E2E_CLINE_OPENAI_MODEL \
+		SAFEHOUSE_E2E_CLINE_OPENAI_FALLBACK_MODEL \
+		SAFEHOUSE_E2E_CLINE_ANTHROPIC_MODEL \
+		SAFEHOUSE_E2E_CLINE_ANTHROPIC_FALLBACK_MODEL \
+		SAFEHOUSE_E2E_CODEX_MODEL \
+		SAFEHOUSE_E2E_KILO_MODEL \
+		SAFEHOUSE_E2E_KILO_FALLBACK_MODEL \
+		SAFEHOUSE_E2E_OPENCODE_MODEL \
+		SAFEHOUSE_E2E_OPENCODE_FALLBACK_MODEL \
+		SAFEHOUSE_E2E_GOOSE_PROVIDER \
+		SAFEHOUSE_E2E_GOOSE_MODEL \
+		SAFEHOUSE_E2E_PI_PROVIDER \
+		SAFEHOUSE_E2E_PI_MODEL
+}

@@ -41,19 +41,10 @@ detect_pi_provider() {
 }
 
 detect_pi_model() {
-	local provider="$1"
-
 	if [[ -n "${SAFEHOUSE_E2E_PI_MODEL:-}" ]]; then
 		printf '%s' "${SAFEHOUSE_E2E_PI_MODEL}"
 		return 0
 	fi
-
-	case "${provider}" in
-	openai) printf '%s' "gpt-4o-mini" ;;
-	anthropic) printf '%s' "claude-3-5-sonnet-latest" ;;
-	google) printf '%s' "gemini-1.5-pro" ;;
-	*) printf '%s' "gpt-4o-mini" ;;
-	esac
 }
 
 run_prompt() {
@@ -62,12 +53,23 @@ run_prompt() {
 	local provider model
 
 	provider="$(detect_pi_provider)"
-	model="$(detect_pi_model "${provider}")"
+	model="$(detect_pi_model || true)"
+
+	if [[ -n "${model}" ]]; then
+		run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			--provider "${provider}" \
+			--model "${model}" \
+			--no-extensions \
+			--no-session \
+			--print \
+			"${prompt}"
+		return $?
+	fi
 
 	run_safehouse_command "${output_file}" \
 		"${AGENT_BIN}" \
 		--provider "${provider}" \
-		--model "${model}" \
 		--no-extensions \
 		--no-session \
 		--print \

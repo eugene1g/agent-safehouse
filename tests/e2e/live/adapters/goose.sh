@@ -49,24 +49,13 @@ detect_goose_provider() {
 }
 
 detect_goose_model() {
-	local provider="$1"
-
 	if [[ -n "${SAFEHOUSE_E2E_GOOSE_MODEL:-}" ]]; then
 		printf '%s' "${SAFEHOUSE_E2E_GOOSE_MODEL}"
 		return 0
 	fi
 	if [[ -n "${GOOSE_MODEL:-}" ]]; then
 		printf '%s' "${GOOSE_MODEL}"
-		return 0
 	fi
-
-	# Default models are best-effort and can be overridden via env vars above.
-	case "${provider}" in
-	openai) printf '%s' "gpt-4o-mini" ;;
-	anthropic) printf '%s' "claude-3-5-sonnet-latest" ;;
-	gemini-cli) printf '%s' "gemini-1.5-pro" ;;
-	*) printf '%s' "gpt-4o-mini" ;;
-	esac
 }
 
 run_prompt() {
@@ -75,16 +64,29 @@ run_prompt() {
 	local provider model
 
 	provider="$(detect_goose_provider)"
-	model="$(detect_goose_model "${provider}")"
+	model="$(detect_goose_model || true)"
 
 	# GOOSE_MODE=auto bypasses goose's internal approval prompts so the
 	# macOS sandbox is the sole enforcement layer.
+	if [[ -n "${model}" ]]; then
+		GOOSE_MODE=auto \
+			run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			run \
+			--provider "${provider}" \
+			--model "${model}" \
+			--text "${prompt}" \
+			--no-session \
+			--quiet \
+			--output-format text
+		return $?
+	fi
+
 	GOOSE_MODE=auto \
 		run_safehouse_command "${output_file}" \
 		"${AGENT_BIN}" \
 		run \
 		--provider "${provider}" \
-		--model "${model}" \
 		--text "${prompt}" \
 		--no-session \
 		--quiet \

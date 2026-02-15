@@ -91,8 +91,32 @@ ensure_codex_login() {
 run_prompt() {
 	local prompt="$1"
 	local output_file="$2"
+	local codex_model="${SAFEHOUSE_E2E_CODEX_MODEL:-}"
+	local status=0
 
 	ensure_codex_login
+
+	if [[ -n "${codex_model}" ]]; then
+		set +e
+		run_safehouse_command "${output_file}" \
+			"${AGENT_BIN}" \
+			-m "${codex_model}" \
+			exec \
+			--skip-git-repo-check \
+			--dangerously-bypass-approvals-and-sandbox \
+			--color never \
+			"${prompt}"
+		status=$?
+		set -e
+
+		# Fall back if the configured model alias is unavailable on this CLI/API version.
+		if [[ "${status}" -eq 0 ]]; then
+			return 0
+		fi
+		if ! rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
+			return "${status}"
+		fi
+	fi
 
 	run_safehouse_command "${output_file}" \
 		"${AGENT_BIN}" \

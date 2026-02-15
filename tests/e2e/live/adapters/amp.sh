@@ -20,12 +20,35 @@ AUTH_PATTERNS=(
 run_prompt() {
 	local prompt="$1"
 	local output_file="$2"
+	local amp_mode="${SAFEHOUSE_E2E_AMP_MODE:-}"
+	local status=0
 
 	local attempt=1
 	local max_attempts="${SAFEHOUSE_E2E_AMP_RETRIES:-2}"
 
 	while (( attempt <= max_attempts )); do
-		if run_safehouse_command "${output_file}" \
+		if [[ -n "${amp_mode}" ]]; then
+			set +e
+			run_safehouse_command "${output_file}" \
+				"${AGENT_BIN}" \
+				--dangerously-allow-all \
+				--mode "${amp_mode}" \
+				--execute "${prompt}"
+			status=$?
+			set -e
+
+			# Backward-compatible fallback for Amp builds without --mode.
+			if [[ "${status}" -ne 0 ]] && rg -qi -- 'unknown option.*mode|unrecognized option.*mode|unexpected argument.*mode' "${output_file}"; then
+				if run_safehouse_command "${output_file}" \
+					"${AGENT_BIN}" \
+					--dangerously-allow-all \
+					--execute "${prompt}"; then
+					return 0
+				fi
+			elif [[ "${status}" -eq 0 ]]; then
+				return 0
+			fi
+		elif run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			--dangerously-allow-all \
 			--execute "${prompt}"; then

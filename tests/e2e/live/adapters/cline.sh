@@ -29,28 +29,49 @@ DENIAL_PATTERNS=(
 )
 
 ensure_cline_auth() {
-	local provider key model_id auth_out
+	local provider key model_id fallback_model_id auth_out
+
+	run_cline_auth() {
+		local auth_log="$1"
+		local auth_provider="$2"
+		local auth_key="$3"
+		local auth_model="${4:-}"
+		if [[ -n "${auth_model}" ]]; then
+			run_safehouse_command "${auth_log}" "${AGENT_BIN}" auth --provider "${auth_provider}" --apikey "${auth_key}" --modelid "${auth_model}"
+		else
+			run_safehouse_command "${auth_log}" "${AGENT_BIN}" auth --provider "${auth_provider}" --apikey "${auth_key}"
+		fi
+	}
 
 	if [[ "${CLINE_AUTH_DONE}" == "1" ]]; then
 		return 0
 	fi
 
-	# Prefer Anthropic when available since it's already used elsewhere in this suite.
-	if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-		provider="anthropic"
-		key="${ANTHROPIC_API_KEY}"
-		model_id="claude-sonnet-4-5-20250929"
-	elif [[ -n "${OPENAI_API_KEY:-}" ]]; then
+	# Prefer OpenAI for low-cost ping checks; fall back to Anthropic when needed.
+	if [[ -n "${OPENAI_API_KEY:-}" ]]; then
 		provider="openai-native"
 		key="${OPENAI_API_KEY}"
-		model_id="gpt-4o"
+		model_id="${SAFEHOUSE_E2E_CLINE_OPENAI_MODEL:-}"
+		fallback_model_id="${SAFEHOUSE_E2E_CLINE_OPENAI_FALLBACK_MODEL:-}"
+	elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+		provider="anthropic"
+		key="${ANTHROPIC_API_KEY}"
+		model_id="${SAFEHOUSE_E2E_CLINE_ANTHROPIC_MODEL:-}"
+		fallback_model_id="${SAFEHOUSE_E2E_CLINE_ANTHROPIC_FALLBACK_MODEL:-}"
 	else
 		echo "ADAPTER[${ADAPTER_NAME}]: missing ANTHROPIC_API_KEY/OPENAI_API_KEY for cline auth" | tee -a "${TRANSCRIPT_PATH}"
 		exit 2
 	fi
 
 	auth_out="${TRANSCRIPT_PATH%.log}.auth.log"
-	if ! run_safehouse_command "${auth_out}" "${AGENT_BIN}" auth --provider "${provider}" --apikey "${key}" --modelid "${model_id}"; then
+	if ! run_cline_auth "${auth_out}" "${provider}" "${key}" "${model_id}"; then
+		if [[ -n "${fallback_model_id}" ]] && [[ "${fallback_model_id}" != "${model_id}" ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${auth_out}"; then
+			if run_cline_auth "${auth_out}" "${provider}" "${key}" "${fallback_model_id}"; then
+				CLINE_AUTH_DONE=1
+				return 0
+			fi
+		fi
+
 		if is_auth_or_setup_issue "${auth_out}"; then
 			echo "ADAPTER[${ADAPTER_NAME}]: skip due to auth/model/setup issue in cline auth." | tee -a "${TRANSCRIPT_PATH}"
 			print_excerpt "${ADAPTER_NAME} auth output" "${auth_out}"
