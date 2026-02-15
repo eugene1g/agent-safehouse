@@ -37,8 +37,8 @@ run_prompt() {
 			status=$?
 			set -e
 
-			# Backward-compatible fallback for Amp builds without --mode.
-			if [[ "${status}" -ne 0 ]] && rg -qi -- 'unknown option.*mode|unrecognized option.*mode|unexpected argument.*mode' "${output_file}"; then
+			# Fallback for Amp builds that do not support --mode with --execute.
+			if [[ "${status}" -ne 0 ]] && rg -qi -- 'unknown option.*mode|unrecognized option.*mode|unexpected argument.*mode|execute mode is not permitted with --mode' "${output_file}"; then
 				if run_safehouse_command "${output_file}" \
 					"${AGENT_BIN}" \
 					--dangerously-allow-all \

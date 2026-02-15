@@ -21,14 +21,27 @@ run_prompt() {
 	local output_file="$2"
 	local kilo_model="${SAFEHOUSE_E2E_KILO_MODEL:-}"
 	local kilo_fallback_model="${SAFEHOUSE_E2E_KILO_FALLBACK_MODEL:-}"
+	local runtime_root
+	local state_home
+	local cache_home
+	local config_home
 	local status=0
+
+	runtime_root="${WORKDIR}/.kilo-runtime"
+	state_home="${runtime_root}/state"
+	cache_home="${runtime_root}/cache"
+	config_home="${runtime_root}/config"
+	mkdir -p "${state_home}" "${cache_home}" "${config_home}"
 
 	# Kilo defaults to a TUI; use `kilo run` for non-interactive messaging.
 	# Use JSON event stream output to make token detection robust.
 	# Kilo expects the Gemini key under Google's env var name.
 	if [[ -n "${kilo_model}" ]]; then
 		set +e
-		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+		XDG_STATE_HOME="${state_home}" \
+			XDG_CACHE_HOME="${cache_home}" \
+			XDG_CONFIG_HOME="${config_home}" \
+			GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
 			run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			run \
@@ -39,7 +52,10 @@ run_prompt() {
 		status=$?
 		set -e
 	else
-		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+		XDG_STATE_HOME="${state_home}" \
+			XDG_CACHE_HOME="${cache_home}" \
+			XDG_CONFIG_HOME="${config_home}" \
+			GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
 			run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			run \
@@ -54,7 +70,10 @@ run_prompt() {
 	fi
 
 	if [[ -n "${kilo_fallback_model}" ]] && [[ "${kilo_fallback_model}" != "${kilo_model}" ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
-		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+		XDG_STATE_HOME="${state_home}" \
+			XDG_CACHE_HOME="${cache_home}" \
+			XDG_CONFIG_HOME="${config_home}" \
+			GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
 			run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			run \
@@ -66,7 +85,10 @@ run_prompt() {
 	fi
 
 	if rg -qi -- 'unknown option.*model' "${output_file}"; then
-		GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
+		XDG_STATE_HOME="${state_home}" \
+			XDG_CACHE_HOME="${cache_home}" \
+			XDG_CONFIG_HOME="${config_home}" \
+			GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-${GEMINI_API_KEY:-}}" \
 			run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			run \

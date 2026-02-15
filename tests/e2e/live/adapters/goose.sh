@@ -62,14 +62,26 @@ run_prompt() {
 	local prompt="$1"
 	local output_file="$2"
 	local provider model
+	local runtime_root
+	local state_home
+	local cache_home
+	local config_home
 
 	provider="$(detect_goose_provider)"
 	model="$(detect_goose_model || true)"
+	runtime_root="${WORKDIR}/.goose-runtime"
+	state_home="${runtime_root}/state"
+	cache_home="${runtime_root}/cache"
+	config_home="${runtime_root}/config"
+	mkdir -p "${state_home}" "${cache_home}" "${config_home}"
 
 	# GOOSE_MODE=auto bypasses goose's internal approval prompts so the
 	# macOS sandbox is the sole enforcement layer.
 	if [[ -n "${model}" ]]; then
-		GOOSE_MODE=auto \
+		XDG_STATE_HOME="${state_home}" \
+			XDG_CACHE_HOME="${cache_home}" \
+			XDG_CONFIG_HOME="${config_home}" \
+			GOOSE_MODE=auto \
 			run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			run \
@@ -82,7 +94,10 @@ run_prompt() {
 		return $?
 	fi
 
-	GOOSE_MODE=auto \
+	XDG_STATE_HOME="${state_home}" \
+		XDG_CACHE_HOME="${cache_home}" \
+		XDG_CONFIG_HOME="${config_home}" \
+		GOOSE_MODE=auto \
 		run_safehouse_command "${output_file}" \
 		"${AGENT_BIN}" \
 		run \

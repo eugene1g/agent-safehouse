@@ -33,10 +33,10 @@ run_prompt() {
 	local prompt="$1"
 	local output_file="$2"
 	local status=0
-	local extra_args=()
-	local model_args=()
+	local -a extra_args=()
+	local -a model_args=()
 	local aider_model=""
-	local cmd_args=()
+	local -a cmd_args=()
 
 	aider_model="$(detect_aider_model || true)"
 	if [[ -n "${aider_model}" ]]; then
@@ -49,7 +49,13 @@ run_prompt() {
 		extra_args+=(--read "${FORBIDDEN_FILE}")
 	fi
 
-	cmd_args=("${model_args[@]}" "${extra_args[@]}" --message "${prompt}")
+	cmd_args=(--message "${prompt}")
+	if [[ ${#extra_args[@]} -gt 0 ]]; then
+		cmd_args=("${extra_args[@]}" "${cmd_args[@]}")
+	fi
+	if [[ ${#model_args[@]} -gt 0 ]]; then
+		cmd_args=("${model_args[@]}" "${cmd_args[@]}")
+	fi
 	set +e
 	run_safehouse_command "${output_file}" \
 		"${AGENT_BIN}" \

@@ -25,6 +25,7 @@ run_prompt() {
 	local output_file="$2"
 	local claude_model="${SAFEHOUSE_E2E_CLAUDE_MODEL:-}"
 	local claude_fallback_model="${SAFEHOUSE_E2E_CLAUDE_FALLBACK_MODEL:-}"
+	local model_error_pattern='model .* not found|unknown model|invalid model|invalid value|unsupported model|unknown option.*model|selected model|may not exist|run --model'
 	local status=0
 
 	if [[ -n "${claude_model}" ]]; then
@@ -52,7 +53,7 @@ run_prompt() {
 		return 0
 	fi
 
-	if rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model|unknown option.*model' "${output_file}"; then
+	if rg -qi -- "${model_error_pattern}" "${output_file}"; then
 		if [[ -n "${claude_fallback_model}" ]] && [[ "${claude_fallback_model}" != "${claude_model}" ]]; then
 			set +e
 			run_safehouse_command "${output_file}" \
