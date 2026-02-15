@@ -30,44 +30,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare artifacts directory
-        run: |
-          mkdir -p artifacts/e2e
+        run: mkdir -p artifacts/e2e
 
-      - name: Ensure tmux is available
-        run: |
-          if ! command -v tmux >/dev/null 2>&1; then
-            brew update
-            brew install tmux
-          fi
-
-      - name: Ensure rg/fd are available
-        run: |
-          missing=()
-          if ! command -v rg >/dev/null 2>&1; then
-            missing+=(ripgrep)
-          fi
-          if ! command -v fd >/dev/null 2>&1; then
-            missing+=(fd)
-          fi
-          if [ "${#missing[@]}" -gt 0 ]; then
-            brew update
-            brew install "${missing[@]}"
-          fi
-
-      - name: Run tmux-driven TUI E2E checks
-        env:
-          SAFEHOUSE_E2E_TUI_JOBS: "4"
-        run: |
-          set -o pipefail
-          ./tests/e2e/run.sh 2>&1 | tee artifacts/e2e/tui.log
-
+      # ── Decide early whether live-LLM tests will run ──────────────
       - name: Check whether to run live LLM E2E checks
         id: live-llm-check
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          set -o pipefail
           if [ "${{ vars.SAFEHOUSE_E2E_LIVE }}" = "0" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           elif [ -n "${OPENAI_API_KEY}" ] || [ -n "${ANTHROPIC_API_KEY}" ]; then
@@ -76,33 +47,83 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # ── Set up runtimes early so caching + install can overlap TUI ─
       - name: Set up Node (for pnpm-installed agent CLIs)
-        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        if: steps.live-llm-check.outputs.enabled == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
 
       - name: Set up Python (for aider)
-        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        if: steps.live-llm-check.outputs.enabled == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: tests/e2e/agents/python/requirements.txt
 
       - name: Enable corepack (pnpm)
-        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
-        run: |
-          corepack enable
+        if: steps.live-llm-check.outputs.enabled == 'true'
+        run: corepack enable
 
-      - name: Install agent CLIs (repo-local)
-        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+      - name: Get pnpm store path
+        if: steps.live-llm-check.outputs.enabled == 'true'
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        if: steps.live-llm-check.outputs.enabled == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: e2e-pnpm-${{ runner.os }}-${{ hashFiles('tests/e2e/agents/pnpm/package.json') }}
+          restore-keys: |
+            e2e-pnpm-${{ runner.os }}-
+
+      # ── Install CLI tools via brew (single call, no auto-update) ──
+      - name: Ensure tmux, rg, fd are available
         env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          missing=()
+          command -v tmux >/dev/null 2>&1 || missing+=(tmux)
+          command -v rg   >/dev/null 2>&1 || missing+=(ripgrep)
+          command -v fd   >/dev/null 2>&1 || missing+=(fd)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            brew install "${missing[@]}"
+          fi
+
+      # ── Run TUI tests; install agents in background in parallel ───
+      - name: Run TUI E2E checks (+ background agent install)
+        env:
+          SAFEHOUSE_E2E_TUI_JOBS: "4"
           # Cursor agent requires a separate Cursor login/API token and is not
           # testable with only OpenAI/Anthropic keys in CI.
           SAFEHOUSE_E2E_INSTALL_CURSOR_AGENT: "0"
-        run: ./tests/e2e/agents/install.sh
+        run: |
+          set -o pipefail
+
+          # Kick off agent-CLI install in the background while TUI tests run
+          INSTALL_PID=""
+          if [ "${{ steps.live-llm-check.outputs.enabled }}" = "true" ]; then
+            ./tests/e2e/agents/install.sh > artifacts/e2e/install.log 2>&1 &
+            INSTALL_PID=$!
+          fi
+
+          # TUI checks run in the foreground
+          ./tests/e2e/run.sh 2>&1 | tee artifacts/e2e/tui.log
+
+          # Wait for the background install (if any) to finish
+          if [ -n "${INSTALL_PID}" ]; then
+            if ! wait "${INSTALL_PID}"; then
+              echo "::error::Agent CLI install failed. Log follows:"
+              cat artifacts/e2e/install.log
+              exit 1
+            fi
+          fi
 
       - name: Run live LLM E2E checks (optional, requires configured agent/auth)
-        if: ${{ steps.live-llm-check.outputs.enabled == 'true' }}
+        if: steps.live-llm-check.outputs.enabled == 'true'
         env:
           SAFEHOUSE_E2E_USE_PNPM_AGENTS: "1"
           SAFEHOUSE_E2E_ALLOW_GLOBAL_BIN: "0"
