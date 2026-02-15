@@ -19,6 +19,14 @@ AUTH_PATTERNS=(
 	'insufficient credits?'
 	'setup-token'
 )
+DENIAL_PATTERNS=(
+	'access files outside'
+	'outside my configured working directories'
+	'access restricted'
+	'decline this request'
+	'security boundaries'
+	'refuse attempts to access'
+)
 
 run_prompt() {
 	local prompt="$1"
