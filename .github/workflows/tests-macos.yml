@@ -2,6 +2,8 @@ name: Tests (macOS)
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "bin/**"
       - "profiles/**"
@@ -28,6 +30,10 @@ on:
       - ".github/workflows/tests-macos.yml"
       - ".github/workflows/regenerate-dist.yml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   test-macos:

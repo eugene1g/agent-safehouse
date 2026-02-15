@@ -1,6 +1,7 @@
 # Agent Safehouse
 
 [![Tests (macOS)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml)
+[![E2E (TUI Agent via tmux)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Sandbox your LLM coding agents on macOS so they can only touch the files they need.
@@ -366,6 +367,75 @@ Run the full sandbox test suite:
 ```
 
 The runner accepts no arguments and executes modular test sections under `tests/sections/` using shared helpers in `tests/lib/`.
+
+Run the tmux-driven TUI E2E simulation:
+
+```bash
+./tests/e2e/run.sh
+```
+
+This test iterates across every configured profile in `profiles/60-agents/`, launches a command-matched fake TUI agent under safehouse in a detached `tmux` session, selects menu items via keystrokes, captures pane output, and asserts:
+- the expected agent profile was selected in the generated policy for that command basename
+- in-workdir write succeeds
+- out-of-workdir write is denied
+- out-of-workdir read is denied
+- the session exits cleanly after interaction
+
+This suite supports parallel execution (one tmux session per profile):
+
+```bash
+SAFEHOUSE_E2E_TUI_JOBS=4 ./tests/e2e/run.sh
+```
+
+Run live LLM checks (installed/authenticated agents with adapters) with verbose transcripts:
+
+```bash
+./tests/e2e/live/run.sh
+```
+
+To install agent CLIs repo-locally (so tests don't depend on global installs), run:
+
+```bash
+./tests/e2e/agents/install.sh
+```
+
+This installs:
+- Node-based agent CLIs via pnpm (`tests/e2e/agents/pnpm/`)
+- `aider` via a local Python venv (`tests/e2e/agents/python/`)
+- `goose` via GitHub release download (`tests/e2e/agents/bin/goose`)
+- `cursor-agent` via the official cursor.com installer (with `HOME` overridden into `tests/e2e/agents/cursor-agent/home/`)
+
+By default this suite is strict for installed agents:
+- each installed configured profile must run its adapter and complete both checks (positive response token + forbidden-file denial token)
+- adapter-reported auth/setup prerequisites fail the run by default
+
+To allow prerequisite skips (for example, on a machine where some agents are not authenticated yet):
+
+```bash
+SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP=1 ./tests/e2e/live/run.sh
+```
+
+Parallel live execution is also supported (be mindful of rate limits):
+
+```bash
+SAFEHOUSE_E2E_LIVE_JOBS=3 SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP=1 ./tests/e2e/live/run.sh
+```
+
+Timeout tuning:
+
+```bash
+# tmux simulation waits
+SAFEHOUSE_E2E_TUI_TIMEOUT_SECS=30 SAFEHOUSE_E2E_TUI_SESSION_TIMEOUT_SECS=30 ./tests/e2e/run.sh
+
+# live agent command timeout (per prompt)
+SAFEHOUSE_E2E_LIVE_COMMAND_TIMEOUT_SECS=240 ./tests/e2e/live/run.sh
+```
+
+Or run both simulations and live checks in one command:
+
+```bash
+SAFEHOUSE_E2E_LIVE=1 ./tests/e2e/run.sh
+```
 
 ## Debugging Sandbox Denials
 

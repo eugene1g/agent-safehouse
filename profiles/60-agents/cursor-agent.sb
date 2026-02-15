@@ -2,6 +2,7 @@
 ;; Agent: Cursor
 ;; Cursor CLI binary, state, config, and app bundle paths.
 ;; Source: 60-agents/cursor-agent.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - official cursor-agent install/update manages:

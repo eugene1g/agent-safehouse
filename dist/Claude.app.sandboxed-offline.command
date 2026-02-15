@@ -1110,6 +1110,7 @@ emit_embedded_policy_template() {
 ;; Agent: Cursor
 ;; Cursor CLI binary, state, config, and app bundle paths.
 ;; Source: 60-agents/cursor-agent.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - official cursor-agent install/update manages:
@@ -1217,6 +1218,11 @@ emit_embedded_policy_template() {
     (home-prefix "/.local/bin/kilocode")
     (home-subpath "/.kilocode")
     (home-subpath "/.roo")
+    ;; Observed on recent kilo CLI builds (Bun-based): XDG state under ~/.local/share/kilo.
+    (home-subpath "/.config/kilo")
+    (home-subpath "/.cache/kilo")
+    (home-subpath "/.local/share/kilo")
+    (home-subpath "/.local/state/kilo")
     (home-subpath "/Documents/Kilo-Code/MCP")
     (home-subpath "/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code")
 )
