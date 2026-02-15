@@ -68,6 +68,13 @@ Install repo-local agent binaries (Node via pnpm, plus other installers):
 ./tests/e2e/agents/install.sh
 ```
 
+By default, the installer reuses existing repo-local agent installs when present
+(`SAFEHOUSE_E2E_REUSE_EXISTING_INSTALLS=1`). Set it to `0` to force a full reinstall:
+
+```bash
+SAFEHOUSE_E2E_REUSE_EXISTING_INSTALLS=0 ./tests/e2e/agents/install.sh
+```
+
 The live runner prefers agent binaries in:
 
 1. `tests/e2e/agents/bin/*` (downloaded/installed by the scripts in `tests/e2e/agents/*`)
@@ -107,4 +114,3 @@ Live testing is adapter-based:
 - Add a non-interactive adapter: `tests/e2e/live/adapters/<name>.sh`
 
 Adapters run the real CLI under Safehouse and must implement `run_prompt()` (see `tests/e2e/live/adapters/lib/noninteractive-common.sh`).
-

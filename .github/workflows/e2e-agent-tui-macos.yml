@@ -80,6 +80,23 @@ jobs:
           restore-keys: |
             e2e-pnpm-${{ runner.os }}-
 
+      - name: Compute live-agent cache epoch (weekly)
+        if: steps.live-llm-check.outputs.enabled == 'true'
+        id: live-agent-cache-epoch
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache live-agent install outputs
+        if: steps.live-llm-check.outputs.enabled == 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            tests/e2e/agents/bin
+            tests/e2e/agents/pnpm/node_modules
+            tests/e2e/agents/python/venv
+          key: e2e-live-agent-installs-${{ runner.os }}-${{ steps.live-agent-cache-epoch.outputs.week }}-${{ hashFiles('tests/e2e/agents/install.sh', 'tests/e2e/agents/pnpm/install.sh', 'tests/e2e/agents/pnpm/package.json', 'tests/e2e/agents/python/install.sh', 'tests/e2e/agents/python/requirements.txt', 'tests/e2e/agents/goose/install.sh', 'tests/e2e/agents/cursor-agent/install.sh') }}
+          restore-keys: |
+            e2e-live-agent-installs-${{ runner.os }}-${{ steps.live-agent-cache-epoch.outputs.week }}-
+
       # ── Install CLI tools via brew (single call, no auto-update) ──
       - name: Ensure tmux, rg, fd are available
         env:
@@ -97,6 +114,7 @@ jobs:
       - name: Run TUI E2E checks (+ background agent install)
         env:
           SAFEHOUSE_E2E_TUI_JOBS: "4"
+          SAFEHOUSE_E2E_REUSE_EXISTING_INSTALLS: "1"
           # Cursor agent requires a separate Cursor login/API token and is not
           # testable with only OpenAI/Anthropic keys in CI.
           SAFEHOUSE_E2E_INSTALL_CURSOR_AGENT: "0"
