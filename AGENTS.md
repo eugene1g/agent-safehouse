@@ -4,7 +4,7 @@
 
 Agent Safehouse is a macOS sandbox wrapper for coding agents (Claude, Cursor, Aider, Gemini, etc.) built on `sandbox-exec`.
 Policy model is strict by default: start from `(deny default)`, then add explicit allow rules via layered `.sb` profiles.
-Codebase is pure Bash + Sandbox Profile Language (`.sb`); no package manager or build system.
+Core sandbox wrapper is pure Bash + Sandbox Profile Language (`.sb`) and has no build step. Repo also includes a VitePress docs site and Cloudflare deploy tooling (pnpm + Wrangler).
 
 ## Fast Working Rules
 
@@ -25,6 +25,12 @@ Codebase is pure Bash + Sandbox Profile Language (`.sb`); no package manager or 
 # Run command in sandbox
 ./bin/safehouse.sh [policy opts] -- <command> [args...]
 ./bin/safehouse.sh --stdout
+
+# Explain effective workdir/grants/profile selection (debugging)
+./bin/safehouse.sh --explain --stdout
+
+# Trust and load <workdir>/.safehouse config (disabled by default)
+./bin/safehouse.sh --trust-workdir-config --stdout
 
 # Validate behavior
 ./tests/run.sh
@@ -82,6 +88,7 @@ Later rules win. Check ordering first when behavior is unexpected.
 ## Test/CI Signals
 
 - Tests are section-based under `tests/sections/*.sh`, with helpers in `tests/lib/common.sh`.
+- Optional heavier coverage: `./tests/e2e/run.sh` (tmux simulation) and `./tests/e2e/live/run.sh` (real agent CLIs; requires provider API keys).
 - If adding policy behavior, add/update tests with `section_begin` + assertion helpers + `register_section`.
 - Keep `.sb` header comments and any `#safehouse-test-id:*#` markers used by ordering/structure assertions.
 - CI runs macOS tests and auto-regenerates/commits dist artifacts on relevant changes.
