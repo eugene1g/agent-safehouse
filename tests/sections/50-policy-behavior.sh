@@ -44,6 +44,8 @@ run_section_policy_behavior() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password desktop settings-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits 1Password mach-lookup regex grant" "com\\.1password(\\..*)?$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits SSH integration profile" ";; Integration: SSH"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes SSH config metadata grant for git-over-ssh" "/.ssh/config"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes SSH known_hosts metadata grant for git-over-ssh" "/.ssh/known_hosts"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Spotlight integration profile" ";; Integration: Spotlight"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits CleanShot integration profile" ";; Integration: CleanShot"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits clipboard pasteboard access" "(global-name \"com.apple.pasteboard.1\")"

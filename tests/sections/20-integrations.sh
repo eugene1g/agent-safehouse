@@ -11,24 +11,26 @@ run_section_integrations() {
   local policy_keychain_agent policy_non_keychain_agent
   local macos_gui_marker electron_marker
 
-  section_begin "SSH Integration (Opt-In)"
+  section_begin "SSH Metadata Defaults and SSH Integration (Opt-In)"
   policy_ssh="${TEST_CWD}/policy-enable-ssh.sb"
   assert_command_succeeds "safehouse generates policy with --enable=ssh" "$GENERATOR" --output "$policy_ssh" --enable=ssh
 
   ssh_config_path="${HOME}/.ssh/config"
-  assert_denied_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config denied by default" "$ssh_config_path" /bin/cat "$ssh_config_path"
   if [[ -L "$ssh_config_path" ]]; then
     ssh_config_link_target="$(readlink "$ssh_config_path" 2>/dev/null || true)"
     if [[ "$ssh_config_link_target" == /* && "$ssh_config_link_target" != "${HOME}/.ssh/"* ]]; then
+      log_skip "read ~/.ssh/config allowed by default (symlink target outside ~/.ssh; allow via --append-profile if needed)"
       log_skip "read ~/.ssh/config allowed with --enable=ssh (symlink target outside ~/.ssh; allow via --append-profile if needed)"
     else
+      assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config allowed by default" "$ssh_config_path" /bin/cat "$ssh_config_path"
       assert_allowed_if_exists "$policy_ssh" "read ~/.ssh/config allowed with --enable=ssh" "$ssh_config_path" /bin/cat "$ssh_config_path"
     fi
   else
+    assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.ssh/config allowed by default" "$ssh_config_path" /bin/cat "$ssh_config_path"
     assert_allowed_if_exists "$policy_ssh" "read ~/.ssh/config allowed with --enable=ssh" "$ssh_config_path" /bin/cat "$ssh_config_path"
   fi
 
-  assert_denied_if_exists "$POLICY_DEFAULT" "read ~/.ssh/known_hosts denied by default" "${HOME}/.ssh/known_hosts" /bin/cat "${HOME}/.ssh/known_hosts"
+  assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.ssh/known_hosts allowed by default" "${HOME}/.ssh/known_hosts" /bin/cat "${HOME}/.ssh/known_hosts"
   assert_allowed_if_exists "$policy_ssh" "read ~/.ssh/known_hosts allowed with --enable=ssh" "${HOME}/.ssh/known_hosts" /bin/cat "${HOME}/.ssh/known_hosts"
 
   ssh_auth_sock="${SSH_AUTH_SOCK:-}"

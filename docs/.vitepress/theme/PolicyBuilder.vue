@@ -107,6 +107,8 @@ onMounted(() => {
       homeFeedback: document.getElementById('pb-home-feedback')!,
       workdir: document.getElementById('pb-workdir') as HTMLInputElement,
       workdirFeedback: document.getElementById('pb-workdir-feedback')!,
+      gitSshKey: document.getElementById('pb-git-ssh-key') as HTMLInputElement,
+      gitSshKeyFeedback: document.getElementById('pb-git-ssh-key-feedback')!,
       ro: document.getElementById('pb-add-ro') as HTMLTextAreaElement,
       roFeedback: document.getElementById('pb-ro-feedback')!,
       rw: document.getElementById('pb-add-rw') as HTMLTextAreaElement,
@@ -176,12 +178,6 @@ onMounted(() => {
         out.push(p)
       })
       return { values: out, errors: errors, normalized: normalized, duplicateCount: duplicateCount }
-    }
-
-    function parseList(raw: string, home: string, label: string) {
-      var details = parseListDetailed(raw, home, label)
-      if (details.errors.length) throw new Error(details.errors[0])
-      return details.values
     }
 
     function emitAnc(path: string, label: string) {
@@ -301,9 +297,14 @@ onMounted(() => {
       var work = norm(workRaw, homeForExpansion)
       var workErrors: string[] = []
       if (work && work.charAt(0) !== '/') workErrors.push('Workdir must be an absolute path.')
+      var gitSshKeyRaw = String(el.gitSshKey.value || '').trim()
+      var gitSshKey = norm(gitSshKeyRaw, homeForExpansion)
+      var gitSshKeyErrors: string[] = []
+      if (gitSshKey && gitSshKey.charAt(0) !== '/') gitSshKeyErrors.push('Git upstream SSH key path must be an absolute path.')
 
       var roInfo = parseListDetailed(el.ro.value, homeForExpansion, 'Read-only path')
       var rwInfo = parseListDetailed(el.rw.value, homeForExpansion, 'Read/write path')
+      var effectiveRoValues = uniq(roInfo.values.concat(gitSshKey ? [gitSshKey] : []))
 
       var selAgents = selected(AGENTS, 'agent-')
       var selInts = selected(INTEGRATIONS, 'integration-')
@@ -313,17 +314,21 @@ onMounted(() => {
       var macosGui = !!byKey['macos-gui'] || electron
       if (electron) byKey['macos-gui'] = true
 
-      var errors = homeErrors.concat(workErrors).concat(roInfo.errors).concat(rwInfo.errors)
+      var errors = homeErrors.concat(workErrors).concat(gitSshKeyErrors).concat(roInfo.errors).concat(rwInfo.errors)
 
       return {
         homeRaw: homeRaw,
         workRaw: workRaw,
+        gitSshKeyRaw: gitSshKeyRaw,
         home: home,
         work: work,
+        gitSshKey: gitSshKey,
         homeErrors: homeErrors,
         workErrors: workErrors,
+        gitSshKeyErrors: gitSshKeyErrors,
         roInfo: roInfo,
         rwInfo: rwInfo,
+        effectiveRoValues: effectiveRoValues,
         append: String(el.append.value || '').trim(),
         agents: selAgents,
         integrations: selInts,
@@ -355,8 +360,9 @@ onMounted(() => {
       return {
         home: state.home,
         work: state.work,
-        ro: parseList(el.ro.value, state.home, 'Read-only path'),
-        rw: parseList(el.rw.value, state.home, 'Read/write path'),
+        gitSshKey: state.gitSshKey,
+        ro: state.effectiveRoValues,
+        rw: state.rwInfo.values,
         append: state.append,
         agents: state.agents,
         tools: TOOLCHAINS.slice(),
@@ -424,7 +430,7 @@ onMounted(() => {
       if (feats.length) flags.push('--enable=' + feats.join(','))
       if (state.env) flags.push('--env')
       if (state.work && state.work.charAt(0) === '/') flags.push('--workdir="' + state.work.replace(/"/g, '\\"') + '"')
-      if (state.roInfo.values.length) flags.push('--add-dirs-ro="' + state.roInfo.values.join(':').replace(/"/g, '\\"') + '"')
+      if (state.effectiveRoValues.length) flags.push('--add-dirs-ro="' + state.effectiveRoValues.join(':').replace(/"/g, '\\"') + '"')
       if (state.rwInfo.values.length) flags.push('--add-dirs="' + state.rwInfo.values.join(':').replace(/"/g, '\\"') + '"')
 
       return 'safehouse ' + (flags.length ? flags.join(' ') + ' ' : '') + '--stdout -- <agent-command>'
@@ -490,6 +496,7 @@ onMounted(() => {
       var firstError =
         state.homeErrors[0] ||
         state.workErrors[0] ||
+        state.gitSshKeyErrors[0] ||
         state.roInfo.errors[0] ||
         state.rwInfo.errors[0]
       if (firstError) return { ok: false, message: firstError }
@@ -554,13 +561,19 @@ onMounted(() => {
       else if (state.work !== state.workRaw) setFeedback(el.workdirFeedback, 'Using: ' + state.work + ' (normalized from input)', 'ok')
       else setFeedback(el.workdirFeedback, 'Using: ' + state.work, 'ok')
 
+      if (state.gitSshKeyErrors.length) setFeedback(el.gitSshKeyFeedback, state.gitSshKeyErrors[0], 'error')
+      else if (!state.gitSshKey) setFeedback(el.gitSshKeyFeedback, 'Optional. Set the exact SSH private key file used for git upstream auth.', 'warn')
+      else if (state.gitSshKey !== state.gitSshKeyRaw) setFeedback(el.gitSshKeyFeedback, 'Using: ' + state.gitSshKey + ' (normalized from input)', 'ok')
+      else setFeedback(el.gitSshKeyFeedback, 'Using: ' + state.gitSshKey + ' (read-only grant)', 'ok')
+
       if (state.roInfo.errors.length) {
         setFeedback(el.roFeedback, state.roInfo.errors[0], 'error')
       } else {
         var roMsg = String(state.roInfo.values.length) + ' read-only path(s)'
         if (state.roInfo.duplicateCount) roMsg += '; ignored ' + String(state.roInfo.duplicateCount) + ' duplicate line(s)'
         if (state.roInfo.normalized.length) roMsg += '; ' + state.roInfo.normalized[0]
-        setFeedback(el.roFeedback, roMsg, state.roInfo.values.length ? 'ok' : 'warn')
+        if (state.gitSshKey) roMsg += '; + git SSH key grant'
+        setFeedback(el.roFeedback, roMsg, state.effectiveRoValues.length ? 'ok' : 'warn')
       }
 
       if (state.rwInfo.errors.length) {
@@ -590,7 +603,8 @@ onMounted(() => {
       var pathBits: string[] = []
       pathBits.push(state.home && state.home.charAt(0) === '/' ? 'Home: ' + state.home : 'Home: not valid yet')
       pathBits.push(state.work ? 'Workdir: ' + state.work : 'Workdir: not set')
-      pathBits.push('Extra RO: ' + String(state.roInfo.values.length))
+      pathBits.push(state.gitSshKey ? 'Git SSH key: set' : 'Git SSH key: not set')
+      pathBits.push('Extra RO: ' + String(state.effectiveRoValues.length))
       pathBits.push('Extra RW: ' + String(state.rwInfo.values.length))
       pathBits.push(state.append ? 'Overlay: on' : 'Overlay: off')
       el.summaryPaths.textContent = pathBits.join(' | ')
@@ -622,7 +636,9 @@ onMounted(() => {
       else agentPaths.forEach(function (p) { add(p, false) })
       if (s.ro.length || s.rw.length) {
         parts.push(';; #safehouse-test-id:dynamic-cli-grants# Additional dynamic path grants from wizard input.'); parts.push('')
-        s.ro.forEach(function (p: string) { parts.push(emitGrant(p, 'extra read-only path', 'ro')) })
+        s.ro.forEach(function (p: string) {
+          parts.push(emitGrant(p, p === s.gitSshKey ? 'git upstream SSH key' : 'extra read-only path', 'ro'))
+        })
         s.rw.forEach(function (p: string) { parts.push(emitGrant(p, 'extra read/write path', 'rw')) })
       }
       if (s.wideRead) { parts.push('(allow file-read* (subpath "/"))'); parts.push('') }
@@ -755,7 +771,7 @@ onMounted(() => {
       else if (t.id.indexOf('integration-') === 0) markSectionChanged(3)
       if (t.type === 'checkbox') { syncElectron(); updateLiveUi() }
     })
-    ;[el.home, el.workdir, el.ro, el.rw, el.append].forEach(function (node) {
+    ;[el.home, el.workdir, el.gitSshKey, el.ro, el.rw, el.append].forEach(function (node) {
       node.addEventListener('input', function () { markSectionChanged(4); updateLiveUi() })
       node.addEventListener('blur', updateLiveUi)
     })
@@ -867,6 +883,7 @@ onMounted(() => {
             <div class="pb-fs-guide">
               <p><strong>Absolute paths only:</strong> <code>~</code> is supported and expands to your HOME_DIR value.</p>
               <p><strong>Principle of least privilege:</strong> keep write access narrow to reduce accidental damage.</p>
+              <p><strong>SSH auth for git upstreams:</strong> grant only the single private key file your remotes use, not all of <code>~/.ssh</code>.</p>
             </div>
 
             <div class="pb-fs-group">
@@ -881,6 +898,11 @@ onMounted(() => {
                   <label for="pb-workdir">Workdir (read/write; optional)</label>
                   <input id="pb-workdir" type="text" value="/Users/you/projects/my-app">
                   <p id="pb-workdir-feedback" class="pb-field-feedback">Optional. Leave blank to avoid automatic workdir write access.</p>
+                </div>
+                <div class="pb-field">
+                  <label for="pb-git-ssh-key">Git upstream SSH key (read-only; optional)</label>
+                  <input id="pb-git-ssh-key" type="text" placeholder="~/.ssh/id_ed25519">
+                  <p id="pb-git-ssh-key-feedback" class="pb-field-feedback">Optional. Set the exact private key file used for git upstream auth.</p>
                 </div>
               </div>
             </div>

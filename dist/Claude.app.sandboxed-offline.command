@@ -684,6 +684,9 @@ emit_embedded_policy_template() {
     (home-prefix "/.gitconfig")    ;; User gitconfig and variants (.gitconfig.local, etc.) read by git CLI.
     (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
     (home-literal "/.gitattributes")  ;; Global gitattributes file.
+    (home-literal "/.ssh")         ;; Directory traversal for default SSH metadata grants used by git-over-ssh.
+    (home-literal "/.ssh/config")  ;; SSH host aliases/IdentityFile selection used by git remotes.
+    (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by SSH git transports.
 )
 
 ;; ---------------------------------------------------------------------------

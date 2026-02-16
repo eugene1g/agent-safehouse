@@ -29,14 +29,15 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 - **Cloud credential stores** (opt-in)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are available via `--enable=cloud-credentials` and are disabled by default because they expose sensitive credentials. This grant is read/write so tools can refresh tokens and SSO/session caches in place.
 - **Kubernetes CLI state** (opt-in)  - `--enable=kubectl` opens canonical kubectl defaults (`~/.kube/config`, `~/.kube/cache`, `~/.kube/kuberc`) and krew plugin state under `~/.krew`.
 - **Shell startup files** (opt-in)  - `--enable=shell-init` allows reads of startup/config files like `~/.zshenv`, `~/.zprofile`, `~/.zshrc`, and `/private/etc/zshrc`.
-- **SSH config (not `~/.ssh` keys)**  - available when `--enable=ssh` is set: `~/.ssh/config`, `~/.ssh/known_hosts`, `/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`. The SSH profile denies `~/.ssh` first, then re-allows only these non-sensitive files.
+- **SSH git metadata (default)**  - `~/.ssh/config` and `~/.ssh/known_hosts` are readable by default so git-over-ssh remotes work without extra flags.
+- **Extended SSH integration (opt-in)**  - `--enable=ssh` adds launchd SSH agent socket access plus system SSH config/crypto paths (`/etc/ssh/ssh_config`, `/etc/ssh/ssh_config.d/`, `/etc/ssh/crypto/`) and `known_hosts` write persistence for first-connect host key acceptance.
 - **Runtime mach services**  - notification center, logd, diagnosticd, CoreServices, DiskArbitration, DNS-SD, opendirectory, FSEvents, trustd, etc. These are framework-level dependencies that many CLI tools probe during init.
 - **Network (fully open)**  - agents need package registries, APIs, MCP servers, and git remotes. Restricting network is possible but breaks most workflows.
 - **Temp directories**  - `/tmp`, `/var/folders`. Transient files, IPC sockets, build artifacts.
 
 ### What we specifically deny (and why)
 
-- **`~/.ssh` private keys**  - blocked by default. With `--enable=ssh`, the SSH integration still denies `~/.ssh` broadly and only re-allows non-sensitive config paths like `config` and `known_hosts`.
+- **`~/.ssh` private keys**  - blocked by default, including with `--enable=ssh`. If git upstream auth needs a specific private key file, add that exact key path as a read-only grant (`--add-dirs-ro=/absolute/path/to/key` or the Policy Builder filesystem field) instead of granting broad `~/.ssh` access.
 - **Shell startup files (default)**  - shell dotfiles/system startup files are not readable unless `--enable=shell-init` is set.
 - **Browser profile directories (default)**  - browser profile data (cookies/session/password/history) is denied by default to protect sensitive data. Browser native messaging access is opt-in via `--enable=browser-native-messaging`, scoped to `NativeMessagingHosts` (read/write) and `Default/Extensions` (read-only).
 - **Clipboard content**  - clipboard interaction (`pbcopy`/`pbpaste`) is opt-in via `--enable=clipboard` and should be treated like any other potential secret exfiltration path.
