@@ -16,6 +16,122 @@ preflight_runtime() {
   fi
 }
 
+build_sanitized_exec_environment() {
+  local resolved_pwd resolved_user resolved_logname var
+
+  sanitized_exec_environment=()
+
+  # Always provide stable core runtime values.
+  sanitized_exec_environment+=("HOME=${home_dir}")
+  sanitized_exec_environment+=("PATH=${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}")
+  sanitized_exec_environment+=("SHELL=${SHELL:-/bin/sh}")
+  sanitized_exec_environment+=("TMPDIR=${TMPDIR:-/tmp}")
+
+  resolved_pwd="$(pwd -P)"
+  sanitized_exec_environment+=("PWD=${resolved_pwd}")
+
+  resolved_user=""
+  if [[ "${USER+x}" == "x" && -n "${USER}" ]]; then
+    resolved_user="${USER}"
+  elif [[ "${LOGNAME+x}" == "x" && -n "${LOGNAME}" ]]; then
+    resolved_user="${LOGNAME}"
+  fi
+  if [[ -n "$resolved_user" ]]; then
+    sanitized_exec_environment+=("USER=${resolved_user}")
+  fi
+
+  resolved_logname=""
+  if [[ "${LOGNAME+x}" == "x" && -n "${LOGNAME}" ]]; then
+    resolved_logname="${LOGNAME}"
+  elif [[ -n "$resolved_user" ]]; then
+    resolved_logname="${resolved_user}"
+  fi
+  if [[ -n "$resolved_logname" ]]; then
+    sanitized_exec_environment+=("LOGNAME=${resolved_logname}")
+  fi
+
+  for var in TERM TMP TEMP LANG LC_ALL LC_CTYPE LC_COLLATE LC_NUMERIC LC_TIME LC_MESSAGES LC_MONETARY LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION TZ COLORTERM TERM_PROGRAM TERM_PROGRAM_VERSION XDG_CONFIG_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_DATA_HOME SSH_AUTH_SOCK; do
+    if [[ "${!var+x}" == "x" ]]; then
+      sanitized_exec_environment+=("${var}=${!var}")
+    fi
+  done
+}
+
+build_full_exec_environment() {
+  local var
+
+  full_exec_environment=()
+  while IFS= read -r var; do
+    [[ -n "$var" ]] || continue
+    if [[ "${!var+x}" == "x" ]]; then
+      full_exec_environment+=("${var}=${!var}")
+    fi
+  done < <(compgen -e | LC_ALL=C sort)
+}
+
+load_env_file_environment() {
+  local env_file_path="$1"
+  local entry
+  local env_dump_file=""
+  local -a source_cmd=()
+
+  env_file_exec_environment=()
+
+  if [[ -z "$env_file_path" ]]; then
+    echo "Missing value for --env=FILE" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "$env_file_path" ]]; then
+    echo "Env file does not exist or is not a regular file: ${env_file_path}" >&2
+    exit 1
+  fi
+
+  source_cmd=(/usr/bin/env -i)
+  for entry in "${sanitized_exec_environment[@]-}"; do
+    source_cmd+=("$entry")
+  done
+  source_cmd+=(/bin/bash -c 'set -a; source "$1"; /usr/bin/env -0' -- "$env_file_path")
+
+  env_dump_file="$(mktemp "${TMPDIR:-/tmp}/safehouse-env-file.XXXXXX")"
+  if ! "${source_cmd[@]}" >"$env_dump_file"; then
+    rm -f "$env_dump_file"
+    echo "Failed to load env values from file: ${env_file_path}" >&2
+    exit 1
+  fi
+
+  while IFS= read -r -d '' entry; do
+    [[ "$entry" == *=* ]] || continue
+    env_file_exec_environment+=("$entry")
+  done <"$env_dump_file"
+
+  rm -f "$env_dump_file"
+}
+
+merge_exec_environment_with_env_file() {
+  local entry key idx replaced
+
+  merged_exec_environment=("${sanitized_exec_environment[@]-}")
+
+  for entry in "${env_file_exec_environment[@]-}"; do
+    key="${entry%%=*}"
+    [[ -n "$key" ]] || continue
+
+    replaced=0
+    for idx in "${!merged_exec_environment[@]}"; do
+      if [[ "${merged_exec_environment[$idx]%%=*}" == "$key" ]]; then
+        merged_exec_environment[$idx]="$entry"
+        replaced=1
+        break
+      fi
+    done
+
+    if [[ "$replaced" -eq 0 ]]; then
+      merged_exec_environment+=("$entry")
+    fi
+  done
+}
+
 detect_app_bundle() {
   local cmd_path="$1"
   local check_path="$cmd_path"

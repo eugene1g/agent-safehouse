@@ -24,6 +24,7 @@ enable_clipboard_integration=0
 enable_onepassword_integration=0
 enable_cloud_credentials_integration=0
 enable_browser_native_messaging_integration=0
+enable_shell_init_integration=0
 }
 optional_integration_features=(
   docker
@@ -37,8 +38,9 @@ optional_integration_features=(
   1password
   cloud-credentials
   browser-native-messaging
+  shell-init
 )
-supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, all-agents, all-apps, wide-read"
+supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, shell-init, all-agents, all-apps, wide-read"
 enable_all_agents_profiles=0
 enable_all_apps_profiles=0
 enable_wide_read_access=0
@@ -91,6 +93,9 @@ rw_count=0
 
 stdout_policy=0
 explain_mode=0
+runtime_env_mode="sanitized"
+runtime_env_file=""
+runtime_env_file_resolved=""
 
 if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
   workdir_env_set=1

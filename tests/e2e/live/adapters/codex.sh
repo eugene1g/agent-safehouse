@@ -51,7 +51,7 @@ run_safehouse_command_with_stdin() {
 	(
 		cd "${WORKDIR}"
 		PATH="${path_with_agent_bin}"
-		printf '%s\n' "${stdin_content}" | run_with_timeout "${timeout_secs}" "${SAFEHOUSE}" --workdir "${WORKDIR}" --add-dirs-ro "${allow_dirs_ro}" -- "$@"
+		printf '%s\n' "${stdin_content}" | run_with_timeout "${timeout_secs}" "${SAFEHOUSE}" --env --workdir "${WORKDIR}" --add-dirs-ro "${allow_dirs_ro}" -- "$@"
 	) >"${output_file}" 2>&1
 	status=$?
 	set -e

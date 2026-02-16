@@ -36,6 +36,7 @@ PROFILE_KEYS=(
   "profiles/55-integrations-optional/keychain.sb"
   "profiles/55-integrations-optional/kubectl.sb"
   "profiles/55-integrations-optional/macos-gui.sb"
+  "profiles/55-integrations-optional/shell-init.sb"
   "profiles/55-integrations-optional/spotlight.sb"
   "profiles/55-integrations-optional/ssh.sb"
   "profiles/60-agents/aider.sb"
@@ -132,12 +133,6 @@ __SAFEHOUSE_EMBEDDED_profiles_00_base_sb__
     (literal "/private/etc/resolv.conf")                              ;; DNS resolver configuration used by network clients.
     (literal "/private/etc/services")                                 ;; Service name-to-port mappings used by libc lookups.
     (literal "/private/etc/protocols")                                ;; Protocol metadata used by socket/libc helpers.
-    (literal "/private/etc/profile")                                  ;; Shell startup file read by login-shell invocations.
-    (literal "/private/etc/bashrc")                                   ;; Bash startup file read by spawned bash sessions.
-    (literal "/private/etc/zprofile")                                 ;; Zsh startup file read by login zsh sessions.
-    (literal "/private/etc/zshrc")                                    ;; Zsh startup file read by interactive zsh sessions.
-    (literal "/private/etc/paths")                                    ;; PATH defaults used by shell command resolution.
-    (subpath "/private/etc/paths.d")                                  ;; Additional PATH fragment directory used by macOS shells.
     (literal "/private/etc/shells")                                   ;; Valid shell list read by shell/auth tooling.
     (subpath "/private/etc/ssl")                                      ;; TLS CA bundles/certs used by HTTP and package clients.
     (literal "/private/etc/localtime")                                ;; Localtime symlink read by date/time libraries.
@@ -158,17 +153,13 @@ __SAFEHOUSE_EMBEDDED_profiles_00_base_sb__
     (home-literal "/.local/bin")                                      ;; Agents stat this before installing binaries into ~/.local/bin.
 )
 
-;; User preference and shell startup reads needed when local agents launch interactive/login shells and CLI runtimes.
+;; User preference reads needed by local agents/CLIs at startup.
+;; Shell startup file reads are opt-in via 55-integrations-optional/shell-init.sb.
 (allow file-read*
     (home-prefix "/Library/Preferences/.GlobalPreferences")           ;; User-level locale/defaults plist variants read by many frameworks.
     (home-prefix "/Library/Preferences/com.apple.GlobalPreferences")  ;; Apple namespaced variant of user GlobalPreferences.
     (home-subpath "/Library/Preferences/ByHost")                      ;; Per-host preferences read by security CLI and system frameworks.
     (home-literal "/.CFUserTextEncoding")                             ;; User text encoding prefs; read by many processes for correct string handling.
-    (home-literal "/.zshenv")                                         ;; Zsh environment file read on every zsh invocation (incl. non-interactive).
-    (home-literal "/.zprofile")                                       ;; Zsh profile file read by login zsh sessions.
-    (home-literal "/.zshrc")                                          ;; Zsh interactive startup file read by interactive zsh sessions.
-    (home-literal "/.zcompdump")                                      ;; Zsh completion dump cache used by compinit.
-    (home-prefix "/.zcompdump")                                       ;; Versioned variants like .zcompdump-hostname-5.9.
     (home-literal "/.config")                                         ;; XDG config root directory listing for tool discovery.
     (home-literal "/.cache")                                          ;; XDG cache root directory listing for tool discovery.
 )
@@ -177,12 +168,15 @@ __SAFEHOUSE_EMBEDDED_profiles_00_base_sb__
 (allow process-exec)                                                  ;; Required to execute toolchain binaries, shells, and repo tools.
 (allow process-fork)                                                  ;; Required for normal child-process trees in CLI agents.
 (allow sysctl-read)                                                   ;; Runtime/process introspection used by many CLIs at startup.
-(allow process-info-pidinfo)                                          ;; Process status polling for child supervision and cleanup.
-(allow process-info-setcontrol)                                       ;; Process control metadata updates used by CLI runtimes.
 (allow process-info* (target same-sandbox))                           ;; Allow process introspection within the same sandbox.
 (allow signal (target same-sandbox))                                  ;; Allow signalling child processes for cancellation/termination.
 (allow mach-priv-task-port (target same-sandbox))                     ;; Required by some runtimes for same-sandbox process controls.
 (allow pseudo-tty)                                                    ;; Required for interactive terminal sessions and PTY allocation.
+
+; Broader permissions to get info of other processes for debugging
+;(allow process-info-pidinfo)                                          ;; Process status polling for child supervision and cleanup.
+;(allow process-info-setcontrol)                                       ;; Process control metadata updates used by CLI runtimes.
+
 
 ;; Temporary file and socket locations used by local agent subprocesses, package managers, and compilers.
 (allow file-read* file-write*
@@ -1180,6 +1174,34 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_kubectl_sb__
 )
 __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_macos_gui_sb__
       ;;
+    "profiles/55-integrations-optional/shell-init.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_shell_init_sb__'
+;; ---------------------------------------------------------------------------
+;; Integration: Shell Init
+;; Opt-in reads for shell init/config files under /etc and $HOME.
+;; Source: 55-integrations-optional/shell-init.sb
+;; #safehouse-test-id:shell-init-integration#
+;; ---------------------------------------------------------------------------
+
+;; Enables shell startup file reads for workflows that require shell-managed
+;; path/bootstrap behavior. Disabled by default to reduce accidental exposure
+;; of secrets stored in shell dotfiles.
+
+(allow file-read*
+    (literal "/private/etc/profile")                                  ;; Shell startup file read by login-shell invocations.
+    (literal "/private/etc/bashrc")                                   ;; Bash startup file read by spawned bash sessions.
+    (literal "/private/etc/zprofile")                                 ;; Zsh startup file read by login zsh sessions.
+    (literal "/private/etc/zshrc")                                    ;; Zsh startup file read by interactive zsh sessions.
+    (literal "/private/etc/paths")                                    ;; PATH defaults used by shell command resolution.
+    (subpath "/private/etc/paths.d")                                  ;; Additional PATH fragment directory used by macOS shells.
+    (home-literal "/.zshenv")                                         ;; Zsh environment file read on every zsh invocation (incl. non-interactive).
+    (home-literal "/.zprofile")                                       ;; Zsh profile file read by login zsh sessions.
+    (home-literal "/.zshrc")                                          ;; Zsh interactive startup file read by interactive zsh sessions.
+    (home-literal "/.zcompdump")                                      ;; Zsh completion dump cache used by compinit.
+    (home-prefix "/.zcompdump")                                       ;; Versioned variants like .zcompdump-hostname-5.9.
+)
+__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_shell_init_sb__
+      ;;
     "profiles/55-integrations-optional/spotlight.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_spotlight_sb__'
 ;; ---------------------------------------------------------------------------
@@ -1737,6 +1759,7 @@ enable_clipboard_integration=0
 enable_onepassword_integration=0
 enable_cloud_credentials_integration=0
 enable_browser_native_messaging_integration=0
+enable_shell_init_integration=0
 }
 optional_integration_features=(
   docker
@@ -1750,8 +1773,9 @@ optional_integration_features=(
   1password
   cloud-credentials
   browser-native-messaging
+  shell-init
 )
-supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, all-agents, all-apps, wide-read"
+supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, browser-native-messaging, shell-init, all-agents, all-apps, wide-read"
 enable_all_agents_profiles=0
 enable_all_apps_profiles=0
 enable_wide_read_access=0
@@ -1804,6 +1828,9 @@ rw_count=0
 
 stdout_policy=0
 explain_mode=0
+runtime_env_mode="sanitized"
+runtime_env_file=""
+runtime_env_file_resolved=""
 
 if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
   workdir_env_set=1
@@ -1832,6 +1859,122 @@ preflight_runtime() {
     echo "Run with no command (or --stdout) to inspect policy output without execution." >&2
     exit 1
   fi
+}
+
+build_sanitized_exec_environment() {
+  local resolved_pwd resolved_user resolved_logname var
+
+  sanitized_exec_environment=()
+
+  # Always provide stable core runtime values.
+  sanitized_exec_environment+=("HOME=${home_dir}")
+  sanitized_exec_environment+=("PATH=${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}")
+  sanitized_exec_environment+=("SHELL=${SHELL:-/bin/sh}")
+  sanitized_exec_environment+=("TMPDIR=${TMPDIR:-/tmp}")
+
+  resolved_pwd="$(pwd -P)"
+  sanitized_exec_environment+=("PWD=${resolved_pwd}")
+
+  resolved_user=""
+  if [[ "${USER+x}" == "x" && -n "${USER}" ]]; then
+    resolved_user="${USER}"
+  elif [[ "${LOGNAME+x}" == "x" && -n "${LOGNAME}" ]]; then
+    resolved_user="${LOGNAME}"
+  fi
+  if [[ -n "$resolved_user" ]]; then
+    sanitized_exec_environment+=("USER=${resolved_user}")
+  fi
+
+  resolved_logname=""
+  if [[ "${LOGNAME+x}" == "x" && -n "${LOGNAME}" ]]; then
+    resolved_logname="${LOGNAME}"
+  elif [[ -n "$resolved_user" ]]; then
+    resolved_logname="${resolved_user}"
+  fi
+  if [[ -n "$resolved_logname" ]]; then
+    sanitized_exec_environment+=("LOGNAME=${resolved_logname}")
+  fi
+
+  for var in TERM TMP TEMP LANG LC_ALL LC_CTYPE LC_COLLATE LC_NUMERIC LC_TIME LC_MESSAGES LC_MONETARY LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION TZ COLORTERM TERM_PROGRAM TERM_PROGRAM_VERSION XDG_CONFIG_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_DATA_HOME SSH_AUTH_SOCK; do
+    if [[ "${!var+x}" == "x" ]]; then
+      sanitized_exec_environment+=("${var}=${!var}")
+    fi
+  done
+}
+
+build_full_exec_environment() {
+  local var
+
+  full_exec_environment=()
+  while IFS= read -r var; do
+    [[ -n "$var" ]] || continue
+    if [[ "${!var+x}" == "x" ]]; then
+      full_exec_environment+=("${var}=${!var}")
+    fi
+  done < <(compgen -e | LC_ALL=C sort)
+}
+
+load_env_file_environment() {
+  local env_file_path="$1"
+  local entry
+  local env_dump_file=""
+  local -a source_cmd=()
+
+  env_file_exec_environment=()
+
+  if [[ -z "$env_file_path" ]]; then
+    echo "Missing value for --env=FILE" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "$env_file_path" ]]; then
+    echo "Env file does not exist or is not a regular file: ${env_file_path}" >&2
+    exit 1
+  fi
+
+  source_cmd=(/usr/bin/env -i)
+  for entry in "${sanitized_exec_environment[@]-}"; do
+    source_cmd+=("$entry")
+  done
+  source_cmd+=(/bin/bash -c 'set -a; source "$1"; /usr/bin/env -0' -- "$env_file_path")
+
+  env_dump_file="$(mktemp "${TMPDIR:-/tmp}/safehouse-env-file.XXXXXX")"
+  if ! "${source_cmd[@]}" >"$env_dump_file"; then
+    rm -f "$env_dump_file"
+    echo "Failed to load env values from file: ${env_file_path}" >&2
+    exit 1
+  fi
+
+  while IFS= read -r -d '' entry; do
+    [[ "$entry" == *=* ]] || continue
+    env_file_exec_environment+=("$entry")
+  done <"$env_dump_file"
+
+  rm -f "$env_dump_file"
+}
+
+merge_exec_environment_with_env_file() {
+  local entry key idx replaced
+
+  merged_exec_environment=("${sanitized_exec_environment[@]-}")
+
+  for entry in "${env_file_exec_environment[@]-}"; do
+    key="${entry%%=*}"
+    [[ -n "$key" ]] || continue
+
+    replaced=0
+    for idx in "${!merged_exec_environment[@]}"; do
+      if [[ "${merged_exec_environment[$idx]%%=*}" == "$key" ]]; then
+        merged_exec_environment[$idx]="$entry"
+        replaced=1
+        break
+      fi
+    done
+
+    if [[ "$replaced" -eq 0 ]]; then
+      merged_exec_environment+=("$entry")
+    fi
+  done
 }
 
 detect_app_bundle() {
@@ -2875,7 +3018,7 @@ append_cli_profiles() {
 
 emit_explain_summary() {
 	local idx reason profile
-	local workdir_status config_status keychain_status
+	local workdir_status config_status keychain_status exec_env_status
 
 	[[ "$explain_mode" -eq 1 ]] || return 0
 
@@ -2893,6 +3036,24 @@ emit_explain_summary() {
 	else
 		keychain_status="not included"
 	fi
+
+	case "${runtime_env_mode:-sanitized}" in
+	passthrough)
+		exec_env_status="pass-through (enabled via --env)"
+		;;
+	file)
+		if [[ -n "${runtime_env_file_resolved:-}" ]]; then
+			exec_env_status="sanitized allowlist + file overrides (${runtime_env_file_resolved})"
+		elif [[ -n "${runtime_env_file:-}" ]]; then
+			exec_env_status="sanitized allowlist + file overrides (${runtime_env_file})"
+		else
+			exec_env_status="sanitized allowlist + file overrides (--env=FILE)"
+		fi
+		;;
+	*)
+		exec_env_status="sanitized allowlist (default)"
+		;;
+	esac
 
 	if [[ -z "$effective_workdir" ]]; then
 		config_status="skipped (workdir disabled)"
@@ -2917,6 +3078,7 @@ emit_explain_summary() {
 		echo "  optional integrations implicitly injected: $(join_by_space "${optional_integrations_implicit_included[@]-}")"
 		echo "  optional integrations not included: $(join_by_space "${optional_integrations_not_included[@]-}")"
 		echo "  keychain integration: ${keychain_status}"
+		echo "  execution environment: ${exec_env_status}"
 		if [[ -n "${invoked_command_path:-}" ]]; then
 			echo "  invoked command: ${invoked_command_path}"
 		fi
@@ -3432,9 +3594,18 @@ Policy scope options:
       Comma-separated optional features to enable
       Supported values: ${supported_enable_features}
       Note: electron implies macos-gui
+      Note: shell-init enables shell startup file reads
       Note: all-agents loads every 60-agents profile
       Note: all-apps loads every 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)
+
+  --env
+      Execute wrapped command with full inherited environment variables
+
+  --env=FILE
+      Execute wrapped command with sanitized env allowlist plus vars loaded
+      by sourcing FILE (FILE values override sanitized defaults)
+      FILE is sourced by /bin/bash (trusted shell input, not dotenv parsing)
 
   --add-dirs-ro PATHS
   --add-dirs-ro=PATHS
@@ -3531,6 +3702,8 @@ main() {
   local policy_path=""
   local keep_policy_file=0
   local detected_app_bundle=""
+  local execution_env_mode="sanitized"
+  local execution_env_file=""
   local status=0
 
   while [[ $# -gt 0 ]]; do
@@ -3549,6 +3722,17 @@ main() {
         ;;
       --trust-workdir-config|--trust-workdir-config=*)
         policy_args+=("$1")
+        shift
+        ;;
+      --env)
+        execution_env_mode="passthrough"
+        execution_env_file=""
+        shift
+        ;;
+      --env=*)
+        execution_env_file="${1#*=}"
+        [[ -n "$execution_env_file" ]] || { echo "Missing value for --env=FILE" >&2; exit 1; }
+        execution_env_mode="file"
         shift
         ;;
       --)
@@ -3576,6 +3760,19 @@ main() {
         ;;
     esac
   done
+
+  runtime_env_mode="$execution_env_mode"
+  runtime_env_file="$execution_env_file"
+  runtime_env_file_resolved=""
+  if [[ "$runtime_env_mode" == "file" ]]; then
+    validate_sb_string "$runtime_env_file" "--env file path" || exit 1
+    runtime_env_file="$(expand_tilde "$runtime_env_file")"
+    if [[ ! -f "$runtime_env_file" ]]; then
+      echo "Env file does not exist or is not a regular file: ${runtime_env_file}" >&2
+      exit 1
+    fi
+    runtime_env_file_resolved="$(normalize_abs_path "$runtime_env_file")"
+  fi
 
   if [[ "$stdout_policy" -eq 0 && "${#command_args[@]}" -gt 0 ]]; then
     preflight_runtime
@@ -3637,8 +3834,21 @@ main() {
   emit_explain_policy_outcome "$policy_path" "execute"
 
   set +e
-  sandbox-exec -f "$policy_path" -- "${command_args[@]}"
-  status=$?
+  if [[ "$runtime_env_mode" == "passthrough" ]]; then
+    build_full_exec_environment
+    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${full_exec_environment[@]}" "${command_args[@]}"
+    status=$?
+  elif [[ "$runtime_env_mode" == "file" ]]; then
+    build_sanitized_exec_environment
+    load_env_file_environment "$runtime_env_file_resolved"
+    merge_exec_environment_with_env_file
+    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${merged_exec_environment[@]}" "${command_args[@]}"
+    status=$?
+  else
+    build_sanitized_exec_environment
+    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${sanitized_exec_environment[@]}" "${command_args[@]}"
+    status=$?
+  fi
   set -e
 
   if [[ "$keep_policy_file" -ne 1 ]]; then

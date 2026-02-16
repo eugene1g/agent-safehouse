@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 run_section_runtime() {
+  local policy_shell_init
+
   section_begin "System Runtime"
   assert_allowed "$POLICY_DEFAULT" "read /usr/bin" /bin/ls /usr/bin
   assert_allowed_if_exists "$POLICY_DEFAULT" "read /opt (Homebrew)" "/opt" /bin/ls /opt
@@ -12,7 +14,12 @@ run_section_runtime() {
   assert_denied_strict "$POLICY_DEFAULT" "write /dev/zero denied" /bin/sh -c 'printf x > /dev/zero'
   assert_allowed "$POLICY_DEFAULT" "read /tmp" /bin/ls /tmp
   assert_allowed_strict "$POLICY_DEFAULT" "write to /tmp" /usr/bin/touch "$TEST_TMP_CANARY"
-  assert_allowed "$POLICY_DEFAULT" "read shell startup (/etc/zshrc)" /bin/cat /private/etc/zshrc
+  assert_denied_if_exists "$POLICY_DEFAULT" "read shell startup (/etc/zshrc) denied by default" "/private/etc/zshrc" /bin/cat /private/etc/zshrc
+
+  policy_shell_init="${TEST_CWD}/policy-runtime-shell-init.sb"
+  assert_command_succeeds "--enable=shell-init generates policy with shell startup grants" "$GENERATOR" --output "$policy_shell_init" --enable=shell-init
+  assert_allowed_if_exists "$policy_shell_init" "read shell startup (/etc/zshrc) allowed with --enable=shell-init" "/private/etc/zshrc" /bin/cat /private/etc/zshrc
+  rm -f "$policy_shell_init"
 
   section_begin "Clipboard"
   assert_denied_if_exists "$POLICY_DEFAULT" "pbcopy denied by default" "pbcopy" /bin/sh -c 'echo safehouse-test | /usr/bin/pbcopy'

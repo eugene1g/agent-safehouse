@@ -123,7 +123,7 @@ run_safehouse_command() {
 	set +e
 	(
 		cd "${WORKDIR}"
-		PATH="${path_with_agent_bin}" run_with_timeout "${timeout_secs}" "${SAFEHOUSE}" --workdir "${WORKDIR}" --add-dirs-ro "${allow_dirs_ro}" -- "$@" </dev/null
+		PATH="${path_with_agent_bin}" run_with_timeout "${timeout_secs}" "${SAFEHOUSE}" --env --workdir "${WORKDIR}" --add-dirs-ro "${allow_dirs_ro}" -- "$@" </dev/null
 	) >"${output_file}" 2>&1
 	status=$?
 	set -e

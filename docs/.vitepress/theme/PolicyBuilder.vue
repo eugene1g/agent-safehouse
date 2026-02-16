@@ -26,6 +26,7 @@ onMounted(() => {
       'profiles/55-integrations-optional/keychain.sb',
       'profiles/55-integrations-optional/kubectl.sb',
       'profiles/55-integrations-optional/macos-gui.sb',
+      'profiles/55-integrations-optional/shell-init.sb',
       'profiles/55-integrations-optional/spotlight.sb',
       'profiles/55-integrations-optional/ssh.sb',
     ]
@@ -75,8 +76,10 @@ onMounted(() => {
       { key: 'cloud-credentials', label: 'Cloud credentials', path: 'profiles/55-integrations-optional/cloud-credentials.sb', group: 'extra', feature: 'cloud-credentials', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg', on: false },
       { key: 'docker', label: 'Docker', path: 'profiles/55-integrations-optional/docker.sb', group: 'extra', feature: 'docker', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg', on: false },
       { key: 'electron', label: 'Electron', path: 'profiles/55-integrations-optional/electron.sb', group: 'extra', feature: 'electron', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/electron/electron-original.svg', on: false },
+      { key: 'env', label: 'Runtime env pass-through', group: 'extra', feature: 'env', glyph: '\uD83D\uDD13', on: false, desc: 'Use safehouse --env for command execution (runtime-only; no SB policy changes).' },
       { key: 'kubectl', label: 'kubectl', path: 'profiles/55-integrations-optional/kubectl.sb', group: 'extra', feature: 'kubectl', glyph: '\u2638', on: false },
       { key: 'macos-gui', label: 'macOS GUI', path: 'profiles/55-integrations-optional/macos-gui.sb', group: 'extra', feature: 'macosGui', glyph: '\uF8FF', on: false },
+      { key: 'shell-init', label: 'Shell init files', path: 'profiles/55-integrations-optional/shell-init.sb', group: 'extra', feature: 'shellStartup', glyph: '\uD83D\uDDC2', on: false, desc: 'Allow reading ~/.zsh* and /private/etc shell startup files.' },
       { key: 'spotlight', label: 'Spotlight', path: 'profiles/55-integrations-optional/spotlight.sb', group: 'extra', feature: 'spotlight', glyph: '\uD83D\uDD0E', on: false },
       { key: 'ssh', label: 'SSH', path: 'profiles/55-integrations-optional/ssh.sb', group: 'extra', feature: 'ssh', glyph: '>_', on: false },
       { key: 'wide-read', label: 'Access entire file system (read-only)', group: 'extra', feature: 'wideRead', glyph: '\uD83D\uDC41', on: false },
@@ -215,6 +218,7 @@ onMounted(() => {
       if (!s.cleanshot) offOpt.push('cleanshot'); if (!s.onepassword) offOpt.push('1password')
       if (!s.clipboard) offOpt.push('clipboard')
       if (!s.cloudCredentials) offOpt.push('cloud-credentials'); if (!s.browserNativeMessaging) offOpt.push('browser-native-messaging')
+      if (!s.shellStartup) offOpt.push('shell-init')
       if (offOpt.length) {
         l.push(';; Opt-in integrations not enabled: ' + offOpt.join(' '))
         l.push(';; Use --enable=<feature> (comma-separated) to include them.')
@@ -333,9 +337,11 @@ onMounted(() => {
         spotlight: !!byKey['spotlight'],
         cleanshot: !!byKey['cleanshot'],
         clipboard: !!byKey['clipboard'],
+        env: !!byKey['env'],
         onepassword: !!byKey['1password'],
         cloudCredentials: !!byKey['cloud-credentials'],
         browserNativeMessaging: !!byKey['browser-native-messaging'],
+        shellStartup: !!byKey['shell-init'],
         wideRead: !!byKey['wide-read'],
         errors: errors,
       }
@@ -365,9 +371,11 @@ onMounted(() => {
         spotlight: state.spotlight,
         cleanshot: state.cleanshot,
         clipboard: state.clipboard,
+        env: state.env,
         onepassword: state.onepassword,
         cloudCredentials: state.cloudCredentials,
         browserNativeMessaging: state.browserNativeMessaging,
+        shellStartup: state.shellStartup,
         wideRead: state.wideRead,
       }
     }
@@ -383,9 +391,11 @@ onMounted(() => {
       if (s.ssh) feats.push('ssh'); if (s.spotlight) feats.push('spotlight')
       if (s.cleanshot) feats.push('cleanshot'); if (s.clipboard) feats.push('clipboard'); if (s.onepassword) feats.push('1password')
       if (s.cloudCredentials) feats.push('cloud-credentials'); if (s.browserNativeMessaging) feats.push('browser-native-messaging')
+      if (s.shellStartup) feats.push('shell-init')
       if (s.wideRead) feats.push('wide-read')
       var flags: string[] = []
       if (feats.length) flags.push('--enable=' + feats.join(','))
+      if (s.env) flags.push('--env')
       if (s.work) flags.push('--workdir="' + s.work.replace(/"/g, '\\"') + '"')
       if (s.ro.length) flags.push('--add-dirs-ro="' + s.ro.join(':').replace(/"/g, '\\"') + '"')
       if (s.rw.length) flags.push('--add-dirs="' + s.rw.join(':').replace(/"/g, '\\"') + '"')
@@ -407,10 +417,12 @@ onMounted(() => {
       if (state.onepassword) feats.push('1password')
       if (state.cloudCredentials) feats.push('cloud-credentials')
       if (state.browserNativeMessaging) feats.push('browser-native-messaging')
+      if (state.shellStartup) feats.push('shell-init')
       if (state.wideRead) feats.push('wide-read')
 
       var flags: string[] = []
       if (feats.length) flags.push('--enable=' + feats.join(','))
+      if (state.env) flags.push('--env')
       if (state.work && state.work.charAt(0) === '/') flags.push('--workdir="' + state.work.replace(/"/g, '\\"') + '"')
       if (state.roInfo.values.length) flags.push('--add-dirs-ro="' + state.roInfo.values.join(':').replace(/"/g, '\\"') + '"')
       if (state.rwInfo.values.length) flags.push('--add-dirs="' + state.rwInfo.values.join(':').replace(/"/g, '\\"') + '"')

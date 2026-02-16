@@ -1,0 +1,24 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Shell Init
+;; Opt-in reads for shell init/config files under /etc and $HOME.
+;; Source: 55-integrations-optional/shell-init.sb
+;; #safehouse-test-id:shell-init-integration#
+;; ---------------------------------------------------------------------------
+
+;; Enables shell startup file reads for workflows that require shell-managed
+;; path/bootstrap behavior. Disabled by default to reduce accidental exposure
+;; of secrets stored in shell dotfiles.
+
+(allow file-read*
+    (literal "/private/etc/profile")                                  ;; Shell startup file read by login-shell invocations.
+    (literal "/private/etc/bashrc")                                   ;; Bash startup file read by spawned bash sessions.
+    (literal "/private/etc/zprofile")                                 ;; Zsh startup file read by login zsh sessions.
+    (literal "/private/etc/zshrc")                                    ;; Zsh startup file read by interactive zsh sessions.
+    (literal "/private/etc/paths")                                    ;; PATH defaults used by shell command resolution.
+    (subpath "/private/etc/paths.d")                                  ;; Additional PATH fragment directory used by macOS shells.
+    (home-literal "/.zshenv")                                         ;; Zsh environment file read on every zsh invocation (incl. non-interactive).
+    (home-literal "/.zprofile")                                       ;; Zsh profile file read by login zsh sessions.
+    (home-literal "/.zshrc")                                          ;; Zsh interactive startup file read by interactive zsh sessions.
+    (home-literal "/.zcompdump")                                      ;; Zsh completion dump cache used by compinit.
+    (home-prefix "/.zcompdump")                                       ;; Versioned variants like .zcompdump-hostname-5.9.
+)

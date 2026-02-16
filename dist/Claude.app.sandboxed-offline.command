@@ -149,12 +149,6 @@ emit_embedded_policy_template() {
     (literal "/private/etc/resolv.conf")                              ;; DNS resolver configuration used by network clients.
     (literal "/private/etc/services")                                 ;; Service name-to-port mappings used by libc lookups.
     (literal "/private/etc/protocols")                                ;; Protocol metadata used by socket/libc helpers.
-    (literal "/private/etc/profile")                                  ;; Shell startup file read by login-shell invocations.
-    (literal "/private/etc/bashrc")                                   ;; Bash startup file read by spawned bash sessions.
-    (literal "/private/etc/zprofile")                                 ;; Zsh startup file read by login zsh sessions.
-    (literal "/private/etc/zshrc")                                    ;; Zsh startup file read by interactive zsh sessions.
-    (literal "/private/etc/paths")                                    ;; PATH defaults used by shell command resolution.
-    (subpath "/private/etc/paths.d")                                  ;; Additional PATH fragment directory used by macOS shells.
     (literal "/private/etc/shells")                                   ;; Valid shell list read by shell/auth tooling.
     (subpath "/private/etc/ssl")                                      ;; TLS CA bundles/certs used by HTTP and package clients.
     (literal "/private/etc/localtime")                                ;; Localtime symlink read by date/time libraries.
@@ -175,17 +169,13 @@ emit_embedded_policy_template() {
     (home-literal "/.local/bin")                                      ;; Agents stat this before installing binaries into ~/.local/bin.
 )
 
-;; User preference and shell startup reads needed when local agents launch interactive/login shells and CLI runtimes.
+;; User preference reads needed by local agents/CLIs at startup.
+;; Shell startup file reads are opt-in via 55-integrations-optional/shell-init.sb.
 (allow file-read*
     (home-prefix "/Library/Preferences/.GlobalPreferences")           ;; User-level locale/defaults plist variants read by many frameworks.
     (home-prefix "/Library/Preferences/com.apple.GlobalPreferences")  ;; Apple namespaced variant of user GlobalPreferences.
     (home-subpath "/Library/Preferences/ByHost")                      ;; Per-host preferences read by security CLI and system frameworks.
     (home-literal "/.CFUserTextEncoding")                             ;; User text encoding prefs; read by many processes for correct string handling.
-    (home-literal "/.zshenv")                                         ;; Zsh environment file read on every zsh invocation (incl. non-interactive).
-    (home-literal "/.zprofile")                                       ;; Zsh profile file read by login zsh sessions.
-    (home-literal "/.zshrc")                                          ;; Zsh interactive startup file read by interactive zsh sessions.
-    (home-literal "/.zcompdump")                                      ;; Zsh completion dump cache used by compinit.
-    (home-prefix "/.zcompdump")                                       ;; Versioned variants like .zcompdump-hostname-5.9.
     (home-literal "/.config")                                         ;; XDG config root directory listing for tool discovery.
     (home-literal "/.cache")                                          ;; XDG cache root directory listing for tool discovery.
 )
@@ -194,12 +184,15 @@ emit_embedded_policy_template() {
 (allow process-exec)                                                  ;; Required to execute toolchain binaries, shells, and repo tools.
 (allow process-fork)                                                  ;; Required for normal child-process trees in CLI agents.
 (allow sysctl-read)                                                   ;; Runtime/process introspection used by many CLIs at startup.
-(allow process-info-pidinfo)                                          ;; Process status polling for child supervision and cleanup.
-(allow process-info-setcontrol)                                       ;; Process control metadata updates used by CLI runtimes.
 (allow process-info* (target same-sandbox))                           ;; Allow process introspection within the same sandbox.
 (allow signal (target same-sandbox))                                  ;; Allow signalling child processes for cancellation/termination.
 (allow mach-priv-task-port (target same-sandbox))                     ;; Required by some runtimes for same-sandbox process controls.
 (allow pseudo-tty)                                                    ;; Required for interactive terminal sessions and PTY allocation.
+
+; Broader permissions to get info of other processes for debugging
+;(allow process-info-pidinfo)                                          ;; Process status polling for child supervision and cleanup.
+;(allow process-info-setcontrol)                                       ;; Process control metadata updates used by CLI runtimes.
+
 
 ;; Temporary file and socket locations used by local agent subprocesses, package managers, and compilers.
 (allow file-read* file-write*
@@ -649,7 +642,7 @@ emit_embedded_policy_template() {
 
 ;; Optional integrations explicitly enabled: macos-gui electron
 ;; Optional integrations implicitly injected: (none)
-;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials browser-native-messaging
+;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials browser-native-messaging shell-init
 ;; Keychain integration (auto-injected from profile requirements): included
 ;; Use --enable=<feature> (comma-separated) to include optional integrations explicitly.
 ;; Note: selected app/agent profiles and enabled integrations can inject dependencies via $$require=<integration-profile-path>$$ metadata.

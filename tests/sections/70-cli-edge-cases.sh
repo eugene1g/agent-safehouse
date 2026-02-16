@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_shell_init policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_dedup_paths
   local policy_reentrant_first policy_reentrant_second
   local bad_path_with_newline
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config policy_workdir_config_ignored policy_workdir_config_env_trust missing_path home_not_dir
+  local env_file_missing env_file_overrides env_file_tilde
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
-  local policy_explain explain_output_file
+  local policy_explain explain_output_file explain_output_env_pass explain_output_env_file
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
   local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents policy_agent_all_scoped
   local policy_agent_runner_npx policy_agent_runner_bunx policy_agent_runner_uvx policy_agent_runner_pipx policy_agent_runner_xcrun
@@ -44,6 +45,7 @@ run_section_cli_edge_cases() {
   policy_enable_csv="${TEST_CWD}/policy-enable-csv.sb"
   policy_enable_kubectl="${TEST_CWD}/policy-enable-kubectl.sb"
   policy_enable_browser_native_messaging="${TEST_CWD}/policy-enable-browser-native-messaging.sb"
+  policy_enable_shell_init="${TEST_CWD}/policy-enable-shell-init.sb"
   assert_command_succeeds "--enable docker parses as separate argument form" "$GENERATOR" --output "$policy_enable_arg" --enable docker
   assert_policy_contains "$policy_enable_arg" "--enable docker includes docker grants" "/var/run/docker.sock"
   assert_policy_contains "$policy_enable_arg" "--enable docker preamble reports explicit optional integration inclusion" "Optional integrations explicitly enabled: docker"
@@ -52,6 +54,11 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_kubectl" "--enable kubectl includes kubectl integration profile marker" "#safehouse-test-id:kubectl-integration#"
   assert_command_succeeds "--enable browser-native-messaging parses as separate argument form" "$GENERATOR" --output "$policy_enable_browser_native_messaging" --enable browser-native-messaging
   assert_policy_contains "$policy_enable_browser_native_messaging" "--enable browser-native-messaging includes browser native messaging grants" "/NativeMessagingHosts"
+  assert_command_fails "--enable env is rejected (runtime env now uses --env)" "$GENERATOR" --output "${TEST_CWD}/policy-enable-env-invalid.sb" --enable env
+  assert_command_fails "--enable shell-startup is rejected (renamed to shell-init)" "$GENERATOR" --output "${TEST_CWD}/policy-enable-shell-startup-invalid.sb" --enable shell-startup
+  assert_command_succeeds "--enable shell-init parses as separate argument form" "$GENERATOR" --output "$policy_enable_shell_init" --enable shell-init
+  assert_policy_contains "$policy_enable_shell_init" "--enable shell-init includes shell init integration marker" "#safehouse-test-id:shell-init-integration#"
+  assert_policy_contains "$policy_enable_shell_init" "--enable shell-init includes shell startup file grants" "(home-literal \"/.zshenv\")"
   assert_command_succeeds "--enable=docker,electron,kubectl parses CSV with whitespace" "$GENERATOR" --output "$policy_enable_csv" "--enable=docker, electron, kubectl"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes docker grants" "/var/run/docker.sock"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes electron grants" "#safehouse-test-id:electron-integration#"
@@ -148,6 +155,48 @@ run_section_cli_edge_cases() {
   if [[ -n "$safehouse_env_policy" ]]; then
     rm -f "$safehouse_env_policy"
   fi
+
+  section_begin "Execution Environment"
+  assert_command_fails "--env= rejects empty value" "$SAFEHOUSE" --env= -- /usr/bin/true
+  env_file_missing="${TEST_CWD}/safehouse-env-missing.env"
+  assert_command_fails "--env=FILE fails when file does not exist" "$SAFEHOUSE" --env="$env_file_missing" -- /usr/bin/true
+  assert_command_succeeds "safehouse sanitizes non-allowlisted environment vars by default" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" -- /bin/sh -c '[ -z "${SAFEHOUSE_TEST_SECRET+x}" ] && [ -n "${HOME:-}" ] && [ -n "${PATH:-}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
+  assert_command_succeeds "--env preserves inherited environment vars for wrapped commands" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" --env -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'
+  env_file_overrides="${TEST_CWD}/safehouse-env-overrides.env"
+  cat > "$env_file_overrides" <<EOF
+SAFEHOUSE_TEST_SECRET=file-secret
+PATH=/safehouse/env-path
+HOME=/safehouse/env-home
+EOF
+  assert_command_succeeds "--env=FILE loads vars and overrides sanitized defaults" /usr/bin/env SAFEHOUSE_TEST_HOST_ONLY="host-only" "$SAFEHOUSE" --env="$env_file_overrides" -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "file-secret" ] && [ "${PATH:-}" = "/safehouse/env-path" ] && [ "${HOME:-}" = "/safehouse/env-home" ] && [ -z "${SAFEHOUSE_TEST_HOST_ONLY+x}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
+  env_file_tilde="${HOME}/.safehouse-env-tilde-$$.env"
+  cat > "$env_file_tilde" <<EOF
+SAFEHOUSE_TEST_SECRET=tilde-secret
+EOF
+  assert_command_succeeds "--env=FILE expands ~ for env file path" /usr/bin/env SAFEHOUSE_TEST_SECRET="host-secret" "$SAFEHOUSE" --env="~/.safehouse-env-tilde-$$.env" -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "tilde-secret" ]'
+
+  explain_output_env_pass="${TEST_CWD}/policy-explain-env-pass-output.txt"
+  explain_output_env_file="${TEST_CWD}/policy-explain-env-file-output.txt"
+  rm -f "$explain_output_env_pass" "$explain_output_env_file"
+  set +e
+  "$SAFEHOUSE" --env --explain --stdout >/dev/null 2>"$explain_output_env_pass"
+  local explain_env_pass_status=$?
+  "$SAFEHOUSE" --env="$env_file_overrides" --explain --stdout >/dev/null 2>"$explain_output_env_file"
+  local explain_env_file_status=$?
+  set -e
+  if [[ "$explain_env_pass_status" -eq 0 ]] && [[ -f "$explain_output_env_pass" ]] && grep -Fq "execution environment: pass-through (enabled via --env)" "$explain_output_env_pass"; then
+    log_pass "--env explain output reports pass-through mode"
+  else
+    log_fail "--env explain output reports pass-through mode"
+  fi
+  if [[ "$explain_env_file_status" -eq 0 ]] && [[ -f "$explain_output_env_file" ]] && grep -Fq "execution environment: sanitized allowlist + file overrides (" "$explain_output_env_file"; then
+    log_pass "--env=FILE explain output reports file override mode"
+  else
+    log_fail "--env=FILE explain output reports file override mode"
+  fi
+  rm -f "$explain_output_env_pass" "$explain_output_env_file"
+  rm -f "$env_file_overrides"
+  rm -f "$env_file_tilde"
 
   section_begin "Path Grant Deduplication"
   policy_dedup_paths="${TEST_CWD}/policy-dedup-paths.sb"

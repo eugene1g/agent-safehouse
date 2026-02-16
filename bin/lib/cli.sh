@@ -36,9 +36,18 @@ Policy scope options:
       Comma-separated optional features to enable
       Supported values: ${supported_enable_features}
       Note: electron implies macos-gui
+      Note: shell-init enables shell startup file reads
       Note: all-agents loads every 60-agents profile
       Note: all-apps loads every 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)
+
+  --env
+      Execute wrapped command with full inherited environment variables
+
+  --env=FILE
+      Execute wrapped command with sanitized env allowlist plus vars loaded
+      by sourcing FILE (FILE values override sanitized defaults)
+      FILE is sourced by /bin/bash (trusted shell input, not dotenv parsing)
 
   --add-dirs-ro PATHS
   --add-dirs-ro=PATHS
@@ -135,6 +144,8 @@ main() {
   local policy_path=""
   local keep_policy_file=0
   local detected_app_bundle=""
+  local execution_env_mode="sanitized"
+  local execution_env_file=""
   local status=0
 
   while [[ $# -gt 0 ]]; do
@@ -153,6 +164,17 @@ main() {
         ;;
       --trust-workdir-config|--trust-workdir-config=*)
         policy_args+=("$1")
+        shift
+        ;;
+      --env)
+        execution_env_mode="passthrough"
+        execution_env_file=""
+        shift
+        ;;
+      --env=*)
+        execution_env_file="${1#*=}"
+        [[ -n "$execution_env_file" ]] || { echo "Missing value for --env=FILE" >&2; exit 1; }
+        execution_env_mode="file"
         shift
         ;;
       --)
@@ -180,6 +202,19 @@ main() {
         ;;
     esac
   done
+
+  runtime_env_mode="$execution_env_mode"
+  runtime_env_file="$execution_env_file"
+  runtime_env_file_resolved=""
+  if [[ "$runtime_env_mode" == "file" ]]; then
+    validate_sb_string "$runtime_env_file" "--env file path" || exit 1
+    runtime_env_file="$(expand_tilde "$runtime_env_file")"
+    if [[ ! -f "$runtime_env_file" ]]; then
+      echo "Env file does not exist or is not a regular file: ${runtime_env_file}" >&2
+      exit 1
+    fi
+    runtime_env_file_resolved="$(normalize_abs_path "$runtime_env_file")"
+  fi
 
   if [[ "$stdout_policy" -eq 0 && "${#command_args[@]}" -gt 0 ]]; then
     preflight_runtime
@@ -241,8 +276,21 @@ main() {
   emit_explain_policy_outcome "$policy_path" "execute"
 
   set +e
-  sandbox-exec -f "$policy_path" -- "${command_args[@]}"
-  status=$?
+  if [[ "$runtime_env_mode" == "passthrough" ]]; then
+    build_full_exec_environment
+    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${full_exec_environment[@]}" "${command_args[@]}"
+    status=$?
+  elif [[ "$runtime_env_mode" == "file" ]]; then
+    build_sanitized_exec_environment
+    load_env_file_environment "$runtime_env_file_resolved"
+    merge_exec_environment_with_env_file
+    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${merged_exec_environment[@]}" "${command_args[@]}"
+    status=$?
+  else
+    build_sanitized_exec_environment
+    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${sanitized_exec_environment[@]}" "${command_args[@]}"
+    status=$?
+  fi
   set -e
 
   if [[ "$keep_policy_file" -ne 1 ]]; then

@@ -466,7 +466,7 @@ append_cli_profiles() {
 
 emit_explain_summary() {
 	local idx reason profile
-	local workdir_status config_status keychain_status
+	local workdir_status config_status keychain_status exec_env_status
 
 	[[ "$explain_mode" -eq 1 ]] || return 0
 
@@ -484,6 +484,24 @@ emit_explain_summary() {
 	else
 		keychain_status="not included"
 	fi
+
+	case "${runtime_env_mode:-sanitized}" in
+	passthrough)
+		exec_env_status="pass-through (enabled via --env)"
+		;;
+	file)
+		if [[ -n "${runtime_env_file_resolved:-}" ]]; then
+			exec_env_status="sanitized allowlist + file overrides (${runtime_env_file_resolved})"
+		elif [[ -n "${runtime_env_file:-}" ]]; then
+			exec_env_status="sanitized allowlist + file overrides (${runtime_env_file})"
+		else
+			exec_env_status="sanitized allowlist + file overrides (--env=FILE)"
+		fi
+		;;
+	*)
+		exec_env_status="sanitized allowlist (default)"
+		;;
+	esac
 
 	if [[ -z "$effective_workdir" ]]; then
 		config_status="skipped (workdir disabled)"
@@ -508,6 +526,7 @@ emit_explain_summary() {
 		echo "  optional integrations implicitly injected: $(join_by_space "${optional_integrations_implicit_included[@]-}")"
 		echo "  optional integrations not included: $(join_by_space "${optional_integrations_not_included[@]-}")"
 		echo "  keychain integration: ${keychain_status}"
+		echo "  execution environment: ${exec_env_status}"
 		if [[ -n "${invoked_command_path:-}" ]]; then
 			echo "  invoked command: ${invoked_command_path}"
 		fi
