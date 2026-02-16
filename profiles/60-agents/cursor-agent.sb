@@ -11,7 +11,7 @@
 ;;   - ~/.local/share/cursor-agent/versions/<version>/cursor-agent binary + .install.lock
 ;; - local state/config defaults to ~/.cursor (including project state under ~/.cursor/projects)
 ;; - wrapper sets NODE_COMPILE_CACHE under ~/Library/Caches/cursor-compile-cache on macOS
-;; - CLI reads Cursor IDE workspace metadata under ~/Library/Application Support/Cursor/User/workspaceStorage
+;; - CLI reads workspace metadata and related IDE state under ~/Library/Application Support/Cursor
 
 (allow file-read* file-write*
     (home-prefix "/.local/bin/agent")

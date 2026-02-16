@@ -108,7 +108,8 @@ emit_embedded_policy_template() {
 ;; Source: 10-system-runtime.sb
 ;; ---------------------------------------------------------------------------
 
-;; Agents spawn many subprocesses (shells, git, package managers, compilers), so runtime/process allowances are broad by default.
+;; Local LLM agents spawn shells, VCS tooling, package managers, compilers, and test runners.
+;; This module keeps the minimum broad runtime surface needed for those local workflows to function.
 
 (allow file-read*
     (subpath "/usr")                                                  ;; Core system binaries and libraries required by most spawned tools.
@@ -116,7 +117,7 @@ emit_embedded_policy_template() {
     (subpath "/sbin")                                                 ;; System utilities some build/test flows invoke.
     (subpath "/opt")                                                  ;; Homebrew and other package-manager install roots.
     (subpath "/System/Library")                                       ;; macOS runtime frameworks/resources; excludes broader /System/Volumes data paths.
-    (subpath "/System/Volumes/Preboot")                               ;; system libraries and frameworks may resolve through this path
+    (subpath "/System/Volumes/Preboot")                               ;; Some dyld/framework lookups resolve through Preboot symlinks on modern macOS.
     (subpath "/Library/Apple")                                        ;; Apple private frameworks touched by Node/Bun/JVM/native toolchains.
     (subpath "/Library/Frameworks")                                   ;; Global framework lookup path for language runtimes and CLIs.
     (subpath "/Library/Java")                                         ;; JVM runtime and helper assets.
@@ -128,12 +129,13 @@ emit_embedded_policy_template() {
     (literal "/dev")                                                  ;; /dev directory listing; shells enumerate it during initialization.
 )
 
+;; Metadata-only traversal on system roots needed during binary/framework discovery for spawned local-agent tools.
 (allow file-read-metadata
-   (subpath "/System")
+   (subpath "/System")                                                ;; stat/readdir traversal across /System during loader/framework path resolution.
    (subpath "/private/var/run")                                      ;; Metadata traversal for /private/var/run socket namespace.
 )
 
-;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to common runtime needs.
+;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to baseline local-agent runtime needs.
 (allow file-read*
     (literal "/private")                                              ;; Required for symlink traversal under macOS /private namespace.
     (literal "/private/var")                                          ;; Required for symlink traversal to /var-backed paths.
@@ -161,6 +163,7 @@ emit_embedded_policy_template() {
     (literal "/var")                                                  ;; Compatibility symlink root for tools hardcoding /var.
 )
 
+;; Metadata-only traversal for common XDG/home probe paths used by local LLM tooling during startup.
 (allow file-read-metadata
     (literal "/home")                                                 ;; Probed during path resolution by some runtimes.
     (literal "/private/etc")                                          ;; Directory traversal for /etc path resolution.
@@ -172,6 +175,7 @@ emit_embedded_policy_template() {
     (home-literal "/.local/bin")                                      ;; Agents stat this before installing binaries into ~/.local/bin.
 )
 
+;; User preference and shell startup reads needed when local agents launch interactive/login shells and CLI runtimes.
 (allow file-read*
     (home-prefix "/Library/Preferences/.GlobalPreferences")           ;; User-level locale/defaults plist variants read by many frameworks.
     (home-prefix "/Library/Preferences/com.apple.GlobalPreferences")  ;; Apple namespaced variant of user GlobalPreferences.
@@ -197,6 +201,7 @@ emit_embedded_policy_template() {
 (allow mach-priv-task-port (target same-sandbox))                     ;; Required by some runtimes for same-sandbox process controls.
 (allow pseudo-tty)                                                    ;; Required for interactive terminal sessions and PTY allocation.
 
+;; Temporary file and socket locations used by local agent subprocesses, package managers, and compilers.
 (allow file-read* file-write*
     (subpath "/tmp")                                                  ;; Primary temp dir for transient files and IPC sockets.
     (subpath "/private/tmp")                                          ;; macOS backing path for /tmp.
@@ -204,12 +209,13 @@ emit_embedded_policy_template() {
     (subpath "/private/var/folders")                                  ;; macOS backing path for /var/folders.
 )
 
-;; Defense-in-depth: keep launchd-managed user socket endpoints opt-in by integration profile.
+;; Defense-in-depth: keep launchd-managed per-user listener sockets opt-in by specific integration profiles.
 (deny file-read* file-write*
-    (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")
-    (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")
+    (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")   ;; Real tmp namespace for launchd listener sockets (SSH agent, pasteboard, etc.).
+    (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")           ;; Symlinked /tmp view of the same launchd listener sockets.
 )
 
+;; Device nodes needed for shell I/O, PTYs, and descriptor plumbing in local LLM agent terminal workflows.
 (allow file-read* file-write*
     (subpath "/dev/fd")                                               ;; Process substitution and file-descriptor access (bash <(...), /dev/fd/N).
     (literal "/dev/stdout")                                           ;; Standard output stream device.
@@ -217,12 +223,13 @@ emit_embedded_policy_template() {
     (literal "/dev/null")                                             ;; Null sink/source device used by scripts/tools.
     (literal "/dev/tty")                                              ;; Controlling terminal device for interactive sessions.
     (literal "/dev/ptmx")                                             ;; PTY multiplexer required for pseudo-terminal allocation.
-    (literal "/dev/dtracehelper")                                             
+    (literal "/dev/dtracehelper")                                     ;; Compatibility for dyld/runtime startup probes on some binaries.
     (regex #"^/dev/tty")                                              ;; Dynamic tty device names created for terminal sessions.
     (regex #"^/dev/ttys")                                             ;; Alternate tty naming pattern on macOS.
     (regex #"^/dev/pty")                                              ;; Legacy PTY naming pattern used by some tools.
 )
 
+;; Read-only entropy and system probe devices touched by many runtimes spawned by local agents.
 (allow file-read*
     (literal "/dev/zero")                                             ;; Zero-filled source used by some runtimes/tests.
     (literal "/dev/autofs_nowait")                                    ;; Automount readiness check probed by most CLI processes at startup.
@@ -231,16 +238,17 @@ emit_embedded_policy_template() {
     (literal "/dev/random")                                           ;; Blocking entropy source used by some security-sensitive tools.
 )
 
-;; Restrict ioctl to terminal-related devices needed for interactive shell behavior.
+;; Restrict ioctl to terminal devices plus dtracehelper probe compatibility.
 (allow file-ioctl
-    (literal "/dev/dtracehelper")                                             
-    (literal "/dev/tty")
-    (literal "/dev/ptmx")
-    (regex #"^/dev/tty")
-    (regex #"^/dev/ttys")
-    (regex #"^/dev/pty")
+    (literal "/dev/dtracehelper")                                     ;; Some runtimes issue ioctl probes here during startup.
+    (literal "/dev/tty")                                              ;; TTY mode/attribute ioctls needed by interactive shells.
+    (literal "/dev/ptmx")                                             ;; PTY master control ioctls for spawned terminal subprocesses.
+    (regex #"^/dev/tty")                                              ;; Dynamic /dev/ttyN paths created for active terminal sessions.
+    (regex #"^/dev/ttys")                                             ;; Alternate macOS dynamic TTY naming.
+    (regex #"^/dev/pty")                                              ;; Legacy PTY naming used by some terminal libraries.
 )
 
+;; Baseline mach services commonly touched by local-agent runtimes (logging, DNS, trust, file events, identity lookups).
 (allow mach-lookup
     (global-name "com.apple.system.notification_center")              ;; Notification center lookup done by some CLIs.
     (global-name "com.apple.system.opendirectoryd.libinfo")           ;; User/group resolution via opendirectory.
@@ -261,6 +269,7 @@ emit_embedded_policy_template() {
 
 (allow system-socket)                                                 ;; AF_SYSTEM sockets used by network stack for kernel event monitoring.
 
+;; Shared-memory segment read used by NotificationCenter plumbing that some CLI frameworks touch during startup.
 (allow ipc-posix-shm-read-data
     (ipc-posix-name "apple.shm.notification_center")                  ;; Notification center shared memory segment read by system frameworks.
 )
@@ -973,7 +982,6 @@ emit_embedded_policy_template() {
     (home-literal "/.aider.conf.yml")
     (home-literal "/.aider.model.settings.yml")
     (home-literal "/.aider.model.metadata.json")
-    (home-literal "/.env")
     (home-subpath "/.config/aider")
     (home-subpath "/.cache/aider")
     (home-subpath "/.local/share/aider")
@@ -1003,7 +1011,7 @@ emit_embedded_policy_template() {
 )
 
 (allow file-read*
-    (home-subpath "/.claude")
+    (home-subpath "/.claude")  ;; Amp probes Claude config/auth files on startup in some environments.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -1119,7 +1127,7 @@ emit_embedded_policy_template() {
 ;;   - ~/.local/share/cursor-agent/versions/<version>/cursor-agent binary + .install.lock
 ;; - local state/config defaults to ~/.cursor (including project state under ~/.cursor/projects)
 ;; - wrapper sets NODE_COMPILE_CACHE under ~/Library/Caches/cursor-compile-cache on macOS
-;; - CLI reads Cursor IDE workspace metadata under ~/Library/Application Support/Cursor/User/workspaceStorage
+;; - CLI reads workspace metadata and related IDE state under ~/Library/Application Support/Cursor
 
 (allow file-read* file-write*
     (home-prefix "/.local/bin/agent")

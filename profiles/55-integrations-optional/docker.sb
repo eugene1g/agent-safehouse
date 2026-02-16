@@ -10,7 +10,7 @@
     (home-literal "/.docker/run/docker.sock")                              ;; Docker Desktop user-scoped socket path.
     (home-literal "/.orbstack/run/docker.sock")                            ;; OrbStack user-scoped daemon socket path.
     (home-subpath "/.docker")                                              ;; Docker CLI config, contexts, plugins, buildx state.
-    (home-subpath "/.colima")                                              ;; Colima socket (Docker Desktop alternative).
+    (home-subpath "/.colima")                                              ;; Colima runtime state (VM, socket, and instance metadata).
     (home-literal "/.rd/docker.sock")                                      ;; Rancher Desktop socket.
 )
 

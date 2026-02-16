@@ -22,5 +22,5 @@
 )
 
 (allow file-read*
-    (home-subpath "/.claude")
+    (home-subpath "/.claude")  ;; Amp probes Claude config/auth files on startup in some environments.
 )

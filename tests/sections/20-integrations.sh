@@ -80,14 +80,14 @@ run_section_integrations() {
   assert_allowed_if_exists "$policy_browser_native_messaging" "read Firefox native messaging hosts dir allowed with --enable=browser-native-messaging" "${HOME}/Library/Application Support/Mozilla/NativeMessagingHosts" /bin/ls "${HOME}/Library/Application Support/Mozilla/NativeMessagingHosts"
   onepassword_group_container_dir="$(find "${HOME}/Library/Group Containers" -mindepth 1 -maxdepth 1 -type d -name "*.com.1password" 2>/dev/null | head -n 1 || true)"
   if [[ -n "$onepassword_group_container_dir" ]]; then
-    onepassword_socket_dir="${onepassword_group_container_dir}/t"
+    onepassword_socket_file="${onepassword_group_container_dir}/t/agent.sock"
     onepassword_settings_file="${onepassword_group_container_dir}/Library/Application Support/1Password/Data/settings/settings.json"
-    assert_denied_if_exists "$POLICY_DEFAULT" "read 1Password socket directory denied by default" "$onepassword_socket_dir" /bin/ls "$onepassword_socket_dir"
-    assert_allowed_if_exists "$policy_onepassword" "read 1Password socket directory allowed with --enable=1password" "$onepassword_socket_dir" /bin/ls "$onepassword_socket_dir"
+    assert_denied_if_exists "$POLICY_DEFAULT" "read 1Password SSH agent socket denied by default" "$onepassword_socket_file" /usr/bin/stat "$onepassword_socket_file"
+    assert_allowed_if_exists "$policy_onepassword" "read 1Password SSH agent socket allowed with --enable=1password" "$onepassword_socket_file" /usr/bin/stat "$onepassword_socket_file"
     assert_denied_if_exists "$POLICY_DEFAULT" "read 1Password desktop settings metadata denied by default" "$onepassword_settings_file" /usr/bin/stat "$onepassword_settings_file"
     assert_allowed_if_exists "$policy_onepassword" "read 1Password desktop settings metadata allowed with --enable=1password" "$onepassword_settings_file" /usr/bin/stat "$onepassword_settings_file"
   else
-    log_skip "read 1Password socket directory (matching Group Container not found)"
+    log_skip "read 1Password SSH agent socket (matching Group Container not found)"
   fi
   assert_denied_if_exists "$POLICY_DEFAULT" "access 1Password SSH agent socket symlink denied by default" "${HOME}/.1password/agent.sock" /bin/ls "${HOME}/.1password/agent.sock"
   assert_allowed_if_exists "$policy_onepassword" "access 1Password SSH agent socket symlink allowed with --enable=1password" "${HOME}/.1password/agent.sock" /bin/ls "${HOME}/.1password/agent.sock"

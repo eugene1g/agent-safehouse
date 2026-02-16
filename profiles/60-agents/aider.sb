@@ -15,7 +15,6 @@
     (home-literal "/.aider.conf.yml")
     (home-literal "/.aider.model.settings.yml")
     (home-literal "/.aider.model.metadata.json")
-    (home-literal "/.env")
     (home-subpath "/.config/aider")
     (home-subpath "/.cache/aider")
     (home-subpath "/.local/share/aider")

@@ -40,7 +40,7 @@ run_section_policy_behavior() {
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes runtime manager pkgx grant" "/.pkgx"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Azure CLI grant" "/.azure"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Azure Developer CLI grant" "/.azd"
-  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password socket-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t(/.*)?$"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password socket-file grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t/agent\\\\.sock$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits regex 1Password desktop settings-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits 1Password mach-lookup regex grant" "com\\.1password(\\..*)?$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits SSH integration profile" ";; Integration: SSH"
@@ -75,7 +75,7 @@ run_section_policy_behavior() {
   assert_policy_contains "$policy_cloud_credentials" "--enable=cloud-credentials includes Azure Developer CLI grant" "/.azd"
   assert_policy_contains "$policy_cloud_credentials" "--enable=cloud-credentials includes Cloud Credentials profile marker" ";; Integration: Cloud Credentials"
 
-  assert_policy_contains "$policy_onepassword" "--enable=1password includes regex 1Password socket-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t(/.*)?$"
+  assert_policy_contains "$policy_onepassword" "--enable=1password includes regex 1Password socket-file grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/t/agent\\\\.sock$"
   assert_policy_contains "$policy_onepassword" "--enable=1password includes regex 1Password desktop settings-dir grant" "Group Containers/[A-Za-z0-9]+\\\\.com\\\\.1password/Library/Application Support/1Password/Data/settings(/.*)?$"
   assert_policy_contains "$policy_onepassword" "--enable=1password includes 1Password mach-lookup regex grant" "com\\.1password(\\..*)?$"
   assert_policy_contains "$policy_onepassword" "--enable=1password includes 1Password profile marker" ";; Integration: 1Password"
