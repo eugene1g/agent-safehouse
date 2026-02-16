@@ -2,7 +2,7 @@
 
 [![Tests (macOS)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml)
 [![E2E (TUI Agent via tmux)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 Sandbox your LLM coding agents on macOS so they can only touch the files they need.
 

@@ -19,6 +19,7 @@ onMounted(() => {
       'profiles/55-integrations-optional/1password.sb',
       'profiles/55-integrations-optional/browser-native-messaging.sb',
       'profiles/55-integrations-optional/cleanshot.sb',
+      'profiles/55-integrations-optional/clipboard.sb',
       'profiles/55-integrations-optional/cloud-credentials.sb',
       'profiles/55-integrations-optional/docker.sb',
       'profiles/55-integrations-optional/electron.sb',
@@ -53,14 +54,14 @@ onMounted(() => {
       { key: 'bun', label: 'Bun', profile: 'bun.sb', logo: 'https://bun.sh/logo.svg', on: true },
       { key: 'deno', label: 'Deno', profile: 'deno.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/denojs/denojs-original.svg', on: true },
       { key: 'go', label: 'Go', profile: 'go.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg', on: true },
-      { key: 'java', label: 'Java', profile: 'java.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg', on: true },
       { key: 'node', label: 'Node.js', profile: 'node.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg', on: true },
-      { key: 'perl', label: 'Perl', profile: 'perl.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/perl/perl-original.svg', on: true },
-      { key: 'php', label: 'PHP', profile: 'php.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-original.svg', on: true },
       { key: 'python', label: 'Python', profile: 'python.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg', on: true },
       { key: 'ruby', label: 'Ruby', profile: 'ruby.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/ruby/ruby-original.svg', on: true },
       { key: 'runtime-managers', label: 'Runtime managers', profile: 'runtime-managers.sb', logo: 'https://github.com/asdf-vm.png?size=96', on: true },
       { key: 'rust', label: 'Rust', profile: 'rust.sb', logo: 'https://cdn.simpleicons.org/rust/F74C00', on: true },
+      { key: 'java', label: 'Java', profile: 'java.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg', on: false },
+      { key: 'perl', label: 'Perl', profile: 'perl.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/perl/perl-original.svg', on: false },
+      { key: 'php', label: 'PHP', profile: 'php.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-original.svg', on: false },
     ]
 
     var INTEGRATIONS = [
@@ -70,6 +71,7 @@ onMounted(() => {
       { key: '1password', label: '1Password', path: 'profiles/55-integrations-optional/1password.sb', group: 'extra', feature: '1password', logo: 'https://github.com/1Password.png?size=96', on: false },
       { key: 'browser-native-messaging', label: 'Browser native messaging', path: 'profiles/55-integrations-optional/browser-native-messaging.sb', group: 'extra', feature: 'browser-native-messaging', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/chrome/chrome-original.svg', on: false },
       { key: 'cleanshot', label: 'CleanShot', path: 'profiles/55-integrations-optional/cleanshot.sb', group: 'extra', feature: 'cleanshot', glyph: '\uD83D\uDCF8', on: false },
+      { key: 'clipboard', label: 'Clipboard', path: 'profiles/55-integrations-optional/clipboard.sb', group: 'extra', feature: 'clipboard', glyph: '\uD83D\uDCCB', on: false },
       { key: 'cloud-credentials', label: 'Cloud credentials', path: 'profiles/55-integrations-optional/cloud-credentials.sb', group: 'extra', feature: 'cloud-credentials', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg', on: false },
       { key: 'docker', label: 'Docker', path: 'profiles/55-integrations-optional/docker.sb', group: 'extra', feature: 'docker', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg', on: false },
       { key: 'electron', label: 'Electron', path: 'profiles/55-integrations-optional/electron.sb', group: 'extra', feature: 'electron', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/electron/electron-original.svg', on: false },
@@ -77,19 +79,12 @@ onMounted(() => {
       { key: 'macos-gui', label: 'macOS GUI', path: 'profiles/55-integrations-optional/macos-gui.sb', group: 'extra', feature: 'macosGui', glyph: '\uF8FF', on: false },
       { key: 'spotlight', label: 'Spotlight', path: 'profiles/55-integrations-optional/spotlight.sb', group: 'extra', feature: 'spotlight', glyph: '\uD83D\uDD0E', on: false },
       { key: 'ssh', label: 'SSH', path: 'profiles/55-integrations-optional/ssh.sb', group: 'extra', feature: 'ssh', glyph: '>_', on: false },
-      { key: 'all-agents', label: 'All agents/apps', group: 'extra', feature: 'all-agents', glyph: '\u221E', on: false },
-      { key: 'wide-read', label: 'Wide read', group: 'extra', feature: 'wideRead', glyph: '\uD83D\uDC41', on: false },
+      { key: 'wide-read', label: 'Access entire file system (read-only)', group: 'extra', feature: 'wideRead', glyph: '\uD83D\uDC41', on: false },
     ] as any[]
-
-    var APPS = [
-      { key: 'claude-app', label: 'Claude.app', profile: 'claude-app.sb', logo: 'https://github.com/anthropics.png?size=96', desc: 'Desktop Claude bundle profile' },
-      { key: 'vscode-app', label: 'Visual Studio Code.app', profile: 'vscode-app.sb', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vscode/vscode-original.svg', desc: 'Desktop VS Code bundle profile' },
-    ]
 
     var ORD = {
       toolchains: TOOLCHAINS.map(function (x) { return x.profile }).slice().sort(),
       agents: AGENTS.map(function (x) { return x.profile }).slice().sort(),
-      apps: APPS.map(function (x) { return x.profile }).slice().sort(),
       optionalIntegrations: OPTIONAL_INTEGRATION_MODULES.slice(),
     }
 
@@ -102,7 +97,6 @@ onMounted(() => {
       toolchainsGrid: document.getElementById('pb-toolchains-grid')!,
       integrationsDefaultGrid: document.getElementById('pb-integrations-default-grid')!,
       integrationsExtraGrid: document.getElementById('pb-integrations-extra-grid')!,
-      appsGrid: document.getElementById('pb-apps-grid')!,
       home: document.getElementById('pb-home-dir') as HTMLInputElement,
       workdir: document.getElementById('pb-workdir') as HTMLInputElement,
       ro: document.getElementById('pb-add-ro') as HTMLTextAreaElement,
@@ -190,6 +184,7 @@ onMounted(() => {
       if (!s.macosGui) offOpt.push('macos-gui'); if (!s.electron) offOpt.push('electron')
       if (!s.ssh) offOpt.push('ssh'); if (!s.spotlight) offOpt.push('spotlight')
       if (!s.cleanshot) offOpt.push('cleanshot'); if (!s.onepassword) offOpt.push('1password')
+      if (!s.clipboard) offOpt.push('clipboard')
       if (!s.cloudCredentials) offOpt.push('cloud-credentials'); if (!s.browserNativeMessaging) offOpt.push('browser-native-messaging')
       if (offOpt.length) {
         l.push(';; Opt-in integrations not enabled: ' + offOpt.join(' '))
@@ -266,22 +261,20 @@ onMounted(() => {
       var home = norm(el.home.value, '/Users/you')
       if (!home) throw new Error('HOME_DIR value is required.'); assertAbs(home, 'HOME_DIR value')
       var work = norm(el.workdir.value, home); if (work) assertAbs(work, 'Workdir')
-      var selAgents = selected(AGENTS, 'agent-'); var selApps = selected(APPS, 'app-'); var selInts = selected(INTEGRATIONS, 'integration-')
+      var selAgents = selected(AGENTS, 'agent-'); var selInts = selected(INTEGRATIONS, 'integration-')
       var byKey: Record<string, boolean> = {}; selInts.forEach(function (i) { byKey[i.key] = true })
       var electron = !!byKey['electron']; var macosGui = !!byKey['macos-gui'] || electron
       if (electron) byKey['macos-gui'] = true
-      var allAgents = !!byKey['all-agents']
       return {
         home, work, ro: parseList(el.ro.value, home, 'Read-only path'), rw: parseList(el.rw.value, home, 'Read/write path'),
-        append: String(el.append.value || '').trim(), agents: selAgents, tools: TOOLCHAINS.slice(), apps: selApps,
-        agentProfiles: allAgents ? ORD.agents.slice() : uniq(selAgents.map(function (a) { return a.profile })),
+        append: String(el.append.value || '').trim(), agents: selAgents, tools: TOOLCHAINS.slice(),
+        agentProfiles: uniq(selAgents.map(function (a) { return a.profile })),
         toolProfiles: ORD.toolchains.slice(),
-        appProfiles: allAgents ? ORD.apps.slice() : uniq(selApps.map(function (a) { return a.profile })),
         explicitOptionalIntegrationPaths: uniq(selInts.filter(function (i) { return i.group === 'extra' && i.path }).map(function (i) { return i.path })),
         docker: !!byKey['docker'], kubectl: !!byKey['kubectl'], electron, macosGui,
-        ssh: !!byKey['ssh'], spotlight: !!byKey['spotlight'], cleanshot: !!byKey['cleanshot'],
+        ssh: !!byKey['ssh'], spotlight: !!byKey['spotlight'], cleanshot: !!byKey['cleanshot'], clipboard: !!byKey['clipboard'],
         onepassword: !!byKey['1password'], cloudCredentials: !!byKey['cloud-credentials'],
-        browserNativeMessaging: !!byKey['browser-native-messaging'], allAgents, wideRead: !!byKey['wide-read'],
+        browserNativeMessaging: !!byKey['browser-native-messaging'], wideRead: !!byKey['wide-read'],
       }
     }
 
@@ -294,26 +287,25 @@ onMounted(() => {
       if (s.docker) feats.push('docker'); if (s.kubectl) feats.push('kubectl')
       if (s.electron) feats.push('electron'); if (!s.electron && s.macosGui) feats.push('macos-gui')
       if (s.ssh) feats.push('ssh'); if (s.spotlight) feats.push('spotlight')
-      if (s.cleanshot) feats.push('cleanshot'); if (s.onepassword) feats.push('1password')
+      if (s.cleanshot) feats.push('cleanshot'); if (s.clipboard) feats.push('clipboard'); if (s.onepassword) feats.push('1password')
       if (s.cloudCredentials) feats.push('cloud-credentials'); if (s.browserNativeMessaging) feats.push('browser-native-messaging')
-      if (s.allAgents) feats.push('all-agents'); if (s.wideRead) feats.push('wide-read')
+      if (s.wideRead) feats.push('wide-read')
       var flags: string[] = []
       if (feats.length) flags.push('--enable=' + feats.join(','))
       if (s.work) flags.push('--workdir="' + s.work.replace(/"/g, '\\"') + '"')
       if (s.ro.length) flags.push('--add-dirs-ro="' + s.ro.join(':').replace(/"/g, '\\"') + '"')
       if (s.rw.length) flags.push('--add-dirs="' + s.rw.join(':').replace(/"/g, '\\"') + '"')
       l.push('safehouse ' + (flags.length ? flags.join(' ') + ' ' : '') + '--stdout -- <agent-command>')
-      l.push('# safehouse CLI auto-selects 60-agents/65-apps by command basename.')
+      l.push('# Select agents above to include matching 60-agents profiles.')
       return l.join('\n')
     }
 
     async function buildPolicy(s: any) {
       var toolPaths = ordered('profiles/30-toolchains/', s.toolProfiles, ORD.toolchains)
       var agentPaths = ordered('profiles/60-agents/', s.agentProfiles, ORD.agents)
-      var appPaths = ordered('profiles/65-apps/', s.appProfiles, ORD.apps)
-      var selectedProfilePaths = agentPaths.concat(appPaths)
+      var selectedProfilePaths = agentPaths.slice()
       var integrationPaths = await resolveOptionalIntegrationPaths(s.explicitOptionalIntegrationPaths, selectedProfilePaths)
-      var fetches = uniq(BASE_MODULES.concat(toolPaths).concat(SHARED_MODULES).concat(CORE_INTEGRATION_MODULES).concat(integrationPaths).concat(agentPaths).concat(appPaths))
+      var fetches = uniq(BASE_MODULES.concat(toolPaths).concat(SHARED_MODULES).concat(CORE_INTEGRATION_MODULES).concat(integrationPaths).concat(agentPaths))
       var texts = await Promise.all(fetches.map(getProfile))
       var by: Record<string, string> = {}; fetches.forEach(function (p, i) { by[p] = texts[i] })
       var parts: string[] = []; var included: string[] = []
@@ -327,8 +319,8 @@ onMounted(() => {
       parts.push(emitIntPreamble(s))
       CORE_INTEGRATION_MODULES.forEach(function (p) { add(p, false) })
       integrationPaths.forEach(function (p) { add(p, false) })
-      if (!agentPaths.length && !appPaths.length) { parts.push(';; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules.'); parts.push('') }
-      else { agentPaths.forEach(function (p) { add(p, false) }); appPaths.forEach(function (p) { add(p, false) }) }
+      if (!agentPaths.length) { parts.push(';; No agent profile selected; skipping 60-agents modules.'); parts.push('') }
+      else agentPaths.forEach(function (p) { add(p, false) })
       if (s.ro.length || s.rw.length) {
         parts.push(';; #safehouse-test-id:dynamic-cli-grants# Additional dynamic path grants from wizard input.'); parts.push('')
         s.ro.forEach(function (p: string) { parts.push(emitGrant(p, 'extra read-only path', 'ro')) })
@@ -376,7 +368,6 @@ onMounted(() => {
       AGENTS.forEach(function (a) { el.agentsGrid.appendChild(makeAgent(a)) })
       TOOLCHAINS.forEach(function (t) { el.toolchainsGrid.appendChild(makeCard({ key: t.key, label: t.label, logo: t.logo }, 'toolchain-', !!t.on, true)) })
       INTEGRATIONS.forEach(function (i: any) { (i.group === 'default' ? el.integrationsDefaultGrid : el.integrationsExtraGrid).appendChild(makeCard(i, 'integration-', !!i.on, !!i.locked)) })
-      APPS.forEach(function (a) { el.appsGrid.appendChild(makeCard({ key: a.key, label: a.label, logo: a.logo, desc: a.desc }, 'app-', false, false)) })
     }
 
     function setGroup(items: any[], prefix: string, val: boolean) { items.forEach(function (x) { var i = document.getElementById(prefix + x.key) as HTMLInputElement | null; if (i && !i.disabled) i.checked = val }) }
@@ -501,11 +492,7 @@ onMounted(() => {
       <section class="pb-step">
         <span class="pb-step-number">2</span>
         <h2>Toolchains</h2>
-        <p class="pb-hint">In strict parity mode, all toolchain profiles are always included.</p>
-        <div class="pb-bulk">
-          <button type="button" disabled>Always included</button>
-          <button type="button" disabled>Always included</button>
-        </div>
+        <p class="pb-hint">In strict CLI parity mode, toolchain profiles are always included. Java, Perl, and PHP are shown last and off by default in the UI.</p>
         <div id="pb-toolchains-grid" class="pb-grid"></div>
       </section>
 
@@ -517,34 +504,42 @@ onMounted(() => {
         <div id="pb-integrations-default-grid" class="pb-grid"></div>
         <p class="pb-group-title">Optional integrations</p>
         <div id="pb-integrations-extra-grid" class="pb-grid"></div>
-        <p class="pb-group-title" style="margin-top:12px">Desktop app profiles</p>
-        <div id="pb-apps-grid" class="pb-apps"></div>
       </section>
 
       <section class="pb-step">
         <span class="pb-step-number">4</span>
         <h2>Your file system</h2>
-        <p class="pb-hint">Configure HOME, workdir, extra path grants, and optional appended overlay rules.</p>
-        <div class="pb-fields">
+        <p class="pb-hint">Set your baseline paths first, then add only the extra grants you actually need.</p>
+        <div class="pb-fs-guide">
+          <p><strong>Use absolute paths:</strong> <code>~</code> is supported and expands to <code>HOME_DIR</code>.</p>
+          <p><strong>Keep write access narrow:</strong> use <code>workdir</code> for your main project, and add explicit extras only when needed.</p>
+          <p><strong>Overlay is advanced:</strong> appended policy text is loaded last and can override earlier rules.</p>
+        </div>
+        <div class="pb-fields pb-fields-fs">
           <div class="pb-field">
             <label for="pb-home-dir">HOME_DIR value</label>
             <input id="pb-home-dir" type="text" value="/Users/you">
+            <p class="pb-field-help">Usually your macOS home path.</p>
           </div>
           <div class="pb-field">
             <label for="pb-workdir">Workdir (read/write; optional)</label>
             <input id="pb-workdir" type="text" value="/Users/you/projects/my-app">
+            <p class="pb-field-help">Primary directory your agents should modify.</p>
           </div>
-          <div class="pb-field pb-full">
+          <div class="pb-field">
             <label for="pb-add-ro">Extra read-only directories (one per line)</label>
             <textarea id="pb-add-ro" placeholder="/Users/you/mywork&#10;/Users/you/docs"></textarea>
+            <p class="pb-field-help">References and sibling repos agents can inspect but not edit.</p>
           </div>
-          <div class="pb-field pb-full">
+          <div class="pb-field">
             <label for="pb-add-rw">Extra read/write directories (one per line)</label>
             <textarea id="pb-add-rw" placeholder="/Users/you/scratch"></textarea>
+            <p class="pb-field-help">Scratch or shared folders agents must be able to update.</p>
           </div>
           <div class="pb-field pb-full">
             <label for="pb-append-profile">Appended profile text (optional, loaded last)</label>
             <textarea id="pb-append-profile" placeholder=";; Example deny overlay&#10;(deny file-read* (home-subpath &quot;/.aws&quot;))"></textarea>
+            <p class="pb-field-help">Optional advanced override layer. Keep this minimal and review carefully.</p>
           </div>
         </div>
       </section>
@@ -616,7 +611,6 @@ onMounted(() => {
 
 /* Cards grid */
 .pb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.pb-apps { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .pb-card { display: block; position: relative; cursor: pointer; }
 .pb-card-box { display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: center; min-height: 62px; background: var(--vp-c-bg); border: 1px solid var(--vp-c-border); border-radius: 10px; padding: 9px; transition: 0.16s; }
 .pb-card:hover .pb-card-box { border-color: var(--vp-c-border); transform: translateY(-1px); }
@@ -628,6 +622,9 @@ onMounted(() => {
 .pb-card .pb-hidden:disabled + .pb-card-box { cursor: default; }
 
 .pb-group-title { margin-top: 4px; margin-bottom: 8px; font-size: 0.8rem; color: var(--vp-c-text-2); font-weight: 600; letter-spacing: 0.2px; line-height: 1.5; }
+.pb-fs-guide { margin: 0 0 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--vp-c-border); background: var(--vp-c-bg-alt); display: grid; gap: 6px; }
+.pb-fs-guide p { margin: 0; color: var(--vp-c-text-2); font-size: 0.8rem; line-height: 1.55; }
+.pb-fs-guide strong { color: var(--vp-c-text-1); font-weight: 600; }
 
 /* Fields */
 .pb-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -637,6 +634,8 @@ onMounted(() => {
 .pb-field input, .pb-field textarea { width: 100%; background: var(--vp-c-bg); border: 1px solid var(--vp-c-border); border-radius: 8px; color: var(--vp-c-text-1); font-family: var(--vp-font-family-mono); font-size: 0.78rem; padding: 10px 12px; line-height: 1.5; }
 .pb-field textarea { min-height: 92px; resize: vertical; }
 .pb-field input:focus, .pb-field textarea:focus { outline: none; border-color: #a67c00; box-shadow: 0 0 0 2px rgba(212,160,23,0.12); }
+.pb-fields-fs .pb-field textarea { min-height: 120px; }
+.pb-field-help { margin: 0; color: var(--vp-c-text-2); font-size: 0.72rem; line-height: 1.45; }
 
 /* Buttons */
 .pb-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }

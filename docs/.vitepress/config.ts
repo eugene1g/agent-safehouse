@@ -54,7 +54,7 @@ export default defineConfig({
     ],
 
     footer: {
-      message: 'Open source under the MIT License.',
+      message: 'Open source under the Apache 2.0 License.',
       copyright: 'Agent Safehouse',
     },
   },
