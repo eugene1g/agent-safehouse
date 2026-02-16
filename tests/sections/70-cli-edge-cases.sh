@@ -165,12 +165,15 @@ run_section_cli_edge_cases() {
   assert_command_fails "--env=FILE fails when file does not exist" "$SAFEHOUSE" --env="$env_file_missing" -- /usr/bin/true
   assert_command_succeeds "safehouse sanitizes non-allowlisted environment vars by default" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" -- /bin/sh -c '[ -z "${SAFEHOUSE_TEST_SECRET+x}" ] && [ -n "${HOME:-}" ] && [ -n "${PATH:-}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
   assert_command_succeeds "--env preserves inherited environment vars for wrapped commands" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" --env -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'
+  assert_command_succeeds "--env parses after command token before -- separator" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" /bin/sh --env -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'
   assert_command_fails "--env cannot be combined with --env-pass" "$SAFEHOUSE" --env --env-pass=SAFEHOUSE_TEST_SECRET -- /usr/bin/true
   assert_command_fails "--env=FILE cannot be combined with --env" "$SAFEHOUSE" --env=./agent.env --env -- /usr/bin/true
 
-  assert_command_fails "--env-pass fails when requested host variable is missing" "$SAFEHOUSE" --env-pass=SAFEHOUSE_TEST_PASS_MISSING -- /usr/bin/true
+  assert_command_succeeds "--env-pass skips requested host variable when it is missing" "$SAFEHOUSE" --env-pass=SAFEHOUSE_TEST_PASS_MISSING -- /bin/sh -c '[ -z "${SAFEHOUSE_TEST_PASS_MISSING+x}" ] && [ -n "${PATH:-}" ]'
   assert_command_succeeds "--env-pass parses separate argument form" /usr/bin/env SAFEHOUSE_TEST_PASS_ONE="pass-one" "$SAFEHOUSE" --env-pass SAFEHOUSE_TEST_PASS_ONE -- /bin/sh -c '[ "${SAFEHOUSE_TEST_PASS_ONE:-}" = "pass-one" ]'
+  assert_command_succeeds "--env-pass parses after command token before -- separator" /usr/bin/env SAFEHOUSE_TEST_PASS_ONE="pass-one" "$SAFEHOUSE" /bin/sh --env-pass=SAFEHOUSE_TEST_PASS_ONE -c '[ "${SAFEHOUSE_TEST_PASS_ONE:-}" = "pass-one" ]'
   assert_command_succeeds "--env-pass passes only selected named vars" /usr/bin/env SAFEHOUSE_TEST_PASS_ONE="pass-one" SAFEHOUSE_TEST_PASS_TWO="pass-two" "$SAFEHOUSE" --env-pass=SAFEHOUSE_TEST_PASS_ONE -- /bin/sh -c '[ "${SAFEHOUSE_TEST_PASS_ONE:-}" = "pass-one" ] && [ -z "${SAFEHOUSE_TEST_PASS_TWO+x}" ] && [ -n "${PATH:-}" ]'
+  assert_command_succeeds "-- separator preserves command-owned --env argument" "$SAFEHOUSE" /bin/sh -c '[ "$1" = "--env" ]' _ -- --env
   assert_command_succeeds "SAFEHOUSE_ENV_PASS applies named var pass-through in default sanitized mode" /usr/bin/env SAFEHOUSE_ENV_PASS="SAFEHOUSE_TEST_PASS_ONE" SAFEHOUSE_TEST_PASS_ONE="env-pass-value" SAFEHOUSE_TEST_PASS_TWO="blocked-value" "$SAFEHOUSE" -- /bin/sh -c '[ "${SAFEHOUSE_TEST_PASS_ONE:-}" = "env-pass-value" ] && [ -z "${SAFEHOUSE_TEST_PASS_TWO+x}" ]'
 
   env_file_overrides="${TEST_CWD}/safehouse-env-overrides.env"

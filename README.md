@@ -344,18 +344,18 @@ SBPL rule interactions are matcher-dependent. Safehouse tests currently verify t
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 | `--explain` | Print effective workdir, grant, and profile-selection summary to stderr |
 
-Path and feature flags accept both `--flag=value` and `--flag value` forms. Runtime env flags support bare `--env`, `--env=FILE`, and `--env-pass=NAME1,NAME2` (or `--env-pass NAME1,NAME2`). For path-based flags/config values, `~` and `~/...` are supported.
+Path and feature flags accept both `--flag=value` and `--flag value` forms. Runtime env flags support bare `--env`, `--env=FILE`, and `--env-pass=NAME1,NAME2` (or `--env-pass NAME1,NAME2`) and may appear anywhere before the first standalone `--` separator. After that separator, remaining args are passed through untouched. For path-based flags/config values, `~` and `~/...` are supported.
 
 Execution behavior:
 - No command args: generate a policy and print the policy file path.
 - Command args provided: generate a policy, then execute the command under `sandbox-exec`.
-- `--` separator is optional (needed when safehouse flags precede the command, e.g. `safehouse --enable=docker -- docker ps`).
+- `--` separator is optional (needed when safehouse flags precede the command, e.g. `safehouse --enable=docker -- docker ps`, or when the wrapped command needs to receive its own `--env`/`--env-pass` arguments unchanged).
 
 Environment behavior:
 - Default execution mode sanitizes the wrapped command environment to a minimal allowlist (`HOME`, `PATH`, `USER`/`LOGNAME`, `SHELL`, `TERM`, `TMPDIR`, locale/XDG basics, and similar runtime-safe vars).
 - `--env` disables that sanitization and passes the full inherited environment through to the wrapped command.
 - `--env=FILE` keeps the sanitized baseline and sources additional env values from `FILE`, with file values overriding sanitized defaults.
-- `--env-pass=NAME1,NAME2` passes only selected host env vars through on top of the sanitized baseline (or on top of `--env=FILE` when combined). If both `--env=FILE` and `--env-pass` set the same key, the host env value from `--env-pass` wins.
+- `--env-pass=NAME1,NAME2` passes only selected host env vars through on top of the sanitized baseline (or on top of `--env=FILE` when combined). If both `--env=FILE` and `--env-pass` set the same key, the host env value from `--env-pass` wins. Names that are not set in the host environment are ignored.
 - `SAFEHOUSE_ENV_PASS` supports the same comma-separated list format as `--env-pass`.
 
 `--env=FILE` format (`FILE` shape):

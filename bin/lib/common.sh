@@ -183,8 +183,7 @@ merge_exec_environment_with_env_pass() {
 
   for var_name in "${runtime_env_pass_names[@]-}"; do
     if [[ "${!var_name+x}" != "x" ]]; then
-      echo "Requested --env-pass variable is not set in host environment: ${var_name}" >&2
-      exit 1
+      continue
     fi
 
     entry="${var_name}=${!var_name}"

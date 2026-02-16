@@ -147,6 +147,65 @@ resolve_profile_target_path() {
   printf '%s\n' "$first_arg"
 }
 
+consume_runtime_env_option() {
+  local current_arg="$1"
+  local remaining_arg_count="$2"
+  local next_arg="${3-}"
+  local runtime_env_pass_csv_value=""
+
+  runtime_env_args_consumed=0
+
+  case "$current_arg" in
+    --env)
+      if [[ "${#runtime_env_pass_names[@]}" -gt 0 ]]; then
+        echo "--env cannot be combined with --env-pass or SAFEHOUSE_ENV_PASS." >&2
+        exit 1
+      fi
+      if [[ "$execution_env_mode" == "file" ]]; then
+        echo "--env cannot be combined with --env=FILE." >&2
+        exit 1
+      fi
+      execution_env_mode="passthrough"
+      execution_env_file=""
+      runtime_env_args_consumed=1
+      ;;
+    --env=*)
+      execution_env_file="${current_arg#*=}"
+      [[ -n "$execution_env_file" ]] || { echo "Missing value for --env=FILE" >&2; exit 1; }
+      if [[ "$execution_env_mode" == "passthrough" ]]; then
+        echo "--env=FILE cannot be combined with --env." >&2
+        exit 1
+      fi
+      execution_env_mode="file"
+      runtime_env_args_consumed=1
+      ;;
+    --env-pass)
+      [[ "$remaining_arg_count" -ge 2 ]] || { echo "Missing value for --env-pass" >&2; exit 1; }
+      if [[ "$execution_env_mode" == "passthrough" ]]; then
+        echo "--env-pass cannot be combined with --env." >&2
+        exit 1
+      fi
+      append_runtime_env_pass_names_from_csv "$next_arg" "--env-pass"
+      runtime_env_args_consumed=2
+      ;;
+    --env-pass=*)
+      runtime_env_pass_csv_value="${current_arg#*=}"
+      [[ -n "$runtime_env_pass_csv_value" ]] || { echo "Missing value for --env-pass=LIST" >&2; exit 1; }
+      if [[ "$execution_env_mode" == "passthrough" ]]; then
+        echo "--env-pass cannot be combined with --env." >&2
+        exit 1
+      fi
+      append_runtime_env_pass_names_from_csv "$runtime_env_pass_csv_value" "--env-pass"
+      runtime_env_args_consumed=1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  return 0
+}
+
 main() {
   local -a policy_args=()
   local -a command_args=()
@@ -155,8 +214,9 @@ main() {
   local detected_app_bundle=""
   local execution_env_mode="sanitized"
   local execution_env_file=""
-  local execution_env_pass_csv=""
   local -a execution_environment=()
+  local runtime_env_args_consumed=0
+  local command_started=0
   local status=0
 
   runtime_env_pass_names=()
@@ -165,6 +225,26 @@ main() {
   fi
 
   while [[ $# -gt 0 ]]; do
+    if consume_runtime_env_option "$1" "$#" "${2-}"; then
+      shift "$runtime_env_args_consumed"
+      continue
+    fi
+
+    if [[ "$command_started" -eq 1 ]]; then
+      case "$1" in
+        --)
+          shift
+          command_args+=("$@")
+          break
+          ;;
+        *)
+          command_args+=("$1")
+          shift
+          ;;
+      esac
+      continue
+    fi
+
     case "$1" in
       -h|--help)
         usage
@@ -180,48 +260,6 @@ main() {
         ;;
       --trust-workdir-config|--trust-workdir-config=*)
         policy_args+=("$1")
-        shift
-        ;;
-      --env)
-        if [[ "${#runtime_env_pass_names[@]}" -gt 0 ]]; then
-          echo "--env cannot be combined with --env-pass or SAFEHOUSE_ENV_PASS." >&2
-          exit 1
-        fi
-        if [[ "$execution_env_mode" == "file" ]]; then
-          echo "--env cannot be combined with --env=FILE." >&2
-          exit 1
-        fi
-        execution_env_mode="passthrough"
-        execution_env_file=""
-        shift
-        ;;
-      --env=*)
-        execution_env_file="${1#*=}"
-        [[ -n "$execution_env_file" ]] || { echo "Missing value for --env=FILE" >&2; exit 1; }
-        if [[ "$execution_env_mode" == "passthrough" ]]; then
-          echo "--env=FILE cannot be combined with --env." >&2
-          exit 1
-        fi
-        execution_env_mode="file"
-        shift
-        ;;
-      --env-pass)
-        [[ $# -ge 2 ]] || { echo "Missing value for --env-pass" >&2; exit 1; }
-        if [[ "$execution_env_mode" == "passthrough" ]]; then
-          echo "--env-pass cannot be combined with --env." >&2
-          exit 1
-        fi
-        append_runtime_env_pass_names_from_csv "$2" "--env-pass"
-        shift 2
-        ;;
-      --env-pass=*)
-        execution_env_pass_csv="${1#*=}"
-        [[ -n "$execution_env_pass_csv" ]] || { echo "Missing value for --env-pass=LIST" >&2; exit 1; }
-        if [[ "$execution_env_mode" == "passthrough" ]]; then
-          echo "--env-pass cannot be combined with --env." >&2
-          exit 1
-        fi
-        append_runtime_env_pass_names_from_csv "$execution_env_pass_csv" "--env-pass"
         shift
         ;;
       --)
@@ -244,8 +282,9 @@ main() {
         exit 1
         ;;
       *)
-        command_args=("$@")
-        break
+        command_started=1
+        command_args+=("$1")
+        shift
         ;;
     esac
   done
