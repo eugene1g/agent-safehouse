@@ -6,12 +6,12 @@
       <!-- Row 1: headline + badges -->
       <div class="headline-row">
         <div class="headline-group">
-          <h1 class="headline">Native macOS sandboxing for Agents</h1>
-          <p class="desc"><code class="code-amber">sandbox-exec</code> policies for coding agents — deny-first, composable, thoroughly tested.</p>
+          <h1 class="headline">Native macOS sandboxing for local agents</h1>
+          <p class="desc"><code class="code-amber">sandbox-exec</code> access policies: deny-first, composable, thoroughly tested.</p>
         </div>
         <div class="badges">
           <span class="badge"><span class="badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Pure Bash</span>
-          <span class="badge"><span class="badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Zero dependencies</span>
+          <span class="badge"><span class="badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Nothing to install</span>
           <span class="badge"><span class="badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Open source</span>
         </div>
       </div>
@@ -21,16 +21,16 @@
         <div class="split-left">
           <h2 class="tagline">Live <span class="word-dangerous">dangerously</span>, but do it <em class="word-safely">safely.</em></h2>
           <div class="safety-points">
-            <div class="sp"><span class="sp-icon deny">✕</span><span><code class="code-red">rm -rf /</code> goes nowhere</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span><strong>No full read access</strong> — only what the agent needs</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span><code class="code-amber-sm">Write access</code> via explicit allow-list only</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span>Sane, dev-friendly defaults</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span>Fully customizable for your setup</span></div>
+            <div class="sp"><span class="sp-icon allow">✓</span><span><code class="code-red">rm -rf /</code> does nothing</span></div>
+            <div class="sp"><span class="sp-icon allow">✓</span><span><strong>No read access</strong> beyond what the agent needs</span></div>
+            <div class="sp"><span class="sp-icon allow">✓</span><span><code class="code-amber-sm">Write access</code> via allow-list</span></div>
+            <div class="sp"><span class="sp-icon allow">✓</span><span>Sane, developer-friendly defaults</span></div>
+            <div class="sp"><span class="sp-icon allow">✓</span><span>Easily customizable</span></div>
           </div>
         </div>
         <div class="split-right">
           <div class="danger-box">
-            <div class="danger-label">Every agent ships the same escape hatch</div>
+            <div class="danger-label">Let your agents fly</div>
             <div class="danger-flag"><span class="prompt">$</span> claude <span class="flag">--dangerously-skip-permissions</span></div>
             <div class="danger-flag"><span class="prompt">$</span> codex <span class="flag">--dangerously-bypass-approvals-and-sandbox</span></div>
             <div class="danger-flag"><span class="prompt">$</span> amp <span class="flag">--dangerously-allow-all</span></div>

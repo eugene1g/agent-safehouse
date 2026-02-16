@@ -39,7 +39,7 @@ const withRows = [
       <h2 class="section-title">
         Successfully contained <span class="struck">agents</span> <span class="scribble">clunkers</span>
       </h2>
-      <p class="section-sub">All major agents work perfectly inside Safehouse. They just can't touch anything outside it.</p>
+      <p class="section-sub">All agents work perfectly in their sandboxes, but can't impact anything outside it.</p>
       <div class="agents-grid">
         <a
           v-for="agent in agents"
