@@ -3,6 +3,8 @@
 :root {
   --vp-font-family-base: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --vp-font-family-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace;
+  --safehouse-page-max-width: 1040px;
+  --safehouse-doc-content-max-width: 688px;
 
   --vp-c-bg: #0a0e1a;
   --vp-c-bg-alt: #111827;
@@ -49,6 +51,15 @@
 }
 
 /*
+ * Prevent layout jump between short and long pages when vertical scrollbars
+ * appear/disappear across routes.
+ */
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
+/*
  * We run with appearance disabled (always dark), so html may not have `.dark`.
  * Force Shiki to use dark token/background variables in that mode.
  */
@@ -86,4 +97,20 @@ html:not(.dark) .shiki {
 .VPHero .main {
   max-width: none;
   padding: 0;
+}
+
+/*
+ * Width consistency:
+ * - Keep a single outer page frame width across Home/Docs/Policy Builder.
+ * - Keep docs content width stable whether the right outline aside is present or not.
+ */
+@media (min-width: 960px) {
+  .VPDoc .container {
+    max-width: var(--safehouse-page-max-width);
+  }
+
+  .VPDoc .content-container,
+  .VPDoc.has-aside .content-container {
+    max-width: var(--safehouse-doc-content-max-width);
+  }
 }

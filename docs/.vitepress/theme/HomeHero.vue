@@ -6,37 +6,12 @@
       <!-- Row 1: headline + badges -->
       <div class="headline-row">
         <div class="headline-group">
-          <h1 class="headline">Native macOS sandboxing for local agents</h1>
-          <p class="desc"><code class="code-amber">sandbox-exec</code> access policies: deny-first, composable, thoroughly tested.</p>
+          <h1 class="headline">Go full <code class="code-yolo">--yolo</code>. We've got you.</h1>
+          <p class="desc">macOS-native sandboxing for local agents. Move fast, break nothing.</p>
         </div>
-        <div class="badges">
-          <span class="badge"><span class="badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Pure Bash</span>
-          <span class="badge"><span class="badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Nothing to install</span>
-          <span class="badge"><span class="badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Open source</span>
-        </div>
+        <!-- badges hidden for now -->
       </div>
 
-      <!-- Row 2: safety points + danger box -->
-      <div class="split">
-        <div class="split-left">
-          <h2 class="tagline">Live <span class="word-dangerous">dangerously</span>, but do it <em class="word-safely">safely.</em></h2>
-          <div class="safety-points">
-            <div class="sp"><span class="sp-icon allow">✓</span><span><code class="code-red">rm -rf /</code> does nothing</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span><strong>No read access</strong> beyond what the agent needs</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span><code class="code-amber-sm">Write access</code> via allow-list</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span>Sane, developer-friendly defaults</span></div>
-            <div class="sp"><span class="sp-icon allow">✓</span><span>Easily customizable</span></div>
-          </div>
-        </div>
-        <div class="split-right">
-          <div class="danger-box">
-            <div class="danger-label">Let your agents fly</div>
-            <div class="danger-flag"><span class="prompt">$</span> claude <span class="flag">--dangerously-skip-permissions</span></div>
-            <div class="danger-flag"><span class="prompt">$</span> codex <span class="flag">--dangerously-bypass-approvals-and-sandbox</span></div>
-            <div class="danger-flag"><span class="prompt">$</span> amp <span class="flag">--dangerously-allow-all</span></div>
-          </div>
-        </div>
-      </div>
 
     </div>
   </div>
@@ -47,7 +22,7 @@
 
 .hero-custom {
   position: relative;
-  padding: 88px 0 72px;
+  padding: 72px 0 40px;
   overflow: hidden;
 }
 
@@ -89,7 +64,7 @@
 .hero-container {
   position: relative;
   z-index: 1;
-  max-width: 1040px;
+  max-width: var(--safehouse-page-max-width);
   margin: 0 auto;
   padding: 0 28px;
 }
@@ -120,9 +95,11 @@
 }
 
 .desc {
-  font-size: 1.06rem;
-  color: var(--vp-c-text-2);
-  line-height: 1.6;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+  line-height: 1.5;
+  letter-spacing: -0.3px;
 }
 
 .code-amber {
@@ -133,6 +110,24 @@
   padding: 2px 7px;
   border-radius: 4px;
   border: 1px solid rgba(212, 160, 23, 0.12);
+}
+
+.code-yolo {
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.65em;
+  color: #ef5350;
+  background: rgba(239, 83, 80, 0.08);
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(239, 83, 80, 0.18);
+  letter-spacing: 0;
+}
+
+.desc-sub {
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--vp-c-text-2);
+  margin-top: 4px;
 }
 
 .badges {

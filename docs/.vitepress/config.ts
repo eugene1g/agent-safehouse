@@ -31,30 +31,55 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Investigations', link: '/agent-investigations/' },
+      { text: 'Docs', link: '/docs/' },
       { text: 'Policy Builder', link: '/policy-builder' },
     ],
 
-    sidebar: [
-      {
-        text: 'Agent Investigations',
-        link: '/agent-investigations/',
-        items: [
-          { text: 'Aider', link: '/agent-investigations/aider' },
-          { text: 'Auggie (Augment Code)', link: '/agent-investigations/auggie' },
-          { text: 'Claude Code', link: '/agent-investigations/claude-code' },
-          { text: 'Cline', link: '/agent-investigations/cline' },
-          { text: 'Codex', link: '/agent-investigations/codex' },
-          { text: 'Cursor Agent', link: '/agent-investigations/cursor-agent' },
-          { text: 'Droid (Factory CLI)', link: '/agent-investigations/droid' },
-          { text: 'Gemini CLI', link: '/agent-investigations/gemini-cli' },
-          { text: 'Goose', link: '/agent-investigations/goose' },
-          { text: 'Kilo Code', link: '/agent-investigations/kilo-code' },
-          { text: 'OpenCode', link: '/agent-investigations/opencode' },
-          { text: 'Pi', link: '/agent-investigations/pi' },
-        ],
-      },
-    ],
+    sidebar: {
+      '/docs/': [
+        {
+          text: 'Start Here',
+          items: [
+            { text: 'Docs Home', link: '/docs/' },
+            { text: 'Overview & Philosophy', link: '/docs/overview' },
+            { text: 'Isolation Models', link: '/docs/isolation-models' },
+            { text: 'Default Assumptions', link: '/docs/default-assumptions' },
+            { text: 'Getting Started', link: '/docs/getting-started' },
+            { text: 'Usage', link: '/docs/usage' },
+            { text: 'Options', link: '/docs/options' },
+          ],
+        },
+        {
+          text: 'Build Up',
+          items: [
+            { text: 'Policy Architecture', link: '/docs/policy-architecture' },
+            { text: 'Distribution Artifacts', link: '/docs/distribution' },
+            { text: 'Customization', link: '/docs/customization' },
+            { text: 'Testing', link: '/docs/testing' },
+            { text: 'Debugging Sandbox Denials', link: '/docs/debugging' },
+            { text: 'Reference & Prior Art', link: '/docs/references' },
+          ],
+        },
+        {
+          text: 'Agent Investigations',
+          link: '/docs/agent-investigations/',
+          items: [
+            { text: 'Aider', link: '/docs/agent-investigations/aider' },
+            { text: 'Auggie (Augment Code)', link: '/docs/agent-investigations/auggie' },
+            { text: 'Claude Code', link: '/docs/agent-investigations/claude-code' },
+            { text: 'Cline', link: '/docs/agent-investigations/cline' },
+            { text: 'Codex', link: '/docs/agent-investigations/codex' },
+            { text: 'Cursor Agent', link: '/docs/agent-investigations/cursor-agent' },
+            { text: 'Droid (Factory CLI)', link: '/docs/agent-investigations/droid' },
+            { text: 'Gemini CLI', link: '/docs/agent-investigations/gemini-cli' },
+            { text: 'Goose', link: '/docs/agent-investigations/goose' },
+            { text: 'Kilo Code', link: '/docs/agent-investigations/kilo-code' },
+            { text: 'OpenCode', link: '/docs/agent-investigations/opencode' },
+            { text: 'Pi', link: '/docs/agent-investigations/pi' },
+          ],
+        },
+      ],
+    },
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/eugene1g/agent-safehouse' },

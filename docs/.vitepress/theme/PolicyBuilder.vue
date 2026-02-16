@@ -1012,7 +1012,7 @@ onMounted(() => {
 </template>
 
 <style>
-.pb { padding: 20px 0 48px; max-width: 1180px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+.pb { padding: 20px 0 48px; max-width: var(--safehouse-page-max-width); margin: 0 auto; padding-left: 24px; padding-right: 24px; }
 
 .pb-eyebrow { font-family: var(--vp-font-family-mono); font-size: 0.625rem; letter-spacing: 2px; text-transform: uppercase; color: #a67c00; font-weight: 700; margin-bottom: 8px; }
 .pb-h1 { font-size: 2.4rem; font-weight: 700; color: var(--vp-c-text-1); line-height: 1.1; margin-bottom: 10px; }
