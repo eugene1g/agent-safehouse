@@ -572,8 +572,8 @@
 )
 
 ;; Optional integrations explicitly enabled: macos-gui electron
-;; Optional integrations implicitly injected: (none)
-;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials browser-native-messaging shell-init
+;; Optional integrations implicitly injected: browser-native-messaging
+;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials shell-init
 ;; Keychain integration (auto-injected from profile requirements): included
 ;; Use --enable=<feature> (comma-separated) to include optional integrations explicitly.
 ;; Note: selected app/agent profiles and enabled integrations can inject dependencies via $$require=<integration-profile-path>$$ metadata.
@@ -637,6 +637,50 @@
     (home-subpath "/.cache/glab-cli")        ;; glab cache for API and command acceleration.
     (home-subpath "/.local/share/glab-cli")  ;; glab persistent state.
     (home-subpath "/.local/state/glab-cli")  ;; glab runtime state files.
+)
+
+;; ---------------------------------------------------------------------------
+;; Integration: Browser Native Messaging
+;; Browser native messaging host registration (Chromium + Firefox) and Chromium extension detection.
+;; Source: 55-integrations-optional/browser-native-messaging.sb
+;; ---------------------------------------------------------------------------
+
+;; Three things are needed per Chromium browser:
+;;   1. Directory listing on the browser root (check if browser is installed)
+;;   2. Read+write on NativeMessagingHosts (register/update the native messaging manifest)
+;;   3. Read on Default/Extensions (check if a specific extension is installed)
+;; Firefox support only needs NativeMessagingHosts registration paths.
+;; Extensions dir only contains publicly-available extension source/manifests — no browsing data.
+;; No access to cookies, passwords, history, bookmarks, or profile data.
+
+(allow file-read*
+    (home-literal "/Library/Application Support/Google/Chrome")
+    (home-literal "/Library/Application Support/BraveSoftware/Brave-Browser")
+    (home-literal "/Library/Application Support/Arc/User Data")
+    (home-literal "/Library/Application Support/Microsoft Edge")
+    (home-literal "/Library/Application Support/Chromium")
+    (home-literal "/Library/Application Support/Vivaldi")
+    (home-literal "/Library/Application Support/com.operasoftware.Opera")
+    (home-literal "/Library/Application Support/Firefox")
+    (home-literal "/Library/Application Support/Mozilla")
+    (home-subpath "/Library/Application Support/Google/Chrome/Default/Extensions")
+    (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions")
+    (home-subpath "/Library/Application Support/Arc/User Data/Default/Extensions")
+    (home-subpath "/Library/Application Support/Microsoft Edge/Default/Extensions")
+    (home-subpath "/Library/Application Support/Chromium/Default/Extensions")
+    (home-subpath "/Library/Application Support/Vivaldi/Default/Extensions")
+    (home-subpath "/Library/Application Support/com.operasoftware.Opera/Default/Extensions")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Google/Chrome/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Arc/User Data/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Microsoft Edge/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Chromium/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Vivaldi/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
+    (home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
 )
 
 ;; ---------------------------------------------------------------------------
@@ -960,7 +1004,8 @@
 ;; Agent: Claude Code
 ;; Claude Code CLI binary, state, config, and MCP integration paths.
 ;; Source: 60-agents/claude-code.sb
-;; $$require=55-integrations-optional/keychain.sb$$
+;; Include browser-native-messaging so Claude's Chrome bridge works (`claude --chrome`).
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/browser-native-messaging.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - installer-managed binary path: ~/.local/bin/claude (symlink target under ~/.local/share/claude/versions/*)

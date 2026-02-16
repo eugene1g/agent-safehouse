@@ -8,7 +8,7 @@ run_section_integrations() {
   local onepassword_group_container_dir onepassword_socket_dir onepassword_settings_file
   local onepassword_op_candidate onepassword_op_candidates
   local policy_ssh policy_browser_native_messaging policy_onepassword
-  local policy_keychain_agent policy_non_keychain_agent
+  local policy_keychain_agent policy_non_keychain_agent policy_claude_chrome
   local macos_gui_marker electron_marker
 
   section_begin "SSH Metadata Defaults and SSH Integration (Opt-In)"
@@ -159,9 +159,11 @@ run_section_integrations() {
   section_begin "Keychain Access"
   policy_keychain_agent="${TEST_CWD}/policy-agent-keychain-codex.sb"
   policy_non_keychain_agent="${TEST_CWD}/policy-agent-no-keychain-aider.sb"
+  policy_claude_chrome="${TEST_CWD}/policy-agent-claude-code-chrome.sb"
 
   assert_command_succeeds "safehouse generates command-scoped policy for keychain-enabled codex profile" "$SAFEHOUSE" --stdout --output "$policy_keychain_agent" -- codex --version
   assert_command_succeeds "safehouse generates command-scoped policy for non-keychain aider profile" "$SAFEHOUSE" --stdout --output "$policy_non_keychain_agent" -- aider --version
+  assert_command_succeeds "safehouse generates command-scoped policy for claude profile with browser native messaging requirement" "$SAFEHOUSE" --stdout --output "$policy_claude_chrome" -- claude --version
 
   assert_denied_if_exists "$POLICY_DEFAULT" "security find-certificate denied by default (no baseline keychain access)" "security" /usr/bin/security find-certificate -a
   assert_denied_if_exists "$policy_non_keychain_agent" "security find-certificate denied for non-keychain agent profile" "security" /usr/bin/security find-certificate -a
@@ -176,8 +178,10 @@ run_section_integrations() {
   assert_policy_contains "$policy_keychain_agent" "keychain integration provides keychain write path grant" "(home-subpath \"/Library/Keychains\")"
   assert_policy_contains "$policy_keychain_agent" "keychain integration provides scoped security preferences grant" "(home-literal \"/Library/Preferences/com.apple.security.plist\")"
   assert_policy_contains "$policy_keychain_agent" "keychain integration provides SecurityServer mach-lookup grant" "(global-name \"com.apple.SecurityServer\")"
+  assert_policy_contains "$policy_claude_chrome" "claude profile auto-injects browser native messaging integration for --chrome workflows" ";; Integration: Browser Native Messaging"
+  assert_policy_contains "$policy_claude_chrome" "claude profile reports browser native messaging as implicitly injected integration" "Optional integrations implicitly injected: browser-native-messaging"
 
-  rm -f "$policy_ssh" "$policy_browser_native_messaging" "$policy_onepassword" "$policy_keychain_agent" "$policy_non_keychain_agent"
+  rm -f "$policy_ssh" "$policy_browser_native_messaging" "$policy_onepassword" "$policy_keychain_agent" "$policy_non_keychain_agent" "$policy_claude_chrome"
 }
 
 register_section run_section_integrations

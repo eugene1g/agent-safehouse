@@ -2,7 +2,8 @@
 ;; Agent: Claude Code
 ;; Claude Code CLI binary, state, config, and MCP integration paths.
 ;; Source: 60-agents/claude-code.sb
-;; $$require=55-integrations-optional/keychain.sb$$
+;; Include browser-native-messaging so Claude's Chrome bridge works (`claude --chrome`).
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/browser-native-messaging.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - installer-managed binary path: ~/.local/bin/claude (symlink target under ~/.local/share/claude/versions/*)
