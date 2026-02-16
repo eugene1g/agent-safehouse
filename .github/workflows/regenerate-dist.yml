@@ -36,6 +36,39 @@ jobs:
             exit 0
           fi
 
+          changed_dist_files="$(git diff --cached --name-only -- dist)"
+          only_safehouse_sh=1
+          while IFS= read -r changed_file; do
+            [[ -n "$changed_file" ]] || continue
+            if [[ "$changed_file" != "dist/safehouse.sh" ]]; then
+              only_safehouse_sh=0
+              break
+            fi
+          done <<< "$changed_dist_files"
+
+          if [[ "$only_safehouse_sh" -eq 1 ]]; then
+            has_non_timestamp_diff=0
+            while IFS= read -r line; do
+              case "$line" in
+                "diff --git "*|"index "*|"--- "*|"+++ "*|"@@ "*|"")
+                  continue
+                  ;;
+                "+# Embedded Profiles Last Modified (UTC): "*|"-# Embedded Profiles Last Modified (UTC): "*)
+                  continue
+                  ;;
+                *)
+                  has_non_timestamp_diff=1
+                  break
+                  ;;
+              esac
+            done < <(GIT_EXTERNAL_DIFF= git --no-pager diff --cached --no-ext-diff --no-color --unified=0 -- dist/safehouse.sh)
+
+            if [[ "$has_non_timestamp_diff" -eq 0 ]]; then
+              echo "Only dist/safehouse.sh embedded profile timestamp changed; skipping commit."
+              exit 0
+            fi
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: regenerate dist artifacts"
