@@ -91,6 +91,9 @@ onMounted(() => {
     var cache: Record<string, string> = {}
     var resolvedBase: string | null = null
     var lastPolicy = ''
+    var stepNodes: HTMLElement[] = []
+    var openStepByIndex: ((idx: number, scroll?: boolean) => void) | null = null
+    var confirmedSteps: Record<number, boolean> = {}
 
     var el = {
       agentsGrid: document.getElementById('pb-agents-grid')!,
@@ -98,10 +101,20 @@ onMounted(() => {
       integrationsDefaultGrid: document.getElementById('pb-integrations-default-grid')!,
       integrationsExtraGrid: document.getElementById('pb-integrations-extra-grid')!,
       home: document.getElementById('pb-home-dir') as HTMLInputElement,
+      homeFeedback: document.getElementById('pb-home-feedback')!,
       workdir: document.getElementById('pb-workdir') as HTMLInputElement,
+      workdirFeedback: document.getElementById('pb-workdir-feedback')!,
       ro: document.getElementById('pb-add-ro') as HTMLTextAreaElement,
+      roFeedback: document.getElementById('pb-ro-feedback')!,
       rw: document.getElementById('pb-add-rw') as HTMLTextAreaElement,
+      rwFeedback: document.getElementById('pb-rw-feedback')!,
       append: document.getElementById('pb-append-profile') as HTMLTextAreaElement,
+      appendFeedback: document.getElementById('pb-append-feedback')!,
+      summaryAgents: document.getElementById('pb-summary-agents')!,
+      summaryIntegrations: document.getElementById('pb-summary-integrations')!,
+      summaryPaths: document.getElementById('pb-summary-paths')!,
+      summaryIssues: document.getElementById('pb-summary-issues')!,
+      summaryCommand: document.getElementById('pb-summary-command')!,
       status: document.getElementById('pb-status')!,
       moduleCount: document.getElementById('pb-module-count')!,
       command: document.getElementById('pb-command-output')!,
@@ -139,17 +152,33 @@ onMounted(() => {
 
     function assertAbs(p: string, label: string) { if (p && p.charAt(0) !== '/') throw new Error(label + ' must be absolute: ' + p) }
 
-    function parseList(raw: string, home: string, label: string) {
+    function parseListDetailed(raw: string, home: string, label: string) {
       var out: string[] = []
-      String(raw || '').split(/\r?\n/).forEach(function (line) {
+      var errors: string[] = []
+      var normalized: string[] = []
+      var seen: Record<string, boolean> = {}
+      var duplicateCount = 0
+      String(raw || '').split(/\r?\n/).forEach(function (line, idx) {
         var t = line.trim()
         if (!t || t.indexOf('#') === 0 || t.indexOf(';') === 0) return
         var p = norm(t, home)
         if (!p) return
-        assertAbs(p, label)
+        if (p.charAt(0) !== '/') {
+          errors.push(label + ' line ' + String(idx + 1) + ' must be absolute: ' + t)
+          return
+        }
+        if (seen[p]) { duplicateCount += 1; return }
+        seen[p] = true
+        if (p !== t && normalized.length < 2) normalized.push(t + ' -> ' + p)
         out.push(p)
       })
-      return uniq(out)
+      return { values: out, errors: errors, normalized: normalized, duplicateCount: duplicateCount }
+    }
+
+    function parseList(raw: string, home: string, label: string) {
+      var details = parseListDetailed(raw, home, label)
+      if (details.errors.length) throw new Error(details.errors[0])
+      return details.values
     }
 
     function emitAnc(path: string, label: string) {
@@ -190,7 +219,6 @@ onMounted(() => {
         l.push(';; Opt-in integrations not enabled: ' + offOpt.join(' '))
         l.push(';; Use --enable=<feature> (comma-separated) to include them.')
         l.push(';; Note: --enable=electron also enables macos-gui.')
-        l.push(';; Note: selected app/agent profiles can auto-inject integration modules via $$require=<integration-profile-path>$$ metadata.')
         l.push('')
       }
       l.push(';; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.'); l.push('')
@@ -257,24 +285,90 @@ onMounted(() => {
       var out: string[] = []; order.forEach(function (p) { if (s[p]) out.push(prefix + p) }); return out
     }
 
-    function collect() {
-      var home = norm(el.home.value, '/Users/you')
-      if (!home) throw new Error('HOME_DIR value is required.'); assertAbs(home, 'HOME_DIR value')
-      var work = norm(el.workdir.value, home); if (work) assertAbs(work, 'Workdir')
-      var selAgents = selected(AGENTS, 'agent-'); var selInts = selected(INTEGRATIONS, 'integration-')
-      var byKey: Record<string, boolean> = {}; selInts.forEach(function (i) { byKey[i.key] = true })
-      var electron = !!byKey['electron']; var macosGui = !!byKey['macos-gui'] || electron
+    function buildLiveState() {
+      var homeRaw = String(el.home.value || '').trim()
+      var home = norm(homeRaw, '/Users/you')
+      var homeErrors: string[] = []
+      if (!home) homeErrors.push('HOME_DIR is required.')
+      else if (home.charAt(0) !== '/') homeErrors.push('HOME_DIR must be an absolute path (example: /Users/you).')
+
+      var homeForExpansion = home && home.charAt(0) === '/' ? home : '/Users/you'
+      var workRaw = String(el.workdir.value || '').trim()
+      var work = norm(workRaw, homeForExpansion)
+      var workErrors: string[] = []
+      if (work && work.charAt(0) !== '/') workErrors.push('Workdir must be an absolute path.')
+
+      var roInfo = parseListDetailed(el.ro.value, homeForExpansion, 'Read-only path')
+      var rwInfo = parseListDetailed(el.rw.value, homeForExpansion, 'Read/write path')
+
+      var selAgents = selected(AGENTS, 'agent-')
+      var selInts = selected(INTEGRATIONS, 'integration-')
+      var byKey: Record<string, boolean> = {}
+      selInts.forEach(function (i) { byKey[i.key] = true })
+      var electron = !!byKey['electron']
+      var macosGui = !!byKey['macos-gui'] || electron
       if (electron) byKey['macos-gui'] = true
+
+      var errors = homeErrors.concat(workErrors).concat(roInfo.errors).concat(rwInfo.errors)
+
       return {
-        home, work, ro: parseList(el.ro.value, home, 'Read-only path'), rw: parseList(el.rw.value, home, 'Read/write path'),
-        append: String(el.append.value || '').trim(), agents: selAgents, tools: TOOLCHAINS.slice(),
+        homeRaw: homeRaw,
+        workRaw: workRaw,
+        home: home,
+        work: work,
+        homeErrors: homeErrors,
+        workErrors: workErrors,
+        roInfo: roInfo,
+        rwInfo: rwInfo,
+        append: String(el.append.value || '').trim(),
+        agents: selAgents,
+        integrations: selInts,
         agentProfiles: uniq(selAgents.map(function (a) { return a.profile })),
-        toolProfiles: ORD.toolchains.slice(),
         explicitOptionalIntegrationPaths: uniq(selInts.filter(function (i) { return i.group === 'extra' && i.path }).map(function (i) { return i.path })),
-        docker: !!byKey['docker'], kubectl: !!byKey['kubectl'], electron, macosGui,
-        ssh: !!byKey['ssh'], spotlight: !!byKey['spotlight'], cleanshot: !!byKey['cleanshot'], clipboard: !!byKey['clipboard'],
-        onepassword: !!byKey['1password'], cloudCredentials: !!byKey['cloud-credentials'],
-        browserNativeMessaging: !!byKey['browser-native-messaging'], wideRead: !!byKey['wide-read'],
+        docker: !!byKey['docker'],
+        kubectl: !!byKey['kubectl'],
+        electron: electron,
+        macosGui: macosGui,
+        ssh: !!byKey['ssh'],
+        spotlight: !!byKey['spotlight'],
+        cleanshot: !!byKey['cleanshot'],
+        clipboard: !!byKey['clipboard'],
+        onepassword: !!byKey['1password'],
+        cloudCredentials: !!byKey['cloud-credentials'],
+        browserNativeMessaging: !!byKey['browser-native-messaging'],
+        wideRead: !!byKey['wide-read'],
+        errors: errors,
+      }
+    }
+
+    function collect() {
+      var state = buildLiveState()
+      if (state.errors.length) throw new Error(state.errors[0])
+      assertAbs(state.home, 'HOME_DIR value')
+      if (state.work) assertAbs(state.work, 'Workdir')
+      return {
+        home: state.home,
+        work: state.work,
+        ro: parseList(el.ro.value, state.home, 'Read-only path'),
+        rw: parseList(el.rw.value, state.home, 'Read/write path'),
+        append: state.append,
+        agents: state.agents,
+        tools: TOOLCHAINS.slice(),
+        agentProfiles: state.agentProfiles,
+        toolProfiles: ORD.toolchains.slice(),
+        explicitOptionalIntegrationPaths: state.explicitOptionalIntegrationPaths,
+        docker: state.docker,
+        kubectl: state.kubectl,
+        electron: state.electron,
+        macosGui: state.macosGui,
+        ssh: state.ssh,
+        spotlight: state.spotlight,
+        cleanshot: state.cleanshot,
+        clipboard: state.clipboard,
+        onepassword: state.onepassword,
+        cloudCredentials: state.cloudCredentials,
+        browserNativeMessaging: state.browserNativeMessaging,
+        wideRead: state.wideRead,
       }
     }
 
@@ -298,6 +392,199 @@ onMounted(() => {
       l.push('safehouse ' + (flags.length ? flags.join(' ') + ' ' : '') + '--stdout -- <agent-command>')
       l.push('# Select agents above to include matching 60-agents profiles.')
       return l.join('\n')
+    }
+
+    function buildSafehouseCommand(state: any) {
+      var feats: string[] = []
+      if (state.docker) feats.push('docker')
+      if (state.kubectl) feats.push('kubectl')
+      if (state.electron) feats.push('electron')
+      else if (state.macosGui) feats.push('macos-gui')
+      if (state.ssh) feats.push('ssh')
+      if (state.spotlight) feats.push('spotlight')
+      if (state.cleanshot) feats.push('cleanshot')
+      if (state.clipboard) feats.push('clipboard')
+      if (state.onepassword) feats.push('1password')
+      if (state.cloudCredentials) feats.push('cloud-credentials')
+      if (state.browserNativeMessaging) feats.push('browser-native-messaging')
+      if (state.wideRead) feats.push('wide-read')
+
+      var flags: string[] = []
+      if (feats.length) flags.push('--enable=' + feats.join(','))
+      if (state.work && state.work.charAt(0) === '/') flags.push('--workdir="' + state.work.replace(/"/g, '\\"') + '"')
+      if (state.roInfo.values.length) flags.push('--add-dirs-ro="' + state.roInfo.values.join(':').replace(/"/g, '\\"') + '"')
+      if (state.rwInfo.values.length) flags.push('--add-dirs="' + state.rwInfo.values.join(':').replace(/"/g, '\\"') + '"')
+
+      return 'safehouse ' + (flags.length ? flags.join(' ') + ' ' : '') + '--stdout -- <agent-command>'
+    }
+
+    function summarizeLabels(labels: string[], emptyText: string, maxItems: number) {
+      if (!labels.length) return emptyText
+      if (labels.length <= maxItems) return labels.join(', ')
+      return labels.slice(0, maxItems).join(', ') + ' +' + String(labels.length - maxItems) + ' more'
+    }
+
+    function setFeedback(node: HTMLElement, message: string, kind?: 'ok' | 'warn' | 'error') {
+      node.textContent = message
+      node.classList.remove('is-ok', 'is-warn', 'is-error')
+      if (kind) node.classList.add('is-' + kind)
+    }
+
+    function setIssues(errors: string[]) {
+      el.summaryIssues.innerHTML = ''
+      if (!errors.length) {
+        var ok = document.createElement('li')
+        ok.textContent = 'Ready to generate.'
+        el.summaryIssues.appendChild(ok)
+        return
+      }
+      errors.slice(0, 3).forEach(function (msg) {
+        var li = document.createElement('li')
+        li.textContent = msg
+        el.summaryIssues.appendChild(li)
+      })
+      if (errors.length > 3) {
+        var more = document.createElement('li')
+        more.textContent = '+' + String(errors.length - 3) + ' more validation issue(s)'
+        el.summaryIssues.appendChild(more)
+      }
+    }
+
+    function setStepDone(stepNumber: number, done: boolean) {
+      var step = stepNodes[stepNumber - 1]
+      if (!step) return
+      step.classList.toggle('is-done', done)
+    }
+
+    function markStepConfirmed(stepNumber: number) {
+      confirmedSteps[stepNumber] = true
+      setStepDone(stepNumber, true)
+    }
+
+    function markStepNeedsReview(stepNumber: number) {
+      if (!confirmedSteps[stepNumber]) return
+      confirmedSteps[stepNumber] = false
+      setStepDone(stepNumber, false)
+    }
+
+    function markSectionChanged(stepNumber: number) {
+      markStepNeedsReview(stepNumber)
+      if (stepNumber >= 1 && stepNumber <= 4) markStepNeedsReview(5)
+    }
+
+    function validateStepBeforeConfirm(stepNumber: number) {
+      if (stepNumber !== 4) return { ok: true, message: '' }
+      var state = buildLiveState()
+      var firstError =
+        state.homeErrors[0] ||
+        state.workErrors[0] ||
+        state.roInfo.errors[0] ||
+        state.rwInfo.errors[0]
+      if (firstError) return { ok: false, message: firstError }
+      return { ok: true, message: '' }
+    }
+
+    function initStepAccordion() {
+      stepNodes = Array.prototype.slice.call(document.querySelectorAll('.pb-step')) as HTMLElement[]
+      if (!stepNodes.length) return
+
+      confirmedSteps = {}
+      stepNodes.forEach(function (_, idx) {
+        confirmedSteps[idx + 1] = false
+        setStepDone(idx + 1, false)
+      })
+
+      openStepByIndex = function (idx: number, scroll?: boolean) {
+        if (idx < 0 || idx >= stepNodes.length) return
+        stepNodes.forEach(function (step, curIdx) {
+          var open = curIdx === idx
+          step.classList.toggle('is-open', open)
+          var btn = step.querySelector('.pb-step-head') as HTMLButtonElement | null
+          if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false')
+        })
+        if (scroll) stepNodes[idx].scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+
+      stepNodes.forEach(function (step, idx) {
+        var btn = step.querySelector('.pb-step-head') as HTMLButtonElement | null
+        if (!btn) return
+        btn.addEventListener('click', function () {
+          if (openStepByIndex) openStepByIndex(idx, false)
+        })
+        var nextBtn = step.querySelector('.pb-next') as HTMLButtonElement | null
+        if (nextBtn) {
+          nextBtn.addEventListener('click', function () {
+            var stepNumber = idx + 1
+            var check = validateStepBeforeConfirm(stepNumber)
+            if (!check.ok) {
+              setStatus('Fix this section before confirming: ' + check.message, 'error')
+              if (openStepByIndex) openStepByIndex(idx, true)
+              return
+            }
+            markStepConfirmed(stepNumber)
+            if (openStepByIndex) openStepByIndex(idx + 1, true)
+          })
+        }
+      })
+
+      if (openStepByIndex) openStepByIndex(0, false)
+    }
+
+    function updateLiveUi() {
+      var state = buildLiveState()
+
+      if (state.homeErrors.length) setFeedback(el.homeFeedback, state.homeErrors[0], 'error')
+      else if (state.home && state.home !== state.homeRaw) setFeedback(el.homeFeedback, 'Using: ' + state.home + ' (normalized from input)', 'ok')
+      else setFeedback(el.homeFeedback, state.home ? 'Using: ' + state.home : 'Required field.', state.home ? 'ok' : 'error')
+
+      if (state.workErrors.length) setFeedback(el.workdirFeedback, state.workErrors[0], 'error')
+      else if (!state.work) setFeedback(el.workdirFeedback, 'Optional. Leave blank to avoid automatic workdir write access.', 'warn')
+      else if (state.work !== state.workRaw) setFeedback(el.workdirFeedback, 'Using: ' + state.work + ' (normalized from input)', 'ok')
+      else setFeedback(el.workdirFeedback, 'Using: ' + state.work, 'ok')
+
+      if (state.roInfo.errors.length) {
+        setFeedback(el.roFeedback, state.roInfo.errors[0], 'error')
+      } else {
+        var roMsg = String(state.roInfo.values.length) + ' read-only path(s)'
+        if (state.roInfo.duplicateCount) roMsg += '; ignored ' + String(state.roInfo.duplicateCount) + ' duplicate line(s)'
+        if (state.roInfo.normalized.length) roMsg += '; ' + state.roInfo.normalized[0]
+        setFeedback(el.roFeedback, roMsg, state.roInfo.values.length ? 'ok' : 'warn')
+      }
+
+      if (state.rwInfo.errors.length) {
+        setFeedback(el.rwFeedback, state.rwInfo.errors[0], 'error')
+      } else {
+        var rwMsg = String(state.rwInfo.values.length) + ' read/write path(s)'
+        if (state.rwInfo.duplicateCount) rwMsg += '; ignored ' + String(state.rwInfo.duplicateCount) + ' duplicate line(s)'
+        if (state.rwInfo.normalized.length) rwMsg += '; ' + state.rwInfo.normalized[0]
+        setFeedback(el.rwFeedback, rwMsg, state.rwInfo.values.length ? 'ok' : 'warn')
+      }
+
+      if (state.append) setFeedback(el.appendFeedback, 'Advanced overlay will be appended at the end of the generated policy.', 'warn')
+      else setFeedback(el.appendFeedback, 'No overlay set.', 'ok')
+
+      var agentNames = state.agents.map(function (a: any) { return a.label })
+      el.summaryAgents.textContent = agentNames.length
+        ? String(agentNames.length) + ' selected: ' + summarizeLabels(agentNames, '', 3)
+        : 'No agents selected yet.'
+
+      var optionalLabels = state.integrations
+        .filter(function (i: any) { return i.group === 'extra' })
+        .map(function (i: any) { return i.label })
+      el.summaryIntegrations.textContent = optionalLabels.length
+        ? String(optionalLabels.length) + ' enabled: ' + summarizeLabels(optionalLabels, '', 3)
+        : 'No optional integrations enabled.'
+
+      var pathBits: string[] = []
+      pathBits.push(state.home && state.home.charAt(0) === '/' ? 'Home: ' + state.home : 'Home: not valid yet')
+      pathBits.push(state.work ? 'Workdir: ' + state.work : 'Workdir: not set')
+      pathBits.push('Extra RO: ' + String(state.roInfo.values.length))
+      pathBits.push('Extra RW: ' + String(state.rwInfo.values.length))
+      pathBits.push(state.append ? 'Overlay: on' : 'Overlay: off')
+      el.summaryPaths.textContent = pathBits.join(' | ')
+
+      setIssues(state.errors)
+      el.summaryCommand.textContent = buildSafehouseCommand(state)
     }
 
     async function buildPolicy(s: any) {
@@ -387,8 +674,10 @@ onMounted(() => {
         el.moduleCount.textContent = 'Included modules: ' + out.included.length
         el.copy.disabled = false; el.dl.disabled = false; el.launchers.disabled = false
         setStatus('Generated policy from ' + out.included.length + ' modules.', 'success')
-      } catch (err: any) { console.error(err); setStatus(err?.message || String(err), 'error'); el.moduleCount.textContent = 'Included modules: \u2014' }
-      finally { el.gen.disabled = false; el.gen.textContent = old }
+        markStepConfirmed(5)
+        if (openStepByIndex) openStepByIndex(4, true)
+      } catch (err: any) { console.error(err); setStatus(err?.message || String(err), 'error'); el.moduleCount.textContent = 'Included modules: \u2014'; markStepNeedsReview(5) }
+      finally { el.gen.disabled = false; el.gen.textContent = old; updateLiveUi() }
     }
 
     function downloadTextFile(filename: string, text: string, mimeType?: string) {
@@ -440,11 +729,24 @@ onMounted(() => {
       return l.join('\n') + '\n'
     }
 
-    render(); syncElectron()
+    render()
+    syncElectron()
+    initStepAccordion()
+    updateLiveUi()
 
-    document.getElementById('pb-agents-all')!.addEventListener('click', function () { setGroup(AGENTS, 'agent-', true) })
-    document.getElementById('pb-agents-none')!.addEventListener('click', function () { setGroup(AGENTS, 'agent-', false) })
-    document.getElementById('integration-electron')!.addEventListener('change', syncElectron)
+    document.getElementById('pb-agents-all')!.addEventListener('click', function () { setGroup(AGENTS, 'agent-', true); markSectionChanged(1); updateLiveUi() })
+    document.getElementById('pb-agents-none')!.addEventListener('click', function () { setGroup(AGENTS, 'agent-', false); markSectionChanged(1); updateLiveUi() })
+    document.querySelector('.pb-flow')!.addEventListener('change', function (ev) {
+      var t = ev.target as HTMLInputElement | null
+      if (!t) return
+      if (t.id.indexOf('agent-') === 0) markSectionChanged(1)
+      else if (t.id.indexOf('integration-') === 0) markSectionChanged(3)
+      if (t.type === 'checkbox') { syncElectron(); updateLiveUi() }
+    })
+    ;[el.home, el.workdir, el.ro, el.rw, el.append].forEach(function (node) {
+      node.addEventListener('input', function () { markSectionChanged(4); updateLiveUi() })
+      node.addEventListener('blur', updateLiveUi)
+    })
 
     el.gen.addEventListener('click', generate)
     el.copy.addEventListener('click', async function () {
@@ -471,123 +773,236 @@ onMounted(() => {
     <div class="pb-eyebrow">Interactive wizard</div>
     <h1 class="pb-h1">Build your own Safehouse policy</h1>
     <p class="pb-intro">
-      This page assembles policies from real <code>profiles/*.sb</code> modules in strict CLI parity order. Toolchains and core
-      integrations are always-on (like the CLI), optional integrations mirror <code>--enable</code>, and <code>$$require=...$$</code>
-      metadata auto-injects dependent integrations.
+      Pick your coding agents, optional capabilities, and file system access in plain language. The builder creates a sandbox policy you
+      can copy or download without hand-editing policy files.
       <a href="https://github.com/eugene1g/agent-safehouse/tree/main/profiles" target="_blank" rel="noopener noreferrer">View policy modules on GitHub</a>.
     </p>
 
-    <div class="pb-flow">
-      <section class="pb-step">
-        <span class="pb-step-number">1</span>
-        <h2>Your Clankers</h2>
-        <p class="pb-hint">Same visual layout as the home page, but selectable.</p>
-        <div class="pb-bulk">
-          <button id="pb-agents-all" type="button">Select all</button>
-          <button id="pb-agents-none" type="button">Clear all</button>
+    <div class="pb-shell">
+      <div class="pb-flow">
+        <section class="pb-step is-open">
+          <button type="button" class="pb-step-head" aria-expanded="true">
+            <span class="pb-step-number">1</span>
+            <span class="pb-step-head-copy">
+              <span class="pb-step-title">Choose your agents</span>
+              <span class="pb-step-subtitle">Pick which coding assistants this policy should support.</span>
+            </span>
+            <span class="pb-step-done-indicator" aria-hidden="true">✓</span>
+            <span class="pb-step-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="pb-step-content">
+            <div class="pb-bulk">
+              <button id="pb-agents-all" type="button">Select all</button>
+              <button id="pb-agents-none" type="button">Clear all</button>
+            </div>
+            <div id="pb-agents-grid" class="pb-agent-grid"></div>
+            <div class="pb-step-nav">
+              <button type="button" class="pb-next">Confirm &amp; Continue</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="pb-step">
+          <button type="button" class="pb-step-head" aria-expanded="false">
+            <span class="pb-step-number">2</span>
+            <span class="pb-step-head-copy">
+              <span class="pb-step-title">Runtime toolchains</span>
+              <span class="pb-step-subtitle">These are included for compatibility. Java, Perl, and PHP are shown last.</span>
+            </span>
+            <span class="pb-step-done-indicator" aria-hidden="true">✓</span>
+            <span class="pb-step-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="pb-step-content">
+            <div id="pb-toolchains-grid" class="pb-grid pb-grid-tight"></div>
+            <div class="pb-step-nav">
+              <button type="button" class="pb-next">Confirm &amp; Continue</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="pb-step">
+          <button type="button" class="pb-step-head" aria-expanded="false">
+            <span class="pb-step-number">3</span>
+            <span class="pb-step-head-copy">
+              <span class="pb-step-title">Access outside your project</span>
+              <span class="pb-step-subtitle">Enable only the optional capabilities your agents actually need.</span>
+            </span>
+            <span class="pb-step-done-indicator" aria-hidden="true">✓</span>
+            <span class="pb-step-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="pb-step-content">
+            <p class="pb-group-title">Always on</p>
+            <div id="pb-integrations-default-grid" class="pb-grid"></div>
+            <p class="pb-group-title">Optional</p>
+            <div id="pb-integrations-extra-grid" class="pb-grid"></div>
+            <div class="pb-step-nav">
+              <button type="button" class="pb-next">Confirm &amp; Continue</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="pb-step">
+          <button type="button" class="pb-step-head" aria-expanded="false">
+            <span class="pb-step-number">4</span>
+            <span class="pb-step-head-copy">
+              <span class="pb-step-title">File system access</span>
+              <span class="pb-step-subtitle">Start with baseline paths, then add the smallest extra grants you need.</span>
+            </span>
+            <span class="pb-step-done-indicator" aria-hidden="true">✓</span>
+            <span class="pb-step-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="pb-step-content">
+            <div class="pb-fs-guide">
+              <p><strong>Absolute paths only:</strong> <code>~</code> is supported and expands to your HOME_DIR value.</p>
+              <p><strong>Principle of least privilege:</strong> keep write access narrow to reduce accidental damage.</p>
+            </div>
+
+            <div class="pb-fs-group">
+              <h3 class="pb-subhead">Baseline paths</h3>
+              <div class="pb-fields">
+                <div class="pb-field">
+                  <label for="pb-home-dir">HOME_DIR value</label>
+                  <input id="pb-home-dir" type="text" value="/Users/you">
+                  <p id="pb-home-feedback" class="pb-field-feedback">Required field.</p>
+                </div>
+                <div class="pb-field">
+                  <label for="pb-workdir">Workdir (read/write; optional)</label>
+                  <input id="pb-workdir" type="text" value="/Users/you/projects/my-app">
+                  <p id="pb-workdir-feedback" class="pb-field-feedback">Optional. Leave blank to avoid automatic workdir write access.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pb-fs-group">
+              <h3 class="pb-subhead">Extra grants</h3>
+              <div class="pb-fields pb-fields-fs">
+                <div class="pb-field">
+                  <label for="pb-add-ro">Extra read-only directories (one per line)</label>
+                  <textarea id="pb-add-ro" placeholder="/Users/you/mywork&#10;/Users/you/docs"></textarea>
+                  <p id="pb-ro-feedback" class="pb-field-feedback">0 read-only paths</p>
+                </div>
+                <div class="pb-field">
+                  <label for="pb-add-rw">Extra read/write directories (one per line)</label>
+                  <textarea id="pb-add-rw" placeholder="/Users/you/scratch"></textarea>
+                  <p id="pb-rw-feedback" class="pb-field-feedback">0 read/write paths</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pb-fs-group pb-fs-group-advanced">
+              <h3 class="pb-subhead">Advanced override (optional)</h3>
+              <p class="pb-hint">This text is appended last and can override earlier rules. Use only if you know exactly what you need.</p>
+              <div class="pb-field pb-full">
+                <label for="pb-append-profile">Appended profile text</label>
+                <textarea id="pb-append-profile" placeholder=";; Example deny overlay&#10;(deny file-read* (home-subpath &quot;/.aws&quot;))"></textarea>
+                <p id="pb-append-feedback" class="pb-field-feedback">No overlay set.</p>
+              </div>
+            </div>
+            <div class="pb-step-nav">
+              <button type="button" class="pb-next">Confirm &amp; Continue</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="pb-step">
+          <button type="button" class="pb-step-head" aria-expanded="false">
+            <span class="pb-step-number">5</span>
+            <span class="pb-step-head-copy">
+              <span class="pb-step-title">Generate and copy policy</span>
+              <span class="pb-step-subtitle">Create your policy file, inspect it, and copy or download.</span>
+            </span>
+            <span class="pb-step-done-indicator" aria-hidden="true">✓</span>
+            <span class="pb-step-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="pb-step-content">
+            <div class="pb-actions">
+              <button id="pb-generate" type="button" class="pb-btn pb-primary">Generate policy</button>
+              <button id="pb-copy" type="button" class="pb-btn pb-secondary" disabled>Copy policy</button>
+              <button id="pb-download" type="button" class="pb-btn pb-secondary" disabled>Download .sb</button>
+              <button id="pb-download-launchers" type="button" class="pb-btn pb-secondary" disabled>Download desktop launcher setup (.command)</button>
+            </div>
+
+            <ul class="pb-notes">
+              <li>Save the output as <code>my-safehouse.sb</code>.</li>
+              <li>Run: <code>sandbox-exec -f my-safehouse.sb -- &lt;command&gt;</code>.</li>
+              <li>macOS app shortcuts: run the downloaded launcher setup script with <code>bash /path/to/create-safehouse-desktop-launchers.command</code>.</li>
+              <li>Compare with CLI output via <code>safehouse --stdout</code> if needed.</li>
+            </ul>
+
+            <p id="pb-status" class="pb-status">Ready. Select options and click "Generate policy".</p>
+            <p id="pb-module-count" class="pb-module-count">Included modules: —</p>
+
+            <h3 class="pb-out-title">Command helper snippet</h3>
+            <pre><code id="pb-command-output"># Choose options, then click "Generate policy".</code></pre>
+
+            <h3 class="pb-out-title">Generated policy preview</h3>
+            <pre><code id="pb-policy-output">;; Policy output will appear here.</code></pre>
+          </div>
+        </section>
+      </div>
+
+      <aside class="pb-summary" aria-live="polite">
+        <div class="pb-summary-eyebrow">Live summary</div>
+        <h2 class="pb-summary-title">Policy at a glance</h2>
+        <p class="pb-summary-hint">Updates as you make changes.</p>
+
+        <div class="pb-summary-block">
+          <h3>Agents</h3>
+          <p id="pb-summary-agents">No agents selected yet.</p>
         </div>
-        <div id="pb-agents-grid" class="pb-agent-grid"></div>
-      </section>
 
-      <section class="pb-step">
-        <span class="pb-step-number">2</span>
-        <h2>Toolchains</h2>
-        <p class="pb-hint">In strict CLI parity mode, toolchain profiles are always included. Java, Perl, and PHP are shown last and off by default in the UI.</p>
-        <div id="pb-toolchains-grid" class="pb-grid"></div>
-      </section>
-
-      <section class="pb-step">
-        <span class="pb-step-number">3</span>
-        <h2>Things you want your agents to access</h2>
-        <p class="pb-hint">Core integrations are always included. Optional integrations mirror <code>--enable</code>; dependency profiles are auto-injected via <code>$$require=...$$</code>.</p>
-        <p class="pb-group-title">Always-on core integrations (always included)</p>
-        <div id="pb-integrations-default-grid" class="pb-grid"></div>
-        <p class="pb-group-title">Optional integrations</p>
-        <div id="pb-integrations-extra-grid" class="pb-grid"></div>
-      </section>
-
-      <section class="pb-step">
-        <span class="pb-step-number">4</span>
-        <h2>Your file system</h2>
-        <p class="pb-hint">Set your baseline paths first, then add only the extra grants you actually need.</p>
-        <div class="pb-fs-guide">
-          <p><strong>Use absolute paths:</strong> <code>~</code> is supported and expands to <code>HOME_DIR</code>.</p>
-          <p><strong>Keep write access narrow:</strong> use <code>workdir</code> for your main project, and add explicit extras only when needed.</p>
-          <p><strong>Overlay is advanced:</strong> appended policy text is loaded last and can override earlier rules.</p>
-        </div>
-        <div class="pb-fields pb-fields-fs">
-          <div class="pb-field">
-            <label for="pb-home-dir">HOME_DIR value</label>
-            <input id="pb-home-dir" type="text" value="/Users/you">
-            <p class="pb-field-help">Usually your macOS home path.</p>
-          </div>
-          <div class="pb-field">
-            <label for="pb-workdir">Workdir (read/write; optional)</label>
-            <input id="pb-workdir" type="text" value="/Users/you/projects/my-app">
-            <p class="pb-field-help">Primary directory your agents should modify.</p>
-          </div>
-          <div class="pb-field">
-            <label for="pb-add-ro">Extra read-only directories (one per line)</label>
-            <textarea id="pb-add-ro" placeholder="/Users/you/mywork&#10;/Users/you/docs"></textarea>
-            <p class="pb-field-help">References and sibling repos agents can inspect but not edit.</p>
-          </div>
-          <div class="pb-field">
-            <label for="pb-add-rw">Extra read/write directories (one per line)</label>
-            <textarea id="pb-add-rw" placeholder="/Users/you/scratch"></textarea>
-            <p class="pb-field-help">Scratch or shared folders agents must be able to update.</p>
-          </div>
-          <div class="pb-field pb-full">
-            <label for="pb-append-profile">Appended profile text (optional, loaded last)</label>
-            <textarea id="pb-append-profile" placeholder=";; Example deny overlay&#10;(deny file-read* (home-subpath &quot;/.aws&quot;))"></textarea>
-            <p class="pb-field-help">Optional advanced override layer. Keep this minimal and review carefully.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="pb-step">
-        <span class="pb-step-number">5</span>
-        <h2>Get your policy document</h2>
-        <p class="pb-hint">Generate, inspect, copy, and download your <code>.sb</code> policy.</p>
-        <div class="pb-actions">
-          <button id="pb-generate" type="button" class="pb-btn pb-primary">Generate policy</button>
-          <button id="pb-copy" type="button" class="pb-btn pb-secondary" disabled>Copy policy</button>
-          <button id="pb-download" type="button" class="pb-btn pb-secondary" disabled>Download .sb</button>
-          <button id="pb-download-launchers" type="button" class="pb-btn pb-secondary" disabled>Download desktop launcher setup (.command)</button>
+        <div class="pb-summary-block">
+          <h3>Optional access</h3>
+          <p id="pb-summary-integrations">No optional integrations enabled.</p>
         </div>
 
-        <ul class="pb-notes">
-          <li>Save the output as <code>my-safehouse.sb</code>.</li>
-          <li>Run: <code>sandbox-exec -f my-safehouse.sb -- &lt;command&gt;</code>.</li>
-          <li>macOS app shortcuts: run the downloaded launcher setup script with <code>bash /path/to/create-safehouse-desktop-launchers.command</code>.</li>
-          <li>Compare with CLI output via <code>safehouse --stdout</code> if needed.</li>
-        </ul>
+        <div class="pb-summary-block">
+          <h3>File system</h3>
+          <p id="pb-summary-paths">Home: not valid yet.</p>
+        </div>
 
-        <p id="pb-status" class="pb-status">Ready. Select options and click "Generate policy".</p>
-        <p id="pb-module-count" class="pb-module-count">Included modules: —</p>
+        <div class="pb-summary-block">
+          <h3>Ready check</h3>
+          <ul id="pb-summary-issues" class="pb-summary-issues">
+            <li>Ready to generate.</li>
+          </ul>
+        </div>
 
-        <h3 class="pb-out-title">Command helper snippet</h3>
-        <pre><code id="pb-command-output"># Choose options, then click "Generate policy".</code></pre>
-
-        <h3 class="pb-out-title">Generated policy preview</h3>
-        <pre><code id="pb-policy-output">;; Policy output will appear here.</code></pre>
-      </section>
+        <div class="pb-summary-block">
+          <h3>Command preview</h3>
+          <pre class="pb-summary-pre"><code id="pb-summary-command">safehouse --stdout -- &lt;agent-command&gt;</code></pre>
+        </div>
+      </aside>
     </div>
   </div>
 </template>
 
 <style>
-.pb { padding: 20px 0 48px; max-width: 1040px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+.pb { padding: 20px 0 48px; max-width: 1180px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
 
 .pb-eyebrow { font-family: var(--vp-font-family-mono); font-size: 0.625rem; letter-spacing: 2px; text-transform: uppercase; color: #a67c00; font-weight: 700; margin-bottom: 8px; }
 .pb-h1 { font-size: 2.4rem; font-weight: 700; color: var(--vp-c-text-1); line-height: 1.1; margin-bottom: 10px; }
 .pb-intro { max-width: 920px; color: var(--vp-c-text-2); font-size: 0.96rem; line-height: 1.7; margin-bottom: 22px; }
 .pb-intro code, .pb-hint code, .pb-notes code { font-family: var(--vp-font-family-mono); font-size: 0.75rem; color: var(--vp-c-brand-1); background: rgba(212,160,23,0.09); border: 1px solid rgba(212,160,23,0.18); border-radius: 4px; padding: 1px 6px; }
 
-.pb-flow { display: grid; gap: 48px; }
+.pb-shell { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); gap: 20px; align-items: start; }
+.pb-flow { display: grid; gap: 14px; }
 
-.pb-step { position: relative; padding-left: 48px; }
-.pb-step-number { position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--vp-c-brand-1); color: var(--vp-c-brand-1); background: transparent; font-family: var(--vp-font-family-mono); font-size: 0.875rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; user-select: none; }
-.pb-step h2 { font-size: 1.42rem; color: var(--vp-c-text-1); font-weight: 700; line-height: 1.2; margin-bottom: 4px; letter-spacing: -0.2px; border: none; padding: 0; margin-top: 0; }
+.pb-step { border: 1px solid var(--vp-c-border); border-radius: 12px; background: var(--vp-c-bg); overflow: hidden; }
+.pb-step-head { width: 100%; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 16px; gap: 12px; align-items: center; text-align: left; background: transparent; border: 0; cursor: pointer; padding: 13px 14px; }
+.pb-step-head:hover { background: var(--vp-c-bg-alt); }
+.pb-step-number { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--vp-c-brand-1); color: var(--vp-c-brand-1); background: transparent; font-family: var(--vp-font-family-mono); font-size: 0.875rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; user-select: none; }
+.pb-step-head-copy { min-width: 0; display: grid; gap: 3px; }
+.pb-step-title { color: var(--vp-c-text-1); font-size: 1rem; font-weight: 700; line-height: 1.25; }
+.pb-step-subtitle { color: var(--vp-c-text-2); font-size: 0.81rem; line-height: 1.45; }
+.pb-step-done-indicator { width: 20px; height: 20px; border-radius: 999px; border: 1px solid rgba(74, 222, 128, 0.55); color: #4ade80; font-size: 0.72rem; line-height: 1; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; opacity: 0; transform: scale(0.85); transition: opacity 0.18s ease, transform 0.18s ease; }
+.pb-step-chevron { width: 10px; height: 10px; border-right: 2px solid var(--vp-c-text-2); border-bottom: 2px solid var(--vp-c-text-2); transform: rotate(45deg); transition: transform 0.16s ease; justify-self: end; }
+.pb-step.is-open .pb-step-chevron { transform: rotate(225deg); margin-top: 4px; }
+.pb-step.is-done .pb-step-done-indicator { opacity: 1; transform: scale(1); }
+.pb-step.is-done .pb-step-number { border-color: rgba(74, 222, 128, 0.7); color: #4ade80; }
+.pb-step-content { display: none; border-top: 1px solid var(--vp-c-border); padding: 14px 16px 16px; }
+.pb-step.is-open .pb-step-content { display: block; }
+
 .pb-hint { font-size: 0.84rem; color: var(--vp-c-text-2); margin-bottom: 10px; line-height: 1.65; }
 
 .pb-bulk { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -610,13 +1025,14 @@ onMounted(() => {
 .pb-agent .pb-hidden:checked + .pb-agent-box .pb-check { color: #0a0e1a; background: var(--vp-c-brand-1); border-color: var(--vp-c-brand-1); }
 
 /* Cards grid */
-.pb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.pb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 8px; }
+.pb-grid-tight { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
 .pb-card { display: block; position: relative; cursor: pointer; }
-.pb-card-box { display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: center; min-height: 62px; background: var(--vp-c-bg); border: 1px solid var(--vp-c-border); border-radius: 10px; padding: 9px; transition: 0.16s; }
+.pb-card-box { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; min-height: 52px; background: var(--vp-c-bg); border: 1px solid var(--vp-c-border); border-radius: 10px; padding: 7px 8px; transition: 0.16s; }
 .pb-card:hover .pb-card-box { border-color: var(--vp-c-border); transform: translateY(-1px); }
-.pb-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 0.86rem; font-weight: 700; color: var(--vp-c-brand-1); font-family: var(--vp-font-family-mono); overflow: hidden; background: transparent; border: none; }
+.pb-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: var(--vp-c-brand-1); font-family: var(--vp-font-family-mono); overflow: hidden; background: transparent; border: none; }
 .pb-icon img { width: 100%; height: 100%; object-fit: contain; background: transparent; }
-.pb-label { display: block; font-size: 0.84rem; font-weight: 600; color: var(--vp-c-text-1); line-height: 1.3; }
+.pb-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--vp-c-text-1); line-height: 1.3; }
 .pb-meta { display: block; font-size: 0.69rem; color: var(--vp-c-text-2); line-height: 1.35; margin-top: 1px; }
 .pb-card .pb-hidden:checked + .pb-card-box { border-color: var(--vp-c-brand-1); box-shadow: 0 0 0 2px rgba(212,160,23,0.13); background: var(--vp-c-bg-elv); }
 .pb-card .pb-hidden:disabled + .pb-card-box { cursor: default; }
@@ -625,6 +1041,9 @@ onMounted(() => {
 .pb-fs-guide { margin: 0 0 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--vp-c-border); background: var(--vp-c-bg-alt); display: grid; gap: 6px; }
 .pb-fs-guide p { margin: 0; color: var(--vp-c-text-2); font-size: 0.8rem; line-height: 1.55; }
 .pb-fs-guide strong { color: var(--vp-c-text-1); font-weight: 600; }
+.pb-fs-group { border: 1px solid var(--vp-c-border); border-radius: 10px; padding: 12px; background: var(--vp-c-bg); margin-bottom: 10px; }
+.pb-fs-group-advanced { border-color: rgba(239, 83, 80, 0.42); background: rgba(239, 83, 80, 0.08); }
+.pb-subhead { margin: 0 0 8px; color: var(--vp-c-text-1); font-size: 0.9rem; font-weight: 700; border: 0; padding: 0; }
 
 /* Fields */
 .pb-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -635,7 +1054,24 @@ onMounted(() => {
 .pb-field textarea { min-height: 92px; resize: vertical; }
 .pb-field input:focus, .pb-field textarea:focus { outline: none; border-color: #a67c00; box-shadow: 0 0 0 2px rgba(212,160,23,0.12); }
 .pb-fields-fs .pb-field textarea { min-height: 120px; }
-.pb-field-help { margin: 0; color: var(--vp-c-text-2); font-size: 0.72rem; line-height: 1.45; }
+.pb-field-feedback { margin: 0; color: var(--vp-c-text-2); font-size: 0.72rem; line-height: 1.45; }
+.pb-field-feedback.is-ok { color: #4ade80; }
+.pb-field-feedback.is-warn { color: #f5c842; }
+.pb-field-feedback.is-error { color: #ef5350; }
+
+.pb-step-nav { margin-top: 12px; display: flex; justify-content: flex-end; }
+.pb-next { background: var(--vp-c-bg); border: 1px solid var(--vp-c-border); color: var(--vp-c-text-1); font-family: var(--vp-font-family-mono); font-size: 0.68rem; letter-spacing: 0.5px; padding: 7px 10px; border-radius: 7px; cursor: pointer; }
+.pb-next:hover { border-color: #a67c00; color: var(--vp-c-brand-1); }
+
+.pb-summary { position: sticky; top: 84px; width: 100%; max-width: 300px; min-width: 0; justify-self: end; border: 1px solid var(--vp-c-border); border-radius: 12px; background: var(--vp-c-bg-alt); padding: 12px; display: grid; gap: 10px; overflow: hidden; }
+.pb-summary-eyebrow { font-family: var(--vp-font-family-mono); font-size: 0.62rem; letter-spacing: 1.4px; text-transform: uppercase; color: #a67c00; font-weight: 700; }
+.pb-summary-title { margin: 0; color: var(--vp-c-text-1); font-size: 1.05rem; line-height: 1.2; border: 0; padding: 0; }
+.pb-summary-hint { margin: 0; color: var(--vp-c-text-2); font-size: 0.78rem; line-height: 1.45; }
+.pb-summary-block { min-width: 0; border: 1px solid var(--vp-c-border); border-radius: 9px; background: var(--vp-c-bg); padding: 10px; }
+.pb-summary-block h3 { margin: 0 0 6px; font-size: 0.72rem; line-height: 1.2; text-transform: uppercase; letter-spacing: 1px; color: var(--vp-c-text-2); border: 0; padding: 0; font-family: var(--vp-font-family-mono); }
+.pb-summary-block p { margin: 0; color: var(--vp-c-text-1); font-size: 0.76rem; line-height: 1.45; overflow-wrap: anywhere; }
+.pb-summary-issues { margin: 0; padding-left: 16px; display: grid; gap: 4px; }
+.pb-summary-issues li { color: var(--vp-c-text-1); font-size: 0.75rem; line-height: 1.35; overflow-wrap: anywhere; }
 
 /* Buttons */
 .pb-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
@@ -654,13 +1090,25 @@ onMounted(() => {
 .pb-out-title { margin: 16px 0 8px; color: var(--vp-c-text-1); font-size: 0.93rem; font-weight: 600; border: none; padding: 0; }
 
 .pb pre { margin: 0; background: var(--vp-c-bg-alt); border: 1px solid var(--vp-c-border); border-radius: 10px; padding: 14px 15px; max-height: 350px; overflow: auto; font-family: var(--vp-font-family-mono); font-size: 0.74rem; line-height: 1.65; }
+.pb .pb-summary-pre { margin: 0; background: var(--vp-c-bg-alt); border: 1px solid var(--vp-c-border); border-radius: 8px; padding: 10px; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-family: var(--vp-font-family-mono); font-size: 0.69rem; line-height: 1.45; }
 
 /* Responsive */
+@media (max-width: 1100px) {
+  .pb-shell { grid-template-columns: 1fr; }
+  .pb-summary { position: static; max-width: none; justify-self: stretch; }
+}
 @media (max-width: 1024px) { .pb-agent-grid { grid-template-columns: repeat(6, 72px); justify-content: space-around; } }
-@media (max-width: 920px) { .pb-fields { grid-template-columns: 1fr; } .pb-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); } }
+@media (max-width: 920px) {
+  .pb-fields { grid-template-columns: 1fr; }
+  .pb-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+}
 @media (max-width: 760px) {
   .pb-h1 { font-size: 2rem; }
-  .pb-step h2 { font-size: 1.28rem; }
+  .pb-step-head { grid-template-columns: 28px minmax(0, 1fr) auto 14px; gap: 10px; padding: 12px; }
+  .pb-step-number { width: 28px; height: 28px; font-size: 0.8rem; }
+  .pb-step-done-indicator { width: 18px; height: 18px; font-size: 0.66rem; }
+  .pb-step-title { font-size: 0.95rem; }
+  .pb-step-subtitle { font-size: 0.75rem; }
   .pb-agent-grid { grid-template-columns: repeat(4, 72px); justify-content: space-between; }
   .pb-actions { flex-direction: column; }
   .pb-btn { width: 100%; }
