@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import GettingStartedSnippet from './snippets/getting-started.md'
+import SandboxProofSnippet from './snippets/sandbox-proof.md'
+import ShellFunctionsSnippet from './snippets/shell-functions.md'
+
 const agents = [
   { name: 'Claude Code', logo: 'https://github.com/anthropics.png?size=256', link: '/agent-investigations/claude-code' },
   { name: 'Codex', logo: 'https://github.com/openai.png?size=256', link: '/agent-investigations/codex' },
@@ -94,30 +98,16 @@ const withRows = [
     <div class="home-container">
       <h2 class="section-title">Getting started</h2>
       <p class="section-sub">Download a single shell script, make it executable, and run your agent inside it. No build step, no dependencies — just Bash and macOS.</p>
-      <div class="code-block"><pre><code><span class="c"># 1. Download safehouse (single self-contained script)</span>
-<span class="k">mkdir</span> <span class="f">-p</span> <span class="s">~/.local/bin</span>
-<span class="k">curl</span> <span class="f">-fsSL</span> <span class="s">https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/safehouse.sh</span> \
-  <span class="f">-o</span> <span class="s">~/.local/bin/safehouse</span>
-<span class="k">chmod</span> <span class="f">+x</span> <span class="s">~/.local/bin/safehouse</span>
-
-<span class="c"># 2. Run any agent inside Safehouse</span>
-<span class="k">cd</span> ~/projects/my-app
-<span class="k">safehouse</span> claude <span class="f">--dangerously-skip-permissions</span></code></pre></div>
+      <div class="code-block">
+        <GettingStartedSnippet />
+      </div>
       <p class="muted-text">Safehouse automatically grants read/write access to the selected workdir (git root by default) and read access to your installed toolchains. Most of your home directory — SSH keys, other repos, personal files — is denied by the kernel.</p>
 
       <h3 class="subsection-title">See it fail — proof the sandbox works</h3>
       <p class="muted-text" style="margin-bottom: 16px;">Try reading something sensitive inside safehouse. The kernel blocks it before the process ever sees the data.</p>
-      <div class="code-block"><pre><code><span class="c"># Try to read your SSH private key — denied by the kernel</span>
-<span class="k">safehouse</span> cat ~/.ssh/id_ed25519
-<span class="c"># cat: /Users/you/.ssh/id_ed25519: Operation not permitted</span>
-
-<span class="c"># Try to list another repo — invisible</span>
-<span class="k">safehouse</span> ls ~/other-project
-<span class="c"># ls: /Users/you/other-project: Operation not permitted</span>
-
-<span class="c"># But your current project works fine</span>
-<span class="k">safehouse</span> ls .
-<span class="c"># README.md  src/  package.json  ...</span></code></pre></div>
+      <div class="code-block">
+        <SandboxProofSnippet />
+      </div>
     </div>
   </section>
 
@@ -126,17 +116,9 @@ const withRows = [
     <div class="home-container">
       <h2 class="section-title">Safe by default with shell functions</h2>
       <p class="section-sub">Add these to your shell config and every agent runs inside Safehouse automatically — you don't have to remember. To run without the sandbox, use <code>command claude</code> to bypass the function.</p>
-      <div class="code-block"><pre><code><span class="c"># ~/.zshrc or ~/.bashrc</span>
-<span class="k">safe</span>() { safehouse <span class="f">--add-dirs-ro=</span><span class="s">~/mywork</span> <span class="s">"$@"</span>; }
-
-<span class="c"># Sandboxed — the default. Just type the command name.</span>
-<span class="k">claude</span>()   { <span class="k">safe</span> claude <span class="f">--dangerously-skip-permissions</span> <span class="s">"$@"</span>; }
-<span class="k">codex</span>()    { <span class="k">safe</span> codex <span class="f">--dangerously-bypass-approvals-and-sandbox</span> <span class="s">"$@"</span>; }
-<span class="k">amp</span>()      { <span class="k">safe</span> amp <span class="f">--dangerously-allow-all</span> <span class="s">"$@"</span>; }
-<span class="k">gemini</span>()   { NO_BROWSER=true <span class="k">safe</span> gemini <span class="f">--yolo</span> <span class="s">"$@"</span>; }
-
-<span class="c"># Unsandboxed — bypass the function with `command`</span>
-<span class="c"># command claude               — plain interactive session</span></code></pre></div>
+      <div class="code-block">
+        <ShellFunctionsSnippet />
+      </div>
     </div>
   </section>
 </template>
@@ -356,23 +338,27 @@ const withRows = [
 .access-tag.denied { background: rgba(239, 83, 80, 0.1); color: #ef5350; border: 1px solid rgba(239, 83, 80, 0.15); }
 
 /* ---- Code blocks ---- */
-.code-block pre {
-  background: var(--vp-c-bg-alt);
+.code-block :deep(div[class*='language-']) {
+  position: relative;
+  margin: 0;
   border: 1px solid var(--vp-c-border);
   border-radius: 10px;
+  overflow: hidden;
+  background-color: var(--shiki-dark-bg, var(--vp-code-block-bg));
+}
+
+.code-block :deep(div[class*='language-'] pre) {
+  margin: 0;
   padding: 18px 22px;
-  overflow-x: auto;
   font-size: 0.81rem;
   line-height: 1.8;
-  margin: 0;
+  background: transparent !important;
 }
-.code-block code {
-  font-family: var(--vp-font-family-mono);
+
+.code-block :deep(div[class*='language-'] > span.lang),
+.code-block :deep(div[class*='language-'] > button.copy) {
+  display: none;
 }
-.code-block .c { color: var(--vp-c-text-2); }
-.code-block .k { color: #4ade80; }
-.code-block .f { color: #d4a017; }
-.code-block .s { color: #a78bfa; }
 
 /* ---- Responsive ---- */
 @media (max-width: 768px) {

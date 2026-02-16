@@ -49,6 +49,19 @@
 }
 
 /*
+ * We run with appearance disabled (always dark), so html may not have `.dark`.
+ * Force Shiki to use dark token/background variables in that mode.
+ */
+html:not(.dark) .shiki,
+html:not(.dark) .shiki span {
+  color: var(--shiki-dark, inherit) !important;
+}
+
+html:not(.dark) .shiki {
+  background-color: var(--shiki-dark-bg, var(--vp-code-block-bg)) !important;
+}
+
+/*
  * Hide the default VitePress hero text/name/tagline/actions/image
  * since we provide a fully custom hero via the home-hero-info slot.
  * Use direct child selectors to avoid hiding our custom component's classes.

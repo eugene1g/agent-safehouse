@@ -21,6 +21,13 @@ export default defineConfig({
 
   appearance: false,
 
+  markdown: {
+    theme: {
+      light: 'one-light',
+      dark: 'one-dark-pro',
+    },
+  },
+
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
