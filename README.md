@@ -24,7 +24,7 @@ LLM coding agents run shell commands with broad filesystem access. A prompt inje
 - **Keychain and Security framework** (auto-injected for keychain-dependent profiles)  - profiles can declare `$$require=55-integrations-optional/keychain.sb$$`, and Safehouse injects shared keychain/security rules automatically for those agents/apps. This avoids duplicating keychain rules across many profile files while keeping non-keychain agents on a tighter baseline.
 - **SCM credential stores** (always-on)  - `gh` and `glab` integrations are always enabled via core profile: `~/.config/gh`, `~/.cache/gh`, `~/.local/share/gh`, and `~/.config/glab-cli` paths are writable so git and issue workflows keep working. This intentionally allows agent and tool access to repo auth state.
 - **Sanitized runtime environment (default)**  - wrapped commands run with a minimal allowlist of env vars (`HOME`, `PATH`, `USER`, `SHELL`, `TERM`, `TMPDIR`, locale/XDG basics). This reduces accidental credential leakage from your shell environment.
-- **Runtime env controls** (opt-in)  - `--env` keeps the full inherited environment for wrapped commands; `--env=FILE` starts from the sanitized baseline and applies env values sourced from `FILE`.
+- **Runtime env controls** (opt-in)  - `--env` keeps the full inherited environment for wrapped commands; `--env=FILE` starts from the sanitized baseline and applies env values sourced from `FILE`; `--env-pass=NAME1,NAME2` passes only named host env vars on top of the sanitized baseline (or on top of `--env=FILE`).
 - **Clipboard access** (opt-in)  - `pbcopy`/`pbpaste` and other pb* workflows remain denied unless you explicitly add `--enable=clipboard` to your invocation. This is deliberate because clipboard contents can include secrets.
 - **Cloud credential stores** (opt-in)  - integrations for common cloud CLIs (`~/.aws`, `~/.config/gcloud`, `~/.azure`, etc.) are available via `--enable=cloud-credentials` and are disabled by default because they expose sensitive credentials. This grant is read/write so tools can refresh tokens and SSO/session caches in place.
 - **Kubernetes CLI state** (opt-in)  - `--enable=kubectl` opens canonical kubectl defaults (`~/.kube/config`, `~/.kube/cache`, `~/.kube/kuberc`) and krew plugin state under `~/.krew`.
@@ -83,6 +83,7 @@ SAFEHOUSE_APPEND_PROFILE="$HOME/.config/agent-safehouse/local-overrides.sb"
 
 safe() { safehouse --add-dirs-ro=~/mywork --append-profile="$SAFEHOUSE_APPEND_PROFILE" "$@"; }
 safeenv() { safe --env "$@"; } # only when wrapped command must inherit env vars
+safekeys() { safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY "$@"; } # prefer named pass-through over full --env
 claude()   { safe claude --dangerously-skip-permissions "$@"; }
 codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
 amp()      { safe amp --dangerously-allow-all "$@"; }
@@ -97,7 +98,7 @@ How this works:
 - `safe <agent> ...` keeps Safehouse's default workdir behavior: read/write access to the selected workdir (`git` root above CWD, otherwise CWD).
 - `--add-dirs-ro=~/mywork` adds read-only visibility across your shared workspace so agents can inspect nearby repos/reference files.
 - `--append-profile="$SAFEHOUSE_APPEND_PROFILE"` applies your local overrides (like the `~/.gitignore_global` allow rule) after generated defaults.
-- default execution uses a sanitized environment; use `safeenv`/`--env` for full pass-through, or `--env=FILE` for file-sourced overrides on top of sanitized defaults.
+- default execution uses a sanitized environment; use `safeenv`/`--env` for full pass-through, `safekeys`/`--env-pass=...` for named pass-through, or `--env=FILE` for file-sourced overrides on top of sanitized defaults.
 - Running from inside a repo under `~/mywork` gives that repo read/write plus read-only access to sibling paths under `~/mywork`.
 
 Run the real unsandboxed binary with `command claude` (or `command codex`, etc.) when needed.
@@ -193,8 +194,14 @@ safehouse --enable=shell-init -- claude --dangerously-skip-permissions
 # Pass through full inherited environment for wrapped command (off by default)
 safehouse --env -- codex --dangerously-bypass-approvals-and-sandbox
 
+# Pass through only selected host env vars (off by default)
+safehouse --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY -- codex --dangerously-bypass-approvals-and-sandbox
+
 # Source env values from file on top of sanitized defaults
 safehouse --env=./agent.env -- codex --dangerously-bypass-approvals-and-sandbox
+
+# Combine file-sourced defaults with selected host env vars (named vars win)
+safehouse --env=./agent.env --env-pass=OPENAI_API_KEY -- codex --dangerously-bypass-approvals-and-sandbox
 
 # Restore legacy behavior and include all scoped app/agent profiles
 safehouse --enable=all-agents,all-apps codex
@@ -301,7 +308,7 @@ The dist binary is self-contained: it embeds policy modules as plain text and do
 
 ## How It Works
 
-`safehouse` composes a sandbox policy from modular profiles, then runs your command under `sandbox-exec` (with sanitized env by default unless `--env` or `--env=FILE` is set). The policy is assembled in this order:
+`safehouse` composes a sandbox policy from modular profiles, then runs your command under `sandbox-exec` (with sanitized env by default unless `--env`, `--env=FILE`, or `--env-pass=...` is set). The policy is assembled in this order:
 
 | Layer | What it covers |
 |-------|---------------|
@@ -329,12 +336,14 @@ SBPL rule interactions are matcher-dependent. Safehouse tests currently verify t
 | `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
 | `--append-profile=PATH` | Append a sandbox profile file after generated rules (repeatable) |
 | `--enable=FEATURES` | Enable optional features: `clipboard`, `docker`, `kubectl`, `macos-gui`, `electron`, `ssh`, `spotlight`, `cleanshot`, `1password`, `cloud-credentials`, `browser-native-messaging`, `shell-init`, `all-agents`, `all-apps`, `wide-read` (`electron` also enables `macos-gui`; `shell-init` enables shell startup file reads; `all-agents` loads all `60-agents` profiles; `all-apps` loads all `65-apps` profiles; combine both for legacy all-profile behavior; `wide-read` adds broad read-only `/` visibility; keychain access is auto-injected from selected profile `$$require` metadata) |
-| `--env` / `--env=FILE` | Runtime env mode for wrapped command execution: `--env` passes full inherited env; `--env=FILE` uses sanitized defaults plus env values sourced from `FILE` (file values override defaults; `FILE` is Bash-sourced, not dotenv-parsed) |
+| `--env` | Runtime env mode for wrapped command execution: passes the full inherited env (incompatible with `--env-pass`) |
+| `--env=FILE` | Runtime env mode: starts from sanitized defaults plus env values sourced from `FILE` (`FILE` values override defaults; `FILE` is Bash-sourced, not dotenv-parsed) |
+| `--env-pass=NAMES` | Runtime env mode: comma-separated env var names to pass through from host env on top of sanitized defaults (or on top of `--env=FILE`); repeatable; names are deduplicated |
 | `--output=PATH` | Write policy to a file instead of a temp path |
 | `--stdout` | Print the generated policy contents to stdout (does not execute command) |
 | `--explain` | Print effective workdir, grant, and profile-selection summary to stderr |
 
-Path and feature flags accept both `--flag=value` and `--flag value` forms. `--env` supports either bare `--env` or `--env=FILE`. For path-based flags/config values, `~` and `~/...` are supported.
+Path and feature flags accept both `--flag=value` and `--flag value` forms. Runtime env flags support bare `--env`, `--env=FILE`, and `--env-pass=NAME1,NAME2` (or `--env-pass NAME1,NAME2`). For path-based flags/config values, `~` and `~/...` are supported.
 
 Execution behavior:
 - No command args: generate a policy and print the policy file path.
@@ -345,6 +354,8 @@ Environment behavior:
 - Default execution mode sanitizes the wrapped command environment to a minimal allowlist (`HOME`, `PATH`, `USER`/`LOGNAME`, `SHELL`, `TERM`, `TMPDIR`, locale/XDG basics, and similar runtime-safe vars).
 - `--env` disables that sanitization and passes the full inherited environment through to the wrapped command.
 - `--env=FILE` keeps the sanitized baseline and sources additional env values from `FILE`, with file values overriding sanitized defaults.
+- `--env-pass=NAME1,NAME2` passes only selected host env vars through on top of the sanitized baseline (or on top of `--env=FILE` when combined). If both `--env=FILE` and `--env-pass` set the same key, the host env value from `--env-pass` wins.
+- `SAFEHOUSE_ENV_PASS` supports the same comma-separated list format as `--env-pass`.
 
 `--env=FILE` format (`FILE` shape):
 - `FILE` is sourced by `/bin/bash` (with `set -a`), so it should be treated as trusted shell input.
@@ -367,6 +378,7 @@ Environment variables:
 - `SAFEHOUSE_ADD_DIRS`  - Colon-separated paths to grant read/write
 - `SAFEHOUSE_WORKDIR`  - Workdir override (`SAFEHOUSE_WORKDIR=` disables automatic workdir grants)
 - `SAFEHOUSE_TRUST_WORKDIR_CONFIG`  - Trust and load `<workdir>/.safehouse` (`1/0`, `true/false`, `yes/no`, `on/off`)
+- `SAFEHOUSE_ENV_PASS`  - Comma-separated env var names to pass through (same format as `--env-pass`)
 - `SAFEHOUSE_CLAUDE_POLICY_SHA256`  - (Claude launcher only) Expected SHA-256 for the downloaded online apps policy. If set, launch fails if the checksum does not match.
 
 Optional workdir config file:

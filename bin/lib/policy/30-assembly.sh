@@ -466,7 +466,7 @@ append_cli_profiles() {
 
 emit_explain_summary() {
 	local idx reason profile
-	local workdir_status config_status keychain_status exec_env_status
+	local workdir_status config_status keychain_status exec_env_status env_pass_names_status
 
 	[[ "$explain_mode" -eq 1 ]] || return 0
 
@@ -485,6 +485,12 @@ emit_explain_summary() {
 		keychain_status="not included"
 	fi
 
+	if [[ "${#runtime_env_pass_names[@]}" -gt 0 ]]; then
+		env_pass_names_status="${runtime_env_pass_names[*]}"
+	else
+		env_pass_names_status=""
+	fi
+
 	case "${runtime_env_mode:-sanitized}" in
 	passthrough)
 		exec_env_status="pass-through (enabled via --env)"
@@ -497,9 +503,16 @@ emit_explain_summary() {
 		else
 			exec_env_status="sanitized allowlist + file overrides (--env=FILE)"
 		fi
+		if [[ -n "$env_pass_names_status" ]]; then
+			exec_env_status="${exec_env_status} + named host vars (${env_pass_names_status})"
+		fi
 		;;
 	*)
-		exec_env_status="sanitized allowlist (default)"
+		if [[ -n "$env_pass_names_status" ]]; then
+			exec_env_status="sanitized allowlist + named host vars (${env_pass_names_status})"
+		else
+			exec_env_status="sanitized allowlist (default)"
+		fi
 		;;
 	esac
 

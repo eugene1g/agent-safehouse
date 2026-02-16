@@ -69,6 +69,50 @@ build_full_exec_environment() {
   done < <(compgen -e | LC_ALL=C sort)
 }
 
+validate_env_var_name() {
+  local var_name="$1"
+  [[ "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
+}
+
+append_runtime_env_pass_names_from_csv() {
+  local csv="$1"
+  local source_label="$2"
+  local token trimmed existing found
+  local IFS=','
+  local -a values=()
+
+  if [[ -z "$csv" ]]; then
+    echo "Missing value for ${source_label}" >&2
+    exit 1
+  fi
+
+  read -r -a values <<< "$csv"
+  for token in "${values[@]}"; do
+    trimmed="$(trim_whitespace "$token")"
+    if [[ -z "$trimmed" ]]; then
+      echo "Invalid ${source_label} value: empty environment variable name in list." >&2
+      exit 1
+    fi
+
+    if ! validate_env_var_name "$trimmed"; then
+      echo "Invalid ${source_label} value: ${trimmed} is not a valid environment variable name." >&2
+      exit 1
+    fi
+
+    found=0
+    for existing in "${runtime_env_pass_names[@]-}"; do
+      if [[ "$existing" == "$trimmed" ]]; then
+        found=1
+        break
+      fi
+    done
+
+    if [[ "$found" -eq 0 ]]; then
+      runtime_env_pass_names+=("$trimmed")
+    fi
+  done
+}
+
 load_env_file_environment() {
   local env_file_path="$1"
   local entry
@@ -128,6 +172,36 @@ merge_exec_environment_with_env_file() {
 
     if [[ "$replaced" -eq 0 ]]; then
       merged_exec_environment+=("$entry")
+    fi
+  done
+}
+
+merge_exec_environment_with_env_pass() {
+  local var_name entry key idx replaced
+
+  env_pass_merged_exec_environment=("$@")
+
+  for var_name in "${runtime_env_pass_names[@]-}"; do
+    if [[ "${!var_name+x}" != "x" ]]; then
+      echo "Requested --env-pass variable is not set in host environment: ${var_name}" >&2
+      exit 1
+    fi
+
+    entry="${var_name}=${!var_name}"
+    key="${entry%%=*}"
+    [[ -n "$key" ]] || continue
+
+    replaced=0
+    for idx in "${!env_pass_merged_exec_environment[@]}"; do
+      if [[ "${env_pass_merged_exec_environment[$idx]%%=*}" == "$key" ]]; then
+        env_pass_merged_exec_environment[$idx]="$entry"
+        replaced=1
+        break
+      fi
+    done
+
+    if [[ "$replaced" -eq 0 ]]; then
+      env_pass_merged_exec_environment+=("$entry")
     fi
   done
 }

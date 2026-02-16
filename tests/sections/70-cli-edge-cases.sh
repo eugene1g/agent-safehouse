@@ -8,7 +8,7 @@ run_section_cli_edge_cases() {
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config policy_workdir_config_ignored policy_workdir_config_env_trust missing_path home_not_dir
   local env_file_missing env_file_overrides env_file_tilde
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
-  local policy_explain explain_output_file explain_output_env_pass explain_output_env_file
+  local policy_explain explain_output_file explain_output_env_pass explain_output_env_file explain_output_env_named
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
   local policy_agent_codex policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents policy_agent_all_scoped
   local policy_agent_runner_npx policy_agent_runner_bunx policy_agent_runner_uvx policy_agent_runner_pipx policy_agent_runner_xcrun
@@ -158,10 +158,21 @@ run_section_cli_edge_cases() {
 
   section_begin "Execution Environment"
   assert_command_fails "--env= rejects empty value" "$SAFEHOUSE" --env= -- /usr/bin/true
+  assert_command_fails "--env-pass= rejects empty value" "$SAFEHOUSE" --env-pass= -- /usr/bin/true
+  assert_command_fails "--env-pass rejects empty names between commas" "$SAFEHOUSE" --env-pass=FOO,,BAR -- /usr/bin/true
+  assert_command_fails "--env-pass rejects invalid variable names" "$SAFEHOUSE" --env-pass=1INVALID_NAME -- /usr/bin/true
   env_file_missing="${TEST_CWD}/safehouse-env-missing.env"
   assert_command_fails "--env=FILE fails when file does not exist" "$SAFEHOUSE" --env="$env_file_missing" -- /usr/bin/true
   assert_command_succeeds "safehouse sanitizes non-allowlisted environment vars by default" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" -- /bin/sh -c '[ -z "${SAFEHOUSE_TEST_SECRET+x}" ] && [ -n "${HOME:-}" ] && [ -n "${PATH:-}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
   assert_command_succeeds "--env preserves inherited environment vars for wrapped commands" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" --env -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'
+  assert_command_fails "--env cannot be combined with --env-pass" "$SAFEHOUSE" --env --env-pass=SAFEHOUSE_TEST_SECRET -- /usr/bin/true
+  assert_command_fails "--env=FILE cannot be combined with --env" "$SAFEHOUSE" --env=./agent.env --env -- /usr/bin/true
+
+  assert_command_fails "--env-pass fails when requested host variable is missing" "$SAFEHOUSE" --env-pass=SAFEHOUSE_TEST_PASS_MISSING -- /usr/bin/true
+  assert_command_succeeds "--env-pass parses separate argument form" /usr/bin/env SAFEHOUSE_TEST_PASS_ONE="pass-one" "$SAFEHOUSE" --env-pass SAFEHOUSE_TEST_PASS_ONE -- /bin/sh -c '[ "${SAFEHOUSE_TEST_PASS_ONE:-}" = "pass-one" ]'
+  assert_command_succeeds "--env-pass passes only selected named vars" /usr/bin/env SAFEHOUSE_TEST_PASS_ONE="pass-one" SAFEHOUSE_TEST_PASS_TWO="pass-two" "$SAFEHOUSE" --env-pass=SAFEHOUSE_TEST_PASS_ONE -- /bin/sh -c '[ "${SAFEHOUSE_TEST_PASS_ONE:-}" = "pass-one" ] && [ -z "${SAFEHOUSE_TEST_PASS_TWO+x}" ] && [ -n "${PATH:-}" ]'
+  assert_command_succeeds "SAFEHOUSE_ENV_PASS applies named var pass-through in default sanitized mode" /usr/bin/env SAFEHOUSE_ENV_PASS="SAFEHOUSE_TEST_PASS_ONE" SAFEHOUSE_TEST_PASS_ONE="env-pass-value" SAFEHOUSE_TEST_PASS_TWO="blocked-value" "$SAFEHOUSE" -- /bin/sh -c '[ "${SAFEHOUSE_TEST_PASS_ONE:-}" = "env-pass-value" ] && [ -z "${SAFEHOUSE_TEST_PASS_TWO+x}" ]'
+
   env_file_overrides="${TEST_CWD}/safehouse-env-overrides.env"
   cat > "$env_file_overrides" <<EOF
 SAFEHOUSE_TEST_SECRET=file-secret
@@ -169,6 +180,7 @@ PATH=/safehouse/env-path
 HOME=/safehouse/env-home
 EOF
   assert_command_succeeds "--env=FILE loads vars and overrides sanitized defaults" /usr/bin/env SAFEHOUSE_TEST_HOST_ONLY="host-only" "$SAFEHOUSE" --env="$env_file_overrides" -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "file-secret" ] && [ "${PATH:-}" = "/safehouse/env-path" ] && [ "${HOME:-}" = "/safehouse/env-home" ] && [ -z "${SAFEHOUSE_TEST_HOST_ONLY+x}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
+  assert_command_succeeds "--env-pass overrides matching values sourced from --env=FILE" /usr/bin/env SAFEHOUSE_TEST_SECRET="host-secret" "$SAFEHOUSE" --env="$env_file_overrides" --env-pass=SAFEHOUSE_TEST_SECRET -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "host-secret" ] && [ "${PATH:-}" = "/safehouse/env-path" ] && [ "${HOME:-}" = "/safehouse/env-home" ]'
   env_file_tilde="${HOME}/.safehouse-env-tilde-$$.env"
   cat > "$env_file_tilde" <<EOF
 SAFEHOUSE_TEST_SECRET=tilde-secret
@@ -177,12 +189,15 @@ EOF
 
   explain_output_env_pass="${TEST_CWD}/policy-explain-env-pass-output.txt"
   explain_output_env_file="${TEST_CWD}/policy-explain-env-file-output.txt"
-  rm -f "$explain_output_env_pass" "$explain_output_env_file"
+  explain_output_env_named="${TEST_CWD}/policy-explain-env-named-output.txt"
+  rm -f "$explain_output_env_pass" "$explain_output_env_file" "$explain_output_env_named"
   set +e
   "$SAFEHOUSE" --env --explain --stdout >/dev/null 2>"$explain_output_env_pass"
   local explain_env_pass_status=$?
   "$SAFEHOUSE" --env="$env_file_overrides" --explain --stdout >/dev/null 2>"$explain_output_env_file"
   local explain_env_file_status=$?
+  "$SAFEHOUSE" --env-pass=SAFEHOUSE_TEST_EXPLAIN --explain --stdout >/dev/null 2>"$explain_output_env_named"
+  local explain_env_named_status=$?
   set -e
   if [[ "$explain_env_pass_status" -eq 0 ]] && [[ -f "$explain_output_env_pass" ]] && grep -Fq "execution environment: pass-through (enabled via --env)" "$explain_output_env_pass"; then
     log_pass "--env explain output reports pass-through mode"
@@ -194,7 +209,12 @@ EOF
   else
     log_fail "--env=FILE explain output reports file override mode"
   fi
-  rm -f "$explain_output_env_pass" "$explain_output_env_file"
+  if [[ "$explain_env_named_status" -eq 0 ]] && [[ -f "$explain_output_env_named" ]] && grep -Fq "execution environment: sanitized allowlist + named host vars (SAFEHOUSE_TEST_EXPLAIN)" "$explain_output_env_named"; then
+    log_pass "--env-pass explain output reports named host var mode"
+  else
+    log_fail "--env-pass explain output reports named host var mode"
+  fi
+  rm -f "$explain_output_env_pass" "$explain_output_env_file" "$explain_output_env_named"
   rm -f "$env_file_overrides"
   rm -f "$env_file_tilde"
 

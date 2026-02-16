@@ -1831,6 +1831,7 @@ explain_mode=0
 runtime_env_mode="sanitized"
 runtime_env_file=""
 runtime_env_file_resolved=""
+runtime_env_pass_names=()
 
 if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
   workdir_env_set=1
@@ -1914,6 +1915,50 @@ build_full_exec_environment() {
   done < <(compgen -e | LC_ALL=C sort)
 }
 
+validate_env_var_name() {
+  local var_name="$1"
+  [[ "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
+}
+
+append_runtime_env_pass_names_from_csv() {
+  local csv="$1"
+  local source_label="$2"
+  local token trimmed existing found
+  local IFS=','
+  local -a values=()
+
+  if [[ -z "$csv" ]]; then
+    echo "Missing value for ${source_label}" >&2
+    exit 1
+  fi
+
+  read -r -a values <<< "$csv"
+  for token in "${values[@]}"; do
+    trimmed="$(trim_whitespace "$token")"
+    if [[ -z "$trimmed" ]]; then
+      echo "Invalid ${source_label} value: empty environment variable name in list." >&2
+      exit 1
+    fi
+
+    if ! validate_env_var_name "$trimmed"; then
+      echo "Invalid ${source_label} value: ${trimmed} is not a valid environment variable name." >&2
+      exit 1
+    fi
+
+    found=0
+    for existing in "${runtime_env_pass_names[@]-}"; do
+      if [[ "$existing" == "$trimmed" ]]; then
+        found=1
+        break
+      fi
+    done
+
+    if [[ "$found" -eq 0 ]]; then
+      runtime_env_pass_names+=("$trimmed")
+    fi
+  done
+}
+
 load_env_file_environment() {
   local env_file_path="$1"
   local entry
@@ -1973,6 +2018,36 @@ merge_exec_environment_with_env_file() {
 
     if [[ "$replaced" -eq 0 ]]; then
       merged_exec_environment+=("$entry")
+    fi
+  done
+}
+
+merge_exec_environment_with_env_pass() {
+  local var_name entry key idx replaced
+
+  env_pass_merged_exec_environment=("$@")
+
+  for var_name in "${runtime_env_pass_names[@]-}"; do
+    if [[ "${!var_name+x}" != "x" ]]; then
+      echo "Requested --env-pass variable is not set in host environment: ${var_name}" >&2
+      exit 1
+    fi
+
+    entry="${var_name}=${!var_name}"
+    key="${entry%%=*}"
+    [[ -n "$key" ]] || continue
+
+    replaced=0
+    for idx in "${!env_pass_merged_exec_environment[@]}"; do
+      if [[ "${env_pass_merged_exec_environment[$idx]%%=*}" == "$key" ]]; then
+        env_pass_merged_exec_environment[$idx]="$entry"
+        replaced=1
+        break
+      fi
+    done
+
+    if [[ "$replaced" -eq 0 ]]; then
+      env_pass_merged_exec_environment+=("$entry")
     fi
   done
 }
@@ -3018,7 +3093,7 @@ append_cli_profiles() {
 
 emit_explain_summary() {
 	local idx reason profile
-	local workdir_status config_status keychain_status exec_env_status
+	local workdir_status config_status keychain_status exec_env_status env_pass_names_status
 
 	[[ "$explain_mode" -eq 1 ]] || return 0
 
@@ -3037,6 +3112,12 @@ emit_explain_summary() {
 		keychain_status="not included"
 	fi
 
+	if [[ "${#runtime_env_pass_names[@]}" -gt 0 ]]; then
+		env_pass_names_status="${runtime_env_pass_names[*]}"
+	else
+		env_pass_names_status=""
+	fi
+
 	case "${runtime_env_mode:-sanitized}" in
 	passthrough)
 		exec_env_status="pass-through (enabled via --env)"
@@ -3049,9 +3130,16 @@ emit_explain_summary() {
 		else
 			exec_env_status="sanitized allowlist + file overrides (--env=FILE)"
 		fi
+		if [[ -n "$env_pass_names_status" ]]; then
+			exec_env_status="${exec_env_status} + named host vars (${env_pass_names_status})"
+		fi
 		;;
 	*)
-		exec_env_status="sanitized allowlist (default)"
+		if [[ -n "$env_pass_names_status" ]]; then
+			exec_env_status="sanitized allowlist + named host vars (${env_pass_names_status})"
+		else
+			exec_env_status="sanitized allowlist (default)"
+		fi
 		;;
 	esac
 
@@ -3607,6 +3695,12 @@ Policy scope options:
       by sourcing FILE (FILE values override sanitized defaults)
       FILE is sourced by /bin/bash (trusted shell input, not dotenv parsing)
 
+  --env-pass NAMES
+  --env-pass=NAMES
+      Comma-separated env variable names to pass through from host env
+      on top of sanitized defaults (repeatable; names are deduplicated)
+      Compatible with default mode and --env=FILE; incompatible with --env
+
   --add-dirs-ro PATHS
   --add-dirs-ro=PATHS
       Colon-separated paths to grant read-only access
@@ -3657,6 +3751,9 @@ Environment:
   SAFEHOUSE_TRUST_WORKDIR_CONFIG
       Trust and load <workdir>/.safehouse (1/0, true/false, yes/no, on/off)
 
+  SAFEHOUSE_ENV_PASS
+      Comma-separated env var names to pass through (same format as --env-pass)
+
 Config file:
   <workdir>/.safehouse (optional, loaded only when trusted)
       Supports keys:
@@ -3704,7 +3801,14 @@ main() {
   local detected_app_bundle=""
   local execution_env_mode="sanitized"
   local execution_env_file=""
+  local execution_env_pass_csv=""
+  local -a execution_environment=()
   local status=0
+
+  runtime_env_pass_names=()
+  if [[ "${SAFEHOUSE_ENV_PASS+x}" == "x" && -n "${SAFEHOUSE_ENV_PASS}" ]]; then
+    append_runtime_env_pass_names_from_csv "${SAFEHOUSE_ENV_PASS}" "SAFEHOUSE_ENV_PASS"
+  fi
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -3725,6 +3829,14 @@ main() {
         shift
         ;;
       --env)
+        if [[ "${#runtime_env_pass_names[@]}" -gt 0 ]]; then
+          echo "--env cannot be combined with --env-pass or SAFEHOUSE_ENV_PASS." >&2
+          exit 1
+        fi
+        if [[ "$execution_env_mode" == "file" ]]; then
+          echo "--env cannot be combined with --env=FILE." >&2
+          exit 1
+        fi
         execution_env_mode="passthrough"
         execution_env_file=""
         shift
@@ -3732,7 +3844,30 @@ main() {
       --env=*)
         execution_env_file="${1#*=}"
         [[ -n "$execution_env_file" ]] || { echo "Missing value for --env=FILE" >&2; exit 1; }
+        if [[ "$execution_env_mode" == "passthrough" ]]; then
+          echo "--env=FILE cannot be combined with --env." >&2
+          exit 1
+        fi
         execution_env_mode="file"
+        shift
+        ;;
+      --env-pass)
+        [[ $# -ge 2 ]] || { echo "Missing value for --env-pass" >&2; exit 1; }
+        if [[ "$execution_env_mode" == "passthrough" ]]; then
+          echo "--env-pass cannot be combined with --env." >&2
+          exit 1
+        fi
+        append_runtime_env_pass_names_from_csv "$2" "--env-pass"
+        shift 2
+        ;;
+      --env-pass=*)
+        execution_env_pass_csv="${1#*=}"
+        [[ -n "$execution_env_pass_csv" ]] || { echo "Missing value for --env-pass=LIST" >&2; exit 1; }
+        if [[ "$execution_env_mode" == "passthrough" ]]; then
+          echo "--env-pass cannot be combined with --env." >&2
+          exit 1
+        fi
+        append_runtime_env_pass_names_from_csv "$execution_env_pass_csv" "--env-pass"
         shift
         ;;
       --)
@@ -3836,19 +3971,24 @@ main() {
   set +e
   if [[ "$runtime_env_mode" == "passthrough" ]]; then
     build_full_exec_environment
-    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${full_exec_environment[@]}" "${command_args[@]}"
-    status=$?
+    execution_environment=("${full_exec_environment[@]}")
   elif [[ "$runtime_env_mode" == "file" ]]; then
     build_sanitized_exec_environment
     load_env_file_environment "$runtime_env_file_resolved"
     merge_exec_environment_with_env_file
-    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${merged_exec_environment[@]}" "${command_args[@]}"
-    status=$?
+    execution_environment=("${merged_exec_environment[@]}")
   else
     build_sanitized_exec_environment
-    sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${sanitized_exec_environment[@]}" "${command_args[@]}"
-    status=$?
+    execution_environment=("${sanitized_exec_environment[@]}")
   fi
+
+  if [[ "$runtime_env_mode" != "passthrough" ]] && [[ "${#runtime_env_pass_names[@]}" -gt 0 ]]; then
+    merge_exec_environment_with_env_pass "${execution_environment[@]}"
+    execution_environment=("${env_pass_merged_exec_environment[@]}")
+  fi
+
+  sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${execution_environment[@]}" "${command_args[@]}"
+  status=$?
   set -e
 
   if [[ "$keep_policy_file" -ne 1 ]]; then

@@ -96,6 +96,7 @@ explain_mode=0
 runtime_env_mode="sanitized"
 runtime_env_file=""
 runtime_env_file_resolved=""
+runtime_env_pass_names=()
 
 if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
   workdir_env_set=1
