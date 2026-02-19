@@ -837,7 +837,15 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_cleanshot_sb__
 
 (allow mach-lookup
     (global-name "com.apple.pasteboard.1")                               ;; Pasteboard service used by pbcopy/pbpaste.
+    (global-name "com.apple.lsd.mapdb")                                  ;; Launch Services type lookups required by pbcopy.
+    (global-name "com.apple.lsd.modifydb")
 )
+
+;; Don't actually need these for clipboarding (I think)
+;; (allow file-read*
+;;     (home-subpath "/Library/Preferences/com.apple.LaunchServices")       ;; LaunchServices prefs read by pbcopy for UTI resolution.
+;;     (subpath "/System/iOSSupport/System/Library/ExtensionKit/ExtensionPoints")
+;; )
 __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_clipboard_sb__
       ;;
     "profiles/55-integrations-optional/cloud-credentials.sb")
@@ -1296,6 +1304,7 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_aider_sb__
 ;; Agent: Amp
 ;; Amp CLI binary, state, and config paths.
 ;; Source: 60-agents/amp.sb
+;; $$require=55-integrations-optional/clipboard.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - install script binary locations:

@@ -641,8 +641,8 @@ emit_embedded_policy_template() {
 )
 
 ;; Optional integrations explicitly enabled: macos-gui electron
-;; Optional integrations implicitly injected: browser-native-messaging
-;; Optional integrations not included: docker kubectl ssh spotlight cleanshot clipboard 1password cloud-credentials shell-init
+;; Optional integrations implicitly injected: clipboard browser-native-messaging
+;; Optional integrations not included: docker kubectl ssh spotlight cleanshot 1password cloud-credentials shell-init
 ;; Keychain integration (auto-injected from profile requirements): included
 ;; Use --enable=<feature> (comma-separated) to include optional integrations explicitly.
 ;; Note: selected app/agent profiles and enabled integrations can inject dependencies via $$require=<integration-profile-path>$$ metadata.
@@ -751,6 +751,24 @@ emit_embedded_policy_template() {
     (home-subpath "/Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts")
     (home-subpath "/Library/Application Support/Mozilla/NativeMessagingHosts")
 )
+
+;; ---------------------------------------------------------------------------
+;; Integration: Clipboard
+;; Clipboard read/write access for macOS pbcopy/pbpaste and related workflows.
+;; Source: 55-integrations-optional/clipboard.sb
+;; ---------------------------------------------------------------------------
+
+(allow mach-lookup
+    (global-name "com.apple.pasteboard.1")                               ;; Pasteboard service used by pbcopy/pbpaste.
+    (global-name "com.apple.lsd.mapdb")                                  ;; Launch Services type lookups required by pbcopy.
+    (global-name "com.apple.lsd.modifydb")
+)
+
+;; Don't actually need these for clipboarding (I think)
+;; (allow file-read*
+;;     (home-subpath "/Library/Preferences/com.apple.LaunchServices")       ;; LaunchServices prefs read by pbcopy for UTI resolution.
+;;     (subpath "/System/iOSSupport/System/Library/ExtensionKit/ExtensionPoints")
+;; )
 
 ;; ---------------------------------------------------------------------------
 ;; Integration: Electron
@@ -1031,6 +1049,7 @@ emit_embedded_policy_template() {
 ;; Agent: Amp
 ;; Amp CLI binary, state, and config paths.
 ;; Source: 60-agents/amp.sb
+;; $$require=55-integrations-optional/clipboard.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - install script binary locations:
