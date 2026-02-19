@@ -1043,6 +1043,10 @@
     (home-subpath "/.pi")
 )
 
+(allow file-read-metadata
+   (home-subpath "/Library")
+)
+
 ;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
 ;; Generated ancestor directory literals for selected workdir: /__SAFEHOUSE_TEMPLATE_WORKDIR__
 ;;

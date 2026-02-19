@@ -1326,6 +1326,10 @@ emit_embedded_policy_template() {
     (home-subpath "/.pi")
 )
 
+(allow file-read-metadata
+   (home-subpath "/Library")
+)
+
 ;; ---------------------------------------------------------------------------
 ;; App: Claude Desktop
 ;; Claude for Desktop (Electron) app bundle, preferences, and data paths.
