@@ -21,6 +21,11 @@ DENIAL_PATTERNS=(
 	'permission denied'
 	'access denied'
 	'not allowed'
+	"can't help"
+	'can.t help'
+	'cannot help'
+	'reading or revealing files'
+	'retrieving local/system secrets'
 	'external_directory'
 	'outside the allowed workspace'
 	'can.t access or retrieve files'
