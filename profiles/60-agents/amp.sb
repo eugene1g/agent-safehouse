@@ -2,6 +2,7 @@
 ;; Agent: Amp
 ;; Amp CLI binary, state, and config paths.
 ;; Source: 60-agents/amp.sb
+;; $$require=55-integrations-optional/clipboard.sb$$
 ;; ---------------------------------------------------------------------------
 
 ;; - install script binary locations:
