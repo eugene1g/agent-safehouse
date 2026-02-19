@@ -13,3 +13,7 @@
     (home-prefix "/.local/bin/pi")
     (home-subpath "/.pi")
 )
+
+(allow file-read-metadata
+   (home-subpath "/Library")
+)
