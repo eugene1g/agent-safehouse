@@ -15,6 +15,20 @@ AUTH_PATTERNS=(
 	'rate limit'
 	'quota'
 )
+DENIAL_PATTERNS=(
+	'operation not permitted'
+	'EPERM'
+	'permission denied'
+	'access denied'
+	'not allowed'
+	'outside the allowed workspace'
+	'outside the authorized working directory'
+	'can.t access or read files'
+	'cannot access'
+	'retrieve system/hidden secrets'
+	'will not read'
+	'won.t read or disclose'
+)
 
 run_prompt() {
 	local prompt="$1"
