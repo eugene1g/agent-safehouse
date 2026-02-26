@@ -25,6 +25,7 @@ PROFILE_KEYS=(
   "profiles/40-shared/agent-common.sb"
   "profiles/50-integrations-core/container-runtime-default-deny.sb"
   "profiles/50-integrations-core/git.sb"
+  "profiles/50-integrations-core/launch-services.sb"
   "profiles/50-integrations-core/scm-clis.sb"
   "profiles/55-integrations-optional/1password.sb"
   "profiles/55-integrations-optional/browser-native-messaging.sb"
@@ -710,6 +711,46 @@ __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_container_runtime_default_den
     (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by SSH git transports.
 )
 __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_git_sb__
+      ;;
+    "profiles/50-integrations-core/launch-services.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_launch_services_sb__'
+;; ---------------------------------------------------------------------------
+;; Integration: Launch Services
+;; macOS Launch Services access needed by the `open` command to resolve
+;; which application should handle a file, folder, or URL, then launch it.
+;; Source: 50-integrations-core/launch-services.sb
+;; ---------------------------------------------------------------------------
+
+;; -- Mach services -----------------------------------------------------------
+;; `open` queries lsd to map file types / UTIs to default applications, then
+;; talks to Core Services to actually launch the resolved handler.
+(allow mach-lookup
+    (global-name "com.apple.lsd.mapdb")                          ;; Read-only type→app mapping database.
+    (global-name "com.apple.lsd.modifydb")                       ;; Writeable mapping database (required even for read-only `open` calls).
+    (global-name "com.apple.coreservices.quarantine-resolver")    ;; Gatekeeper quarantine check before launching an app.
+;    (global-name "com.apple.coreservices.appleevents")           ;; Apple Events IPC used by `open` to tell the target app what to open.
+;    (global-name "com.apple.metadata.mds.legacy")                ;; Legacy Spotlight interface used during app resolution.
+)
+
+;; -- Launch Services preferences and ExtensionKit discovery ------------------
+;(allow file-read*
+;    (home-subpath "/Library/Preferences/com.apple.LaunchServices")  ;; Per-user default-app overrides and secure plist.
+;)
+
+;; -- Sandbox extension issuance ----------------------------------------------
+;; When `open` hands a path to the target application, it issues a sandbox
+;; extension so the launched app can access the file/folder. Without this
+;; the target app receives the open request but cannot read the path.
+(allow file-issue-extension
+    (extension-class "com.apple.app-sandbox.read")
+    (extension-class "com.apple.app-sandbox.read-write")
+)
+
+;; -- Launch Services open action ---------------------------------------------
+;; The `lsopen` operation is the kernel-level Launch Services call that
+;; actually opens a file/folder/URL with its registered handler application.
+(allow lsopen)
+__SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_launch_services_sb__
       ;;
     "profiles/50-integrations-core/scm-clis.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_scm_clis_sb__'
