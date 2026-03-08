@@ -53,6 +53,7 @@ setup_test_environment() {
   TEST_GIT_SUBDIR="${TEST_GIT_REPO}/nested/work"
   TEST_RO_FILE="${HOME}/.safehouse-test-ro-file.$$"
   TEST_RW_FILE="${HOME}/.safehouse-test-rw-file.$$"
+  TEST_GITIGNORE_FILE="${HOME}/.gitignore-safehouse-test.$$"
   TEST_TMP_CANARY="/tmp/safehouse-test-tmp-canary.$$"
   TEST_HOME_CANARY="${HOME}/.safehouse-test-home-canary.$$"
   SAFEHOUSE_OUTPUT_POLICY="${TEST_CWD}/safehouse-output-policy.sb"
@@ -68,6 +69,7 @@ setup_test_environment() {
   echo "test-overlap-content" > "${TEST_OVERLAP_DIR}/overlap.txt"
   echo "test-ro-file-content" > "$TEST_RO_FILE"
   echo "test-rw-file-content" > "$TEST_RW_FILE"
+  echo "safehouse-test-ignore" > "$TEST_GITIGNORE_FILE"
 
   echo "Generating default policy (CWD=${TEST_CWD})..."
   POLICY_DEFAULT="$(cd "$TEST_CWD" && "$GENERATOR")"
@@ -122,7 +124,7 @@ cleanup_test_environment() {
     "$TEST_DENIED_DIR" \
     "$TEST_GIT_REPO"
 
-  rm -f "$TEST_RO_FILE" "$TEST_RW_FILE" "$TEST_TMP_CANARY" "$TEST_HOME_CANARY" "$SAFEHOUSE_OUTPUT_POLICY" "$DRY_RUN_CANARY"
+  rm -f "$TEST_RO_FILE" "$TEST_RW_FILE" "$TEST_GITIGNORE_FILE" "$TEST_TMP_CANARY" "$TEST_HOME_CANARY" "$SAFEHOUSE_OUTPUT_POLICY" "$DRY_RUN_CANARY"
 
   if [[ -n "${POLICY_DEFAULT:-}" && -f "${POLICY_DEFAULT:-}" ]]; then
     rm -f "$POLICY_DEFAULT"
