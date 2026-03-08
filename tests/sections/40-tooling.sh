@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 run_section_tooling() {
-  local node_bin
-  local policy_claude_startup policy_amp_startup
+  local node_bin copilot_bin
+  local policy_claude_startup policy_amp_startup policy_copilot_startup
 
   section_begin "Toolchains"
   assert_allowed_if_exists "$POLICY_DEFAULT" "git --version" "git" /bin/sh -c 'git --version'
@@ -21,14 +21,27 @@ run_section_tooling() {
   section_begin "Agent Startup"
   policy_claude_startup="${TEST_CWD}/policy-agent-startup-claude.sb"
   policy_amp_startup="${TEST_CWD}/policy-agent-startup-amp.sb"
+  policy_copilot_startup="${TEST_CWD}/policy-agent-startup-copilot.sb"
 
   assert_command_succeeds "safehouse generates command-scoped policy for claude startup checks" "$SAFEHOUSE" --stdout --output "$policy_claude_startup" -- claude --version
   assert_command_succeeds "safehouse generates command-scoped policy for amp startup checks" "$SAFEHOUSE" --stdout --output "$policy_amp_startup" -- amp --version
+  copilot_bin="$(command -v copilot 2>/dev/null || true)"
+  if [[ -n "$copilot_bin" ]]; then
+    copilot_bin="$(realpath "$copilot_bin" 2>/dev/null || readlink -f "$copilot_bin" 2>/dev/null || echo "$copilot_bin")"
+    assert_command_succeeds "safehouse generates command-scoped policy for copilot startup checks" "$SAFEHOUSE" --stdout --output "$policy_copilot_startup" -- "$copilot_bin" --version
+  else
+    log_skip "safehouse generates command-scoped policy for copilot startup checks (copilot not found)"
+  fi
 
   assert_allowed_if_exists "$policy_claude_startup" "claude --version" "${HOME}/.local/bin/claude" /bin/sh -c "'${HOME}/.local/bin/claude' --version"
   assert_allowed_if_exists "$policy_amp_startup" "amp --version" "${HOME}/.amp/bin/amp" /bin/sh -c "'${HOME}/.amp/bin/amp' --version"
+  if [[ -n "$copilot_bin" ]]; then
+    assert_allowed_strict "$policy_copilot_startup" "copilot --version" "$copilot_bin" --version
+  else
+    log_skip "copilot --version (copilot not found)"
+  fi
 
-  rm -f "$policy_claude_startup" "$policy_amp_startup"
+  rm -f "$policy_claude_startup" "$policy_amp_startup" "$policy_copilot_startup"
 
   section_begin "Git Operations"
   assert_allowed "$POLICY_DEFAULT" "git init in CWD" /bin/sh -c "cd '${TEST_CWD}' && git init -q"

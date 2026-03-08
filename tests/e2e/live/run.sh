@@ -107,6 +107,7 @@ command_basename_for_profile() {
 
 	case "${profile_base}" in
 	claude-code) printf '%s\n' "claude" ;;
+	copilot-cli) printf '%s\n' "copilot" ;;
 	cursor-agent) printf '%s\n' "cursor-agent" ;;
 	kilo-code) printf '%s\n' "kilo" ;;
 	*) printf '%s\n' "${profile_base}" ;;

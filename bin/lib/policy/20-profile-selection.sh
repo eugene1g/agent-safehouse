@@ -66,6 +66,9 @@ resolve_selected_agent_profiles() {
     cline)
       append_selected_agent_profile "cline.sb" "command basename match: ${cmd}"
       ;;
+    copilot)
+      append_selected_agent_profile "copilot-cli.sb" "command basename match: ${cmd}"
+      ;;
     codex)
       append_selected_agent_profile "codex.sb" "command basename match: ${cmd}"
       ;;

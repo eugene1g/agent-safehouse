@@ -929,6 +929,24 @@
 )
 
 ;; ---------------------------------------------------------------------------
+;; Agent: GitHub Copilot CLI
+;; GitHub Copilot CLI default state/config directory and auth integration.
+;; Source: 60-agents/copilot-cli.sb
+;; $$require=55-integrations-optional/keychain.sb$$
+;; ---------------------------------------------------------------------------
+
+;; - Homebrew cask installs are covered by the baseline /opt runtime grant.
+;; - npm/pnpm global installs commonly expose the launcher via ~/.local/bin or ~/bin.
+;; - Copilot CLI keeps config, logs, unpacked package assets, and session state
+;;   under ~/.copilot by default (`--config-dir` overrides this at runtime).
+
+(allow file-read* file-write*
+    (home-prefix "/.local/bin/copilot")
+    (home-prefix "/bin/copilot")
+    (home-subpath "/.copilot")
+)
+
+;; ---------------------------------------------------------------------------
 ;; Agent: Cursor
 ;; Cursor CLI binary, state, config, and app bundle paths.
 ;; Source: 60-agents/cursor-agent.sb
