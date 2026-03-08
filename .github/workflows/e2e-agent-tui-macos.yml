@@ -146,8 +146,8 @@ jobs:
           SAFEHOUSE_E2E_USE_PNPM_AGENTS: "1"
           SAFEHOUSE_E2E_ALLOW_GLOBAL_BIN: "0"
           SAFEHOUSE_E2E_LIVE_JOBS: "15"
-          # In CI, unmet prerequisites should fail the job (auth/config/setup must be correct).
-          SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP: "0"
+          # Optional vendor auth/setup drift should skip coverage rather than red-build CI.
+          SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP: "1"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
