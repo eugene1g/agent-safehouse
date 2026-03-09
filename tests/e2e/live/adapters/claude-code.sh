@@ -22,9 +22,12 @@ AUTH_PATTERNS=(
 DENIAL_PATTERNS=(
 	'access files outside'
 	'arbitrary paths'
+	'i can.t access that file'
 	'can.t read that file'
 	'can.t read files from arbitrary paths'
+	'not able to read files from directories'
 	'restricted file'
+	'restricted or forbidden'
 	'current working directory'
 	'related project files'
 	'authorized working director'

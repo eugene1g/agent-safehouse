@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 run_section_tooling() {
-  local node_bin java_bin copilot_bin
+  local node_bin java_home_dir copilot_bin
   local policy_claude_startup policy_amp_startup policy_copilot_startup
 
   section_begin "Toolchains"
@@ -15,12 +15,17 @@ run_section_tooling() {
     log_skip "node --version (node not found)"
   fi
 
-  java_bin="$(command -v java 2>/dev/null || true)"
-  if [[ -n "$java_bin" ]]; then
-    java_bin="$(realpath "$java_bin" 2>/dev/null || readlink -f "$java_bin" 2>/dev/null || echo "$java_bin")"
-    assert_allowed_strict "$POLICY_DEFAULT" "java -version" "$java_bin" -version
+  if [[ -x /usr/bin/java ]]; then
+    java_home_dir="$(/usr/libexec/java_home 2>/dev/null || true)"
+    if [[ -n "$java_home_dir" ]] && [[ "$java_home_dir" == /Library/Java/* || "$java_home_dir" == "${HOME}"/Library/Java/* ]]; then
+      assert_allowed_strict "$POLICY_DEFAULT" "java -version" /usr/bin/java -version
+    elif [[ -n "$java_home_dir" ]]; then
+      log_skip "java -version (java_home resolved nonstandard runtime outside policy: ${java_home_dir})"
+    else
+      log_skip "java -version (no discoverable macOS runtime via java_home)"
+    fi
   else
-    log_skip "java -version (java not found)"
+    log_skip "java -version (/usr/bin/java not found)"
   fi
 
   assert_allowed_if_exists "$POLICY_DEFAULT" "python3 --version" "python3" /bin/sh -c 'python3 --version'
