@@ -267,7 +267,7 @@ emit_embedded_policy_template() {
 )
 
 ;; Generated HOME ancestor metadata access for home-scoped runtime/toolchain discovery.
-;; #safehouse-test-id:home-ancestor-metadata# Metadata-only ancestor directory literals for HOME path: /Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/home
+;; #safehouse-test-id:home-ancestor-metadata# Metadata-only ancestor directory literals for HOME path: /home/runner/work/agent-safehouse/agent-safehouse/dist/agent-safehouse-static-template/home
 ;;
 ;; Why file-read-metadata on HOME ancestors:
 ;; Some macOS runtimes probe HOME-scoped toolchain paths (for example ~/Library/Java)
@@ -276,13 +276,14 @@ emit_embedded_policy_template() {
 ;; grants can match. Keep this metadata-only to avoid broad read visibility into HOME.
 (allow file-read-metadata
     (literal "/")
-    (literal "/Users")
-    (literal "/Users/eugene")
-    (literal "/Users/eugene/server")
-    (literal "/Users/eugene/server/agent-safehouse")
-    (literal "/Users/eugene/server/agent-safehouse/dist")
-    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template")
-    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/home")
+    (literal "/home")
+    (literal "/home/runner")
+    (literal "/home/runner/work")
+    (literal "/home/runner/work/agent-safehouse")
+    (literal "/home/runner/work/agent-safehouse/agent-safehouse")
+    (literal "/home/runner/work/agent-safehouse/agent-safehouse/dist")
+    (literal "/home/runner/work/agent-safehouse/agent-safehouse/dist/agent-safehouse-static-template")
+    (literal "/home/runner/work/agent-safehouse/agent-safehouse/dist/agent-safehouse-static-template/home")
 )
 
 ;; ---------------------------------------------------------------------------
