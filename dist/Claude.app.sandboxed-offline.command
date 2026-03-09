@@ -642,7 +642,7 @@ emit_embedded_policy_template() {
 
 ;; Optional integrations explicitly enabled: macos-gui electron
 ;; Optional integrations implicitly injected: clipboard browser-native-messaging
-;; Optional integrations not included: docker kubectl ssh spotlight cleanshot 1password cloud-credentials agent-browser shell-init process-control lldb
+;; Optional integrations not included: docker kubectl chromium-headless chromium-full ssh spotlight cleanshot 1password cloud-credentials agent-browser shell-init process-control lldb
 ;; Keychain integration (auto-injected from profile requirements): included
 ;; Use --enable=<feature> (comma-separated) to include optional integrations explicitly.
 ;; Note: selected app/agent profiles and enabled integrations can inject dependencies via $$require=<integration-profile-path>$$ metadata.

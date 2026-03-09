@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_agent_browser policy_enable_macos_gui policy_enable_electron policy_enable_browser_native_messaging policy_enable_shell_init policy_enable_process_control policy_enable_lldb policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_agent_browser policy_enable_macos_gui policy_enable_electron policy_enable_chromium_headless policy_enable_chromium_full policy_enable_browser_native_messaging policy_enable_shell_init policy_enable_process_control policy_enable_lldb policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_dedup_paths
   local policy_reentrant_first policy_reentrant_second
   local bad_path_with_newline
@@ -45,6 +45,8 @@ run_section_cli_edge_cases() {
   policy_enable_csv="${TEST_CWD}/policy-enable-csv.sb"
   policy_enable_kubectl="${TEST_CWD}/policy-enable-kubectl.sb"
   policy_enable_agent_browser="${TEST_CWD}/policy-enable-agent-browser.sb"
+  policy_enable_chromium_headless="${TEST_CWD}/policy-enable-chromium-headless.sb"
+  policy_enable_chromium_full="${TEST_CWD}/policy-enable-chromium-full.sb"
   policy_enable_browser_native_messaging="${TEST_CWD}/policy-enable-browser-native-messaging.sb"
   policy_enable_shell_init="${TEST_CWD}/policy-enable-shell-init.sb"
   policy_enable_process_control="${TEST_CWD}/policy-enable-process-control.sb"
@@ -55,11 +57,25 @@ run_section_cli_edge_cases() {
   assert_policy_not_contains "$policy_enable_arg" "--enable docker does not include browser native messaging grants unless explicitly enabled" "/NativeMessagingHosts"
   assert_command_succeeds "--enable kubectl parses as separate argument form" "$GENERATOR" --output "$policy_enable_kubectl" --enable kubectl
   assert_policy_contains "$policy_enable_kubectl" "--enable kubectl includes kubectl integration profile marker" "#safehouse-test-id:kubectl-integration#"
+  assert_command_succeeds "--enable chromium-headless parses as separate argument form" "$GENERATOR" --output "$policy_enable_chromium_headless" --enable chromium-headless
+  assert_policy_contains "$policy_enable_chromium_headless" "--enable chromium-headless includes Chromium Headless integration marker" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_enable_chromium_headless" "--enable chromium-headless includes browser launch mach grant" "(global-name \"com.apple.windowserver.active\")"
+  assert_policy_not_contains "$policy_enable_chromium_headless" "--enable chromium-headless does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
+  assert_command_succeeds "--enable chromium-full parses as separate argument form" "$GENERATOR" --output "$policy_enable_chromium_full" --enable chromium-full
+  assert_policy_contains "$policy_enable_chromium_full" "--enable chromium-full includes Chromium Full integration marker" "#safehouse-test-id:chromium-full-integration#"
+  assert_policy_contains "$policy_enable_chromium_full" "--enable chromium-full includes Chrome DevToolsActivePort grant" "/Library/Application Support/Google/Chrome/DevToolsActivePort"
+  assert_policy_contains "$policy_enable_chromium_full" "--enable chromium-full injects Chromium Headless integration" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_enable_chromium_full" "--enable chromium-full preamble reports Chromium Headless as implicit dependency" "Optional integrations implicitly injected: chromium-headless"
+  assert_policy_not_contains "$policy_enable_chromium_full" "--enable chromium-full does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
   assert_command_succeeds "--enable agent-browser parses as separate argument form" "$GENERATOR" --output "$policy_enable_agent_browser" --enable agent-browser
   assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser includes agent-browser integration marker" "#safehouse-test-id:agent-browser-integration#"
   assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser includes agent-browser state grant" "(home-subpath \"/.agent-browser\")"
-  assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser implies macOS GUI integration" ";; Integration: macOS GUI"
-  assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser implies shell-init integration" "#safehouse-test-id:shell-init-integration#"
+  assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser includes browser launch mach grant" "(global-name \"com.apple.windowserver.active\")"
+  assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser injects Chromium Headless integration" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser preamble reports Chromium Headless as implicit dependency" "Optional integrations implicitly injected: chromium-headless"
+  assert_policy_not_contains "$policy_enable_agent_browser" "--enable agent-browser does not inject electron integration" "#safehouse-test-id:electron-integration#"
+  assert_policy_not_contains "$policy_enable_agent_browser" "--enable agent-browser does not inject macOS GUI profile" ";; Integration: macOS GUI"
+  assert_policy_not_contains "$policy_enable_agent_browser" "--enable agent-browser does not inject shell-init integration" "#safehouse-test-id:shell-init-integration#"
   assert_command_succeeds "--enable browser-native-messaging parses as separate argument form" "$GENERATOR" --output "$policy_enable_browser_native_messaging" --enable browser-native-messaging
   assert_policy_contains "$policy_enable_browser_native_messaging" "--enable browser-native-messaging includes browser native messaging grants" "/NativeMessagingHosts"
   assert_command_fails "--enable env is rejected (runtime env now uses --env)" "$GENERATOR" --output "${TEST_CWD}/policy-enable-env-invalid.sb" --enable env

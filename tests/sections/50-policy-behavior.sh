@@ -4,6 +4,7 @@ run_section_policy_behavior() {
   local policy_all_agents
   local policy_clipboard
   local policy_agent_browser policy_browser_native_messaging policy_cloud_credentials policy_onepassword
+  local policy_chromium_headless policy_chromium_full
   local policy_ssh policy_spotlight policy_cleanshot policy_process_control policy_lldb
   local policy_docker_wide_read policy_docker_workdir_root policy_docker_append_allow
   local append_docker_allow append_docker_allow_marker
@@ -24,6 +25,8 @@ run_section_policy_behavior() {
   assert_policy_contains "$POLICY_DEFAULT" "default policy container deny block includes OrbStack home socket path" "/.orbstack/run/docker.sock"
   assert_policy_contains "$POLICY_DEFAULT" "default policy container deny block includes Podman runtime socket path" "/var/run/podman/podman.sock"
   assert_policy_contains "$POLICY_DEFAULT" "default policy container deny block includes Colima socket regex" "/\\\\.colima/[^/]+/docker\\\\.sock$"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits chromium-headless integration marker" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits chromium-full integration marker" "#safehouse-test-id:chromium-full-integration#"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits agent-browser state grant" "/.agent-browser"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits agent-browser Chromium mach rendezvous grant" "MachPortRendezvousServer"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits browser native messaging grants" "/NativeMessagingHosts"
@@ -61,6 +64,8 @@ run_section_policy_behavior() {
   policy_browser_native_messaging="${TEST_CWD}/policy-feature-browser-native-messaging.sb"
   policy_cloud_credentials="${TEST_CWD}/policy-feature-cloud-credentials.sb"
   policy_onepassword="${TEST_CWD}/policy-feature-1password.sb"
+  policy_chromium_headless="${TEST_CWD}/policy-feature-chromium-headless.sb"
+  policy_chromium_full="${TEST_CWD}/policy-feature-chromium-full.sb"
   policy_ssh="${TEST_CWD}/policy-feature-ssh.sb"
   policy_spotlight="${TEST_CWD}/policy-feature-spotlight.sb"
   policy_cleanshot="${TEST_CWD}/policy-feature-cleanshot.sb"
@@ -68,6 +73,8 @@ run_section_policy_behavior() {
   policy_process_control="${TEST_CWD}/policy-feature-process-control.sb"
   policy_lldb="${TEST_CWD}/policy-feature-lldb.sb"
 
+  assert_command_succeeds "--enable=chromium-headless includes Chromium Headless profile" "$GENERATOR" --output "$policy_chromium_headless" --enable=chromium-headless
+  assert_command_succeeds "--enable=chromium-full includes Chromium Full profile" "$GENERATOR" --output "$policy_chromium_full" --enable=chromium-full
   assert_command_succeeds "--enable=agent-browser includes agent-browser profile" "$GENERATOR" --output "$policy_agent_browser" --enable=agent-browser
   assert_command_succeeds "--enable=browser-native-messaging includes browser native messaging profile" "$GENERATOR" --output "$policy_browser_native_messaging" --enable=browser-native-messaging
   assert_command_succeeds "--enable=cloud-credentials includes cloud credentials profile" "$GENERATOR" --output "$policy_cloud_credentials" --enable=cloud-credentials
@@ -79,11 +86,35 @@ run_section_policy_behavior() {
   assert_command_succeeds "--enable=process-control includes Process Control profile" "$GENERATOR" --output "$policy_process_control" --enable=process-control
   assert_command_succeeds "--enable=lldb includes LLDB profile" "$GENERATOR" --output "$policy_lldb" --enable=lldb
 
+  assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes Chromium Headless profile marker" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes Chromium mach rendezvous marker" "#safehouse-test-id:chromium-headless-rendezvous#"
+  assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes Chromium crashpad marker" "#safehouse-test-id:chromium-headless-crashpad#"
+  assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes browser launch mach grant" "(global-name \"com.apple.windowserver.active\")"
+  assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes GPU user-client grant" "(iokit-user-client-class \"IOSurfaceRootUserClient\")"
+  assert_policy_not_contains "$policy_chromium_headless" "--enable=chromium-headless does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
+  assert_policy_not_contains "$policy_chromium_headless" "--enable=chromium-headless does not inject shell-init integration" "#safehouse-test-id:shell-init-integration#"
+
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chromium Full profile marker" "#safehouse-test-id:chromium-full-integration#"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chromium Full rendezvous marker" "#safehouse-test-id:chromium-full-rendezvous#"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chrome for Testing prefs grant" "/Library/Preferences/com.google.chrome.for.testing.plist"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chrome DevToolsActivePort grant" "/Library/Application Support/Google/Chrome/DevToolsActivePort"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chrome Crashpad grant" "/Library/Application Support/Google/Chrome for Testing/Crashpad"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes pasteboard lookup grant" "(global-name \"com.apple.pasteboard.1\")"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes OpenDirectory lookup grant" "(global-name \"com.apple.system.opendirectoryd.api\")"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes token-client lookup grant" "(global-name \"com.apple.ctkd.token-client\")"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full implicitly injects Chromium Headless integration" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full preamble reports Chromium Headless as implicitly injected" "Optional integrations implicitly injected: chromium-headless"
+  assert_policy_not_contains "$policy_chromium_full" "--enable=chromium-full does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
+
   assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes Agent Browser profile marker" "#safehouse-test-id:agent-browser-integration#"
   assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes agent-browser state grant" "(home-subpath \"/.agent-browser\")"
   assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes Chromium mach rendezvous grant" "MachPortRendezvousServer"
-  assert_policy_contains "$policy_agent_browser" "--enable=agent-browser implicitly injects macOS GUI integration" ";; Integration: macOS GUI"
-  assert_policy_contains "$policy_agent_browser" "--enable=agent-browser implicitly injects shell-init integration" "#safehouse-test-id:shell-init-integration#"
+  assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes browser launch mach grant" "(global-name \"com.apple.windowserver.active\")"
+  assert_policy_contains "$policy_agent_browser" "--enable=agent-browser implicitly injects Chromium Headless integration" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_agent_browser" "--enable=agent-browser preamble reports Chromium Headless as implicitly injected" "Optional integrations implicitly injected: chromium-headless"
+  assert_policy_not_contains "$policy_agent_browser" "--enable=agent-browser does not inject electron integration" "#safehouse-test-id:electron-integration#"
+  assert_policy_not_contains "$policy_agent_browser" "--enable=agent-browser does not inject macOS GUI integration" ";; Integration: macOS GUI"
+  assert_policy_not_contains "$policy_agent_browser" "--enable=agent-browser no longer injects shell-init integration" "#safehouse-test-id:shell-init-integration#"
 
   assert_policy_contains "$policy_browser_native_messaging" "--enable=browser-native-messaging includes browser native messaging grants" "/NativeMessagingHosts"
   assert_policy_contains "$policy_browser_native_messaging" "--enable=browser-native-messaging includes Firefox native messaging grants" "/Mozilla/NativeMessagingHosts"
@@ -128,7 +159,7 @@ run_section_policy_behavior() {
   assert_policy_contains "$policy_all_agents" "all-agents policy includes opentui data grant" "/.local/share/opentui"
   assert_policy_contains "$policy_all_agents" "all-agents policy includes goose config grant" "/.config/goose"
   assert_policy_contains "$policy_all_agents" "all-agents policy includes kilocode binary grant" "/.local/bin/kilocode"
-  rm -f "$policy_all_agents" "$policy_clipboard" "$policy_process_control" "$policy_lldb"
+  rm -f "$policy_all_agents" "$policy_clipboard" "$policy_process_control" "$policy_lldb" "$policy_chromium_headless" "$policy_chromium_full"
 
   for docker_sock in \
     "/var/run/docker.sock" \

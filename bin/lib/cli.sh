@@ -36,7 +36,8 @@ Policy scope options:
       Comma-separated optional features to enable
       Supported values: ${supported_enable_features}
       Note: electron implies macos-gui
-      Note: agent-browser implies macos-gui and shell-init
+      Note: chromium-full implies chromium-headless
+      Note: agent-browser implies chromium-headless
       Note: shell-init enables shell startup file reads
       Note: process-control enables host process enumeration/signalling
       Note: lldb enables LLDB toolchain + task-port access and implies process-control

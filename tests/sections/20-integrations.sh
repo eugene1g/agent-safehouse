@@ -7,9 +7,9 @@ run_section_integrations() {
   local ssh_auth_sock
   local onepassword_group_container_dir onepassword_socket_dir onepassword_settings_file
   local onepassword_op_candidate onepassword_op_candidates
-  local policy_ssh policy_browser_native_messaging policy_onepassword
+  local policy_ssh policy_browser_native_messaging policy_onepassword policy_chromium_headless policy_chromium_full
   local policy_keychain_agent policy_non_keychain_agent policy_claude_chrome
-  local macos_gui_marker electron_marker
+  local chromium_headless_marker chromium_full_marker macos_gui_marker electron_marker
 
   section_begin "Git Metadata Defaults"
   assert_allowed_if_exists "$POLICY_DEFAULT" "read ~/.gitconfig allowed by default" "${HOME}/.gitconfig" /bin/cat "${HOME}/.gitconfig"
@@ -115,7 +115,42 @@ run_section_integrations() {
   section_begin "macOS GUI / Electron Integration Policy Coverage"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits macOS GUI integration profile" ";; Integration: macOS GUI"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits electron integration profile" "#safehouse-test-id:electron-integration#"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Chromium Headless integration profile" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Chromium Full integration profile" "#safehouse-test-id:chromium-full-integration#"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy does not load agent-specific Claude Desktop profile when no command is provided" "(preference-domain \"com.anthropic.claudefordesktop\")"
+
+  policy_chromium_headless="${TEST_CWD}/policy-enable-chromium-headless.sb"
+  policy_chromium_full="${TEST_CWD}/policy-enable-chromium-full.sb"
+  assert_command_succeeds "safehouse generates policy with --enable=chromium-headless" "$GENERATOR" --output "$policy_chromium_headless" --enable=chromium-headless
+  assert_command_succeeds "safehouse generates policy with --enable=chromium-full" "$GENERATOR" --output "$policy_chromium_full" --enable=chromium-full
+  for chromium_headless_marker in \
+    "#safehouse-test-id:chromium-headless-integration#" \
+    "#safehouse-test-id:chromium-headless-gpu#" \
+    "#safehouse-test-id:chromium-headless-crashpad#" \
+    "#safehouse-test-id:chromium-headless-rendezvous#" \
+    "(global-name \"com.apple.windowserver.active\")" \
+    "(global-name \"com.apple.audio.audiohald\")" \
+    "(iokit-user-client-class \"IOSurfaceRootUserClient\")" \
+    "(iokit-user-client-class \"AGXDeviceUserClient\")"; do
+    assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes required grant/marker (${chromium_headless_marker})" "$chromium_headless_marker"
+  done
+  assert_policy_not_contains "$policy_chromium_headless" "--enable=chromium-headless does not include agent-browser profile" "#safehouse-test-id:agent-browser-integration#"
+
+  for chromium_full_marker in \
+    "#safehouse-test-id:chromium-full-integration#" \
+    "#safehouse-test-id:chromium-full-rendezvous#" \
+    "#safehouse-test-id:chromium-full-profile#" \
+    "#safehouse-test-id:chromium-headless-integration#" \
+    "(global-name \"com.apple.pasteboard.1\")" \
+    "(global-name \"com.apple.system.opendirectoryd.api\")" \
+    "(global-name \"com.apple.ctkd.token-client\")" \
+    "/Library/Preferences/com.google.chrome.for.testing.plist" \
+    "/Library/Application Support/Google/Chrome/DevToolsActivePort" \
+    "/Library/Application Support/Google/Chrome for Testing/Crashpad" \
+    "com\\.google\\.chrome\\.for\\.testing\\.MachPortRendezvousServer"; do
+    assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes required grant/marker (${chromium_full_marker})" "$chromium_full_marker"
+  done
+  assert_policy_not_contains "$policy_chromium_full" "--enable=chromium-full does not include agent-browser profile" "#safehouse-test-id:agent-browser-integration#"
 
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes macOS GUI integration profile" ";; Integration: macOS GUI"
   for macos_gui_marker in \
@@ -185,7 +220,7 @@ run_section_integrations() {
   assert_policy_contains "$policy_claude_chrome" "claude profile auto-injects browser native messaging integration for --chrome workflows" ";; Integration: Browser Native Messaging"
   assert_policy_contains "$policy_claude_chrome" "claude profile reports browser native messaging as implicitly injected integration" "Optional integrations implicitly injected: browser-native-messaging"
 
-  rm -f "$policy_ssh" "$policy_browser_native_messaging" "$policy_onepassword" "$policy_keychain_agent" "$policy_non_keychain_agent" "$policy_claude_chrome"
+  rm -f "$policy_ssh" "$policy_browser_native_messaging" "$policy_onepassword" "$policy_chromium_headless" "$policy_chromium_full" "$policy_keychain_agent" "$policy_non_keychain_agent" "$policy_claude_chrome"
 }
 
 register_section run_section_integrations

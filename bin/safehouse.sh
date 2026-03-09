@@ -17,6 +17,8 @@ enable_docker_integration=0
 enable_kubectl_integration=0
 enable_macos_gui_integration=0
 enable_electron_integration=0
+enable_chromium_headless_integration=0
+enable_chromium_full_integration=0
 enable_ssh_integration=0
 enable_spotlight_integration=0
 enable_cleanshot_integration=0
@@ -34,6 +36,8 @@ optional_integration_features=(
   kubectl
   macos-gui
   electron
+  chromium-headless
+  chromium-full
   ssh
   spotlight
   cleanshot
@@ -46,7 +50,7 @@ optional_integration_features=(
   process-control
   lldb
 )
-supported_enable_features="docker, kubectl, macos-gui, electron, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, agent-browser, browser-native-messaging, shell-init, process-control, lldb, all-agents, all-apps, wide-read"
+supported_enable_features="docker, kubectl, macos-gui, electron, chromium-headless, chromium-full, ssh, spotlight, cleanshot, clipboard, 1password, cloud-credentials, agent-browser, browser-native-messaging, shell-init, process-control, lldb, all-agents, all-apps, wide-read"
 enable_all_agents_profiles=0
 enable_all_apps_profiles=0
 enable_wide_read_access=0

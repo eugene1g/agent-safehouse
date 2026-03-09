@@ -1,0 +1,44 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Chromium Full
+;; Additional headed/full-window Chrome for Testing allowances layered on top
+;; of Chromium Headless.
+;; Source: 55-integrations-optional/chromium-full.sb
+;; #safehouse-test-id:chromium-full-integration#
+;; #safehouse-test-id:chromium-full-rendezvous#
+;; #safehouse-test-id:chromium-full-profile#
+;; $$require=55-integrations-optional/chromium-headless.sb$$
+;; ---------------------------------------------------------------------------
+
+;; Keep this integration scoped to the extra probes observed from headed Chrome
+;; for Testing launches. Headless Chromium startup allowances continue to come
+;; from the shared chromium-headless integration.
+
+(allow file-read-metadata
+    (home-literal "/Library/Application Support/Google")
+    (home-literal "/Library/Application Support/Google/Chrome")
+    (home-literal "/Library/Application Support/Google/Chrome for Testing")
+    (home-literal "/Library/Application Support/Google/Chrome for Testing/Crashpad")
+    (home-literal "/Library/Google")
+)
+
+(allow file-read*
+    (literal "/Library")                                              ;; Headed Chrome probes the Library root during desktop app bootstrap.
+    (home-literal "/Library/Preferences/com.google.chrome.for.testing.plist")
+    (home-literal "/Library/Google/Google Chrome Brand.plist")
+)
+
+(allow file-read* file-write*
+    (home-literal "/Library/Application Support/Google/Chrome/DevToolsActivePort")        ;; Playwright-style full-browser launches wait on this exact DevTools handshake file.
+    (home-subpath "/Library/Application Support/Google/Chrome for Testing/Crashpad")       ;; Crashpad keeps its database and metadata under the Chrome for Testing app-support tree.
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.google\.chrome\.for\.testing\.MachPortRendezvousServer\.")
+)
+
+(allow mach-lookup
+    (global-name-regex #"^com\.google\.chrome\.for\.testing\.MachPortRendezvousServer\.")
+    (global-name "com.apple.pasteboard.1")
+    (global-name "com.apple.system.opendirectoryd.api")
+    (global-name "com.apple.ctkd.token-client")
+)
