@@ -16,7 +16,6 @@
     (subpath "/System/Volumes/Preboot")                               ;; Some dyld/framework lookups resolve through Preboot symlinks on modern macOS.
     (subpath "/Library/Apple")                                        ;; Apple private frameworks touched by Node/Bun/JVM/native toolchains.
     (subpath "/Library/Frameworks")                                   ;; Global framework lookup path for language runtimes and CLIs.
-    (subpath "/Library/Java")                                         ;; JVM runtime and helper assets.
     (subpath "/Library/Fonts")                                        ;; Font reads used by headless renderers/PDF/image tasks.
     (subpath "/Library/Filesystems/NetFSPlugins")                     ;; Path resolution may load NetFS plugins during filesystem lookups.
     (subpath "/Library/Preferences/Logging")                          ;; macOS logging stack reads prefs during process init.

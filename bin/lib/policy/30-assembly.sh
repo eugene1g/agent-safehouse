@@ -322,6 +322,40 @@ emit_path_ancestor_literals() {
 	append_policy_chunk "$chunk"
 }
 
+emit_path_ancestor_metadata_literals() {
+	local path="$1"
+	local label="$2"
+	local chunk
+	local trimmed cur IFS part escaped_cur
+	local -a parts=()
+
+	chunk=";; #safehouse-test-id:home-ancestor-metadata# Metadata-only ancestor directory literals for ${label}: ${path}"
+	chunk+=$'\n;;'
+	chunk+=$'\n;; Why file-read-metadata on HOME ancestors:'
+	chunk+=$'\n;; Some macOS runtimes probe HOME-scoped toolchain paths (for example ~/Library/Java)'
+	chunk+=$'\n;; even when the selected workdir lives elsewhere. Without metadata-only access to the'
+	chunk+=$'\n;; HOME ancestor chain, those probes fail before the more specific home-subpath/home-literal'
+	chunk+=$'\n;; grants can match. Keep this metadata-only to avoid broad read visibility into HOME.'
+	chunk+=$'\n(allow file-read-metadata'
+	chunk+=$'\n    (literal "/")'
+
+	trimmed="${path#/}"
+	if [[ -n "$trimmed" ]]; then
+		cur=""
+		IFS='/'
+		read -r -a parts <<<"$trimmed"
+		for part in "${parts[@]}"; do
+			[[ -z "$part" ]] && continue
+			cur+="/${part}"
+			escaped_cur="$(escape_for_sb "$cur")"
+			chunk+="$(printf '\n    (literal "%s")' "$escaped_cur")"
+		done
+	fi
+
+	chunk+=$'\n)\n'
+	append_policy_chunk "$chunk"
+}
+
 emit_extra_access_rules() {
 	local target="$1"
 	local path escaped
@@ -398,6 +432,17 @@ emit_workdir_access() {
 		append_policy_chunk "(allow file-read* file-write* (literal \"${escaped}\"))"
 	fi
 	append_policy_chunk ""
+}
+
+emit_home_ancestor_metadata_access() {
+	local target="$1"
+
+	if [[ -z "${home_dir:-}" ]]; then
+		return 0
+	fi
+
+	append_policy_chunk ";; Generated HOME ancestor metadata access for home-scoped runtime/toolchain discovery."
+	emit_path_ancestor_metadata_literals "$home_dir" "HOME path"
 }
 
 array_contains_exact() {
@@ -596,6 +641,7 @@ build_profile() {
 
 		append_resolved_base_profile "$tmp" "${PROFILES_DIR}/00-base.sb"
 		append_profile "$tmp" "${PROFILES_DIR}/10-system-runtime.sb"
+		emit_home_ancestor_metadata_access "$tmp"
 		append_profile "$tmp" "${PROFILES_DIR}/20-network.sb"
 
 		append_all_module_profiles "$tmp" "${PROFILES_DIR}/30-toolchains"

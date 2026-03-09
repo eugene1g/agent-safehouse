@@ -120,7 +120,6 @@ emit_embedded_policy_template() {
     (subpath "/System/Volumes/Preboot")                               ;; Some dyld/framework lookups resolve through Preboot symlinks on modern macOS.
     (subpath "/Library/Apple")                                        ;; Apple private frameworks touched by Node/Bun/JVM/native toolchains.
     (subpath "/Library/Frameworks")                                   ;; Global framework lookup path for language runtimes and CLIs.
-    (subpath "/Library/Java")                                         ;; JVM runtime and helper assets.
     (subpath "/Library/Fonts")                                        ;; Font reads used by headless renderers/PDF/image tasks.
     (subpath "/Library/Filesystems/NetFSPlugins")                     ;; Path resolution may load NetFS plugins during filesystem lookups.
     (subpath "/Library/Preferences/Logging")                          ;; macOS logging stack reads prefs during process init.
@@ -267,6 +266,25 @@ emit_embedded_policy_template() {
     (ipc-posix-name "apple.shm.notification_center")                  ;; Notification center shared memory segment read by system frameworks.
 )
 
+;; Generated HOME ancestor metadata access for home-scoped runtime/toolchain discovery.
+;; #safehouse-test-id:home-ancestor-metadata# Metadata-only ancestor directory literals for HOME path: /Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/home
+;;
+;; Why file-read-metadata on HOME ancestors:
+;; Some macOS runtimes probe HOME-scoped toolchain paths (for example ~/Library/Java)
+;; even when the selected workdir lives elsewhere. Without metadata-only access to the
+;; HOME ancestor chain, those probes fail before the more specific home-subpath/home-literal
+;; grants can match. Keep this metadata-only to avoid broad read visibility into HOME.
+(allow file-read-metadata
+    (literal "/")
+    (literal "/Users")
+    (literal "/Users/eugene")
+    (literal "/Users/eugene/server")
+    (literal "/Users/eugene/server/agent-safehouse")
+    (literal "/Users/eugene/server/agent-safehouse/dist")
+    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template")
+    (literal "/Users/eugene/server/agent-safehouse/dist/agent-safehouse-static-template/home")
+)
+
 ;; ---------------------------------------------------------------------------
 ;; Network
 ;; Network policy; intentionally fully open for reliable agent operation.
@@ -359,6 +377,7 @@ emit_embedded_policy_template() {
 ;; Includes common Maven/Gradle/SBT/Coursier and Java runtime manager locations.
 
 (allow file-read* file-write*
+    (subpath "/Library/Java")                                         ;; System-wide JDK/JRE bundles live here on macOS and are probed by /usr/bin/java.
     (home-subpath "/.m2")
     (home-subpath "/.gradle")
     (home-subpath "/.ivy2")
@@ -367,10 +386,35 @@ emit_embedded_policy_template() {
     (home-subpath "/.sdkman")
     (home-subpath "/.cache/coursier")
     (home-subpath "/.coursier")
+    (home-subpath "/Library/Java")                                    ;; User-local JDK bundles under ~/Library/Java let /usr/bin/java resolve a runtime without system installs.
     (home-subpath "/Library/Application Support/Coursier")
     (home-subpath "/Library/Caches/Coursier")
     (home-subpath "/.java")
     (home-literal "/.mavenrc")
+)
+
+;; JVM discovery probes metadata on Library roots and legacy plugin directories before selecting a runtime.
+(allow file-read-metadata
+    (literal "/Library")
+    (literal "/Library/Internet Plug-Ins")
+    (home-literal "/Library")
+    (home-literal "/Library/Internet Plug-Ins")
+)
+
+;; Apple Silicon JVMs set this execution-mode sysctl during startup.
+;; Low risk: this is scoped to one JVM-specific sysctl name, not arbitrary sysctl writes.
+(allow sysctl-write
+    (sysctl-name "kern.grade_cputype")
+)
+
+;; JVM temp directory discovery reaches these XPC services on macOS.
+;; Low risk: dirhelper lookup only enables Darwin temp/cache directory discovery and creation;
+;; it does not grant filesystem access beyond paths already allowed elsewhere in policy.
+;; Low risk: membership lookup exposes group-membership queries, which is mostly limited to
+;; identity metadata disclosure rather than a direct file/network escape primitive.
+(allow mach-lookup
+    (global-name "com.apple.bsd.dirhelper")
+    (global-name "com.apple.system.opendirectoryd.membership")
 )
 
 ;; ---------------------------------------------------------------------------

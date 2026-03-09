@@ -7,6 +7,7 @@
 ;; Includes common Maven/Gradle/SBT/Coursier and Java runtime manager locations.
 
 (allow file-read* file-write*
+    (subpath "/Library/Java")                                         ;; System-wide JDK/JRE bundles live here on macOS and are probed by /usr/bin/java.
     (home-subpath "/.m2")
     (home-subpath "/.gradle")
     (home-subpath "/.ivy2")
@@ -15,8 +16,33 @@
     (home-subpath "/.sdkman")
     (home-subpath "/.cache/coursier")
     (home-subpath "/.coursier")
+    (home-subpath "/Library/Java")                                    ;; User-local JDK bundles under ~/Library/Java let /usr/bin/java resolve a runtime without system installs.
     (home-subpath "/Library/Application Support/Coursier")
     (home-subpath "/Library/Caches/Coursier")
     (home-subpath "/.java")
     (home-literal "/.mavenrc")
+)
+
+;; JVM discovery probes metadata on Library roots and legacy plugin directories before selecting a runtime.
+(allow file-read-metadata
+    (literal "/Library")
+    (literal "/Library/Internet Plug-Ins")
+    (home-literal "/Library")
+    (home-literal "/Library/Internet Plug-Ins")
+)
+
+;; Apple Silicon JVMs set this execution-mode sysctl during startup.
+;; Low risk: this is scoped to one JVM-specific sysctl name, not arbitrary sysctl writes.
+(allow sysctl-write
+    (sysctl-name "kern.grade_cputype")
+)
+
+;; JVM temp directory discovery reaches these XPC services on macOS.
+;; Low risk: dirhelper lookup only enables Darwin temp/cache directory discovery and creation;
+;; it does not grant filesystem access beyond paths already allowed elsewhere in policy.
+;; Low risk: membership lookup exposes group-membership queries, which is mostly limited to
+;; identity metadata disclosure rather than a direct file/network escape primitive.
+(allow mach-lookup
+    (global-name "com.apple.bsd.dirhelper")
+    (global-name "com.apple.system.opendirectoryd.membership")
 )

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 run_section_tooling() {
-  local node_bin copilot_bin
+  local node_bin java_bin copilot_bin
   local policy_claude_startup policy_amp_startup policy_copilot_startup
 
   section_begin "Toolchains"
@@ -13,6 +13,14 @@ run_section_tooling() {
     assert_allowed_strict "$POLICY_DEFAULT" "node --version" "$node_bin" --version
   else
     log_skip "node --version (node not found)"
+  fi
+
+  java_bin="$(command -v java 2>/dev/null || true)"
+  if [[ -n "$java_bin" ]]; then
+    java_bin="$(realpath "$java_bin" 2>/dev/null || readlink -f "$java_bin" 2>/dev/null || echo "$java_bin")"
+    assert_allowed_strict "$POLICY_DEFAULT" "java -version" "$java_bin" -version
+  else
+    log_skip "java -version (java not found)"
   fi
 
   assert_allowed_if_exists "$POLICY_DEFAULT" "python3 --version" "python3" /bin/sh -c 'python3 --version'

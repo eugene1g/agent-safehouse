@@ -6,6 +6,15 @@ run_section_runtime() {
   local fish_bin fish_test_home fish_test_workdir fish_env_path fish_test_user
 
   section_begin "System Runtime"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes generated HOME ancestor metadata grant marker" "#safehouse-test-id:home-ancestor-metadata#"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes HOME root metadata traversal for home-scoped runtime discovery" "(literal \"${HOME}\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes /Library metadata traversal for JVM discovery" "(literal \"/Library\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes /Library/Internet Plug-Ins metadata traversal for JVM discovery" "(literal \"/Library/Internet Plug-Ins\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes ~/Library metadata traversal for JVM discovery" "(home-literal \"/Library\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes ~/Library/Internet Plug-Ins metadata traversal for JVM discovery" "(home-literal \"/Library/Internet Plug-Ins\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes scoped JVM CPU-mode sysctl write" "(sysctl-name \"kern.grade_cputype\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes JVM dirhelper mach lookup" "(global-name \"com.apple.bsd.dirhelper\")"
+  assert_policy_contains "$POLICY_DEFAULT" "default policy includes JVM OpenDirectory membership mach lookup" "(global-name \"com.apple.system.opendirectoryd.membership\")"
   assert_allowed "$POLICY_DEFAULT" "read /usr/bin" /bin/ls /usr/bin
   assert_allowed_if_exists "$POLICY_DEFAULT" "read /opt (Homebrew)" "/opt" /bin/ls /opt
   assert_allowed "$POLICY_DEFAULT" "read system frameworks" /bin/ls /System/Library/Frameworks
