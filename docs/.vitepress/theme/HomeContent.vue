@@ -159,7 +159,7 @@ const agents = [
   { name: 'Pi', logo: 'https://pi.dev/logo.svg', link: '/docs/agent-investigations/pi' },
   { name: 'Cursor Agent', logo: 'https://github.com/cursor.png?size=256', link: '/docs/agent-investigations/cursor-agent' },
   { name: 'Cline', logo: 'https://github.com/cline.png?size=256', link: '/docs/agent-investigations/cline' },
-  { name: 'Kilo Code', logo: '/agent-logos/kilo-code.svg', link: '/docs/agent-investigations/kilo-code' },
+  { name: 'Kilo Code', logo: '/agent-logos/kilo-code.png', link: '/docs/agent-investigations/kilo-code' },
   { name: 'Droid', logo: 'https://github.com/Factory-AI.png?size=256', link: '/docs/agent-investigations/droid' },
 ]
 
