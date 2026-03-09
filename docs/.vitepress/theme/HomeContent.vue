@@ -241,7 +241,7 @@ const accessRows = [
   <section class="home-section">
     <div class="home-container">
       <h2 class="section-title">
-        Tested against all leading <span class="struck">agents</span> <span class="scribble">clankers</span>
+        Tested against all leading <span class="struck">agents</span> <span class="scribble">sleeper agents</span>
       </h2>
       <p class="section-sub">All agents work perfectly in their sandboxes, but can't impact anything outside it.</p>
       <div class="agents-grid">
