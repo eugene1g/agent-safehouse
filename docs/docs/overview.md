@@ -21,6 +21,7 @@ Each policy rule should answer one question:
 ## What Safehouse Allows
 
 - Filesystem reads for core macOS/system/toolchain paths needed for shells, compilers, and package managers.
+- Curated Apple Command Line Tools paths for common shimmed developer tools such as `git`, `make`, and `clang`.
 - Process execution/forking so normal dev subprocess trees work.
 - Host process enumeration/signalling only when `--enable=process-control` or `--enable=lldb` is selected.
 - LLDB/debugger toolchain access only when `--enable=lldb` is selected.

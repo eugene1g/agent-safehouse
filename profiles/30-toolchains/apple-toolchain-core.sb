@@ -1,0 +1,96 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Apple Toolchain Core
+;; Curated Apple Command Line Tools binaries and support data that many macOS
+;; developers expect to work by default via /usr/bin shim entrypoints.
+;; Source: 30-toolchains/apple-toolchain-core.sb
+;; #safehouse-test-id:apple-toolchain-core#
+;; ---------------------------------------------------------------------------
+
+;; This profile intentionally allows a curated non-debugger subset only.
+;; Keep LLDB/debugserver opt-in via the dedicated lldb integration.
+;; Git config/auth state stays in 50-integrations-core/git.sb; this module only
+;; covers the Apple-provided shim target binaries and their CLT support files.
+
+(allow file-read*
+    ;; Ancestor traversal for the curated CLT binary/data whitelist.
+    (literal "/Library")
+    (literal "/Library/Developer")
+    (literal "/Library/Developer/CommandLineTools")
+    (literal "/Library/Developer/CommandLineTools/usr")
+    (literal "/Library/Developer/CommandLineTools/usr/bin")
+    (literal "/Library/Developer/CommandLineTools/usr/include")
+    (literal "/Library/Developer/CommandLineTools/usr/lib")
+    (literal "/Library/Developer/CommandLineTools/usr/libexec")
+    (literal "/Library/Developer/CommandLineTools/usr/libexec/git-core")
+    (literal "/Library/Developer/CommandLineTools/usr/share")
+    (literal "/Library/Developer/CommandLineTools/SDKs")
+
+    ;; Core SCM / build entrypoints commonly invoked through /usr/bin shims.
+    (literal "/Library/Developer/CommandLineTools/usr/bin/git")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/make")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/gnumake")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/clang")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/gcc")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/cpp")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/c89")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/c99")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/ar")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/as")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/ld")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/ld-classic")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/libtool")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/lipo")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/codesign_allocate")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/dsymutil")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/bitcode_strip")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/install_name_tool")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/strip")
+
+    ;; Common source-generation / project-maintenance tooling.
+    (literal "/Library/Developer/CommandLineTools/usr/bin/bison")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/byacc")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/flex")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/flex++")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/lex")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/yacc")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/m4")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/gm4")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/bm4")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/gperf")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/ctags")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/mig")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/rpcgen")
+    (literal "/Library/Developer/CommandLineTools/usr/libexec/migcom")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/unifdef")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/unifdefall")
+
+    ;; Low-risk inspection and formatting utilities frequently used by builds,
+    ;; release automation, and editor integrations.
+    (literal "/Library/Developer/CommandLineTools/usr/bin/clang-format")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/clangd")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/strings")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-cov")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-cxxfilt")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-dwarfdump")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-nm")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-objdump")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-otool")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-profdata")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/llvm-size")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/dyld_info")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/cmpdylib")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/nm-classic")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/otool-classic")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/pagestuff")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/size-classic")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/nmedit")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/segedit")
+    (literal "/Library/Developer/CommandLineTools/usr/bin/vtool")
+
+    ;; Support files needed by git/clang and related CLT binaries.
+    (subpath "/Library/Developer/CommandLineTools/usr/libexec/git-core")
+    (subpath "/Library/Developer/CommandLineTools/usr/include")
+    (subpath "/Library/Developer/CommandLineTools/usr/lib")
+    (subpath "/Library/Developer/CommandLineTools/usr/share")
+    (subpath "/Library/Developer/CommandLineTools/SDKs")
+)

@@ -134,6 +134,9 @@ EOF
     assert_policy_not_contains "$static_policy_path" "${static_policy_label} resolves HOME replacement placeholder" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
     assert_policy_contains "$static_policy_path" "${static_policy_label} includes shared cross-agent profile" ";; Source: 40-shared/agent-common.sb"
     assert_policy_not_contains "$static_policy_path" "${static_policy_label} omits legacy agent common profile path" ";; Source: 60-agents/__common.sb"
+    assert_policy_contains "$static_policy_path" "${static_policy_label} includes Apple toolchain core profile marker" "#safehouse-test-id:apple-toolchain-core#"
+    assert_policy_not_contains "$static_policy_path" "${static_policy_label} omits stale apple-build-tools feature text" "apple-build-tools"
+    assert_policy_not_contains "$static_policy_path" "${static_policy_label} omits LLDB integration by default" ";; Integration: LLDB"
   done
   assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy excludes app profile layers without --enable=all-apps" ";; Source: 65-apps/claude-app.sb"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes Claude desktop app profile" ";; Source: 65-apps/claude-app.sb"
@@ -144,6 +147,7 @@ EOF
   assert_policy_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header includes project homepage link" "# Project: https://agent-safehouse.dev"
   assert_policy_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header includes embedded profile UTC modified timestamp" "# Embedded Profiles Last Modified (UTC): "
   assert_policy_not_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header omits source commit hash" "# Source Commit: "
+  assert_policy_not_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse omits stale apple-build-tools feature text" "apple-build-tools"
   if [[ -x "$dist_claude_launcher" ]]; then
     log_pass "dist Claude launcher output is executable"
   else
@@ -250,6 +254,13 @@ EOF
   assert_policy_contains "$dist_path" "custom dist safehouse header includes project homepage link" "# Project: https://agent-safehouse.dev"
   assert_policy_contains "$dist_default_static" "custom output-dir default static policy includes project banner" ";; Project: https://agent-safehouse.dev"
   assert_policy_contains "$dist_apps_static" "custom output-dir apps static policy includes project banner" ";; Project: https://agent-safehouse.dev"
+  assert_policy_contains "$dist_default_static" "custom output-dir default static policy includes Apple toolchain core profile marker" "#safehouse-test-id:apple-toolchain-core#"
+  assert_policy_not_contains "$dist_default_static" "custom output-dir default static policy omits stale apple-build-tools feature text" "apple-build-tools"
+  assert_policy_not_contains "$dist_default_static" "custom output-dir default static policy omits LLDB integration by default" ";; Integration: LLDB"
+  assert_policy_contains "$dist_apps_static" "custom output-dir apps static policy includes Apple toolchain core profile marker" "#safehouse-test-id:apple-toolchain-core#"
+  assert_policy_not_contains "$dist_apps_static" "custom output-dir apps static policy omits stale apple-build-tools feature text" "apple-build-tools"
+  assert_policy_not_contains "$dist_apps_static" "custom output-dir apps static policy omits LLDB integration by default" ";; Integration: LLDB"
+  assert_policy_not_contains "$dist_path" "custom dist safehouse omits stale apple-build-tools feature text" "apple-build-tools"
 
   set +e
   dist_no_command_policy="$("$dist_path" 2>/dev/null)"

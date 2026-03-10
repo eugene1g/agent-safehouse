@@ -80,6 +80,7 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_browser_native_messaging" "--enable browser-native-messaging includes browser native messaging grants" "/NativeMessagingHosts"
   assert_command_fails "--enable env is rejected (runtime env now uses --env)" "$GENERATOR" --output "${TEST_CWD}/policy-enable-env-invalid.sb" --enable env
   assert_command_fails "--enable shell-startup is rejected (renamed to shell-init)" "$GENERATOR" --output "${TEST_CWD}/policy-enable-shell-startup-invalid.sb" --enable shell-startup
+  assert_command_fails "--enable apple-build-tools is rejected (replaced by default apple-toolchain-core)" "$GENERATOR" --output "${TEST_CWD}/policy-enable-apple-build-tools-invalid.sb" --enable apple-build-tools
   assert_command_succeeds "--enable shell-init parses as separate argument form" "$GENERATOR" --output "$policy_enable_shell_init" --enable shell-init
   assert_policy_contains "$policy_enable_shell_init" "--enable shell-init includes shell init integration marker" "#safehouse-test-id:shell-init-integration#"
   assert_policy_contains "$policy_enable_shell_init" "--enable shell-init includes fish config directory grant" "(home-literal \"/.config/fish\")"

@@ -73,6 +73,8 @@ safehouse --enable=lldb -- claude --dangerously-skip-permissions
 safehouse --enable=wide-read -- claude --dangerously-skip-permissions
 ```
 
+Common Apple shimmed tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are covered by the default `apple-toolchain-core` toolchain profile.
+
 `--enable=lldb` opens the sandbox side for LLDB/debugger workflows, but macOS can still deny attach to protected or non-debuggable targets.
 
 ## Environment Modes

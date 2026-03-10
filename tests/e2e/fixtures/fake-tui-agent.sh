@@ -5,21 +5,27 @@ set -uo pipefail
 canary_path="${SAFEHOUSE_E2E_CANARY_PATH:-./safehouse-e2e-canary.txt}"
 forbidden_path="${SAFEHOUSE_E2E_FORBIDDEN_PATH:-${HOME}/.safehouse-e2e-forbidden.txt}"
 forbidden_read_path="${SAFEHOUSE_E2E_FORBIDDEN_READ_PATH:-${HOME}/.safehouse-e2e-forbidden-read.txt}"
+git_repo_path="${PWD}/safehouse-e2e-git-repo"
+makefile_path="${PWD}/Makefile.safehouse-e2e"
+make_output_path="${PWD}/safehouse-e2e-make-output.txt"
 
 menu_items=(
   "Write canary file"
   "Attempt forbidden write"
   "Attempt forbidden read"
+  "Run native Apple git"
+  "Run native Apple make"
   "Exit"
 )
 selection=0
 
 emit_header() {
+  local idx
+
   echo "SAFEHOUSE_FAKE_TUI_READY"
-  echo "MENU:0:${menu_items[0]}"
-  echo "MENU:1:${menu_items[1]}"
-  echo "MENU:2:${menu_items[2]}"
-  echo "MENU:3:${menu_items[3]}"
+  for idx in "${!menu_items[@]}"; do
+    echo "MENU:${idx}:${menu_items[$idx]}"
+  done
   echo "HINT: Use Up/Down or j/k, then Enter."
   echo "EVENT:SELECT:0"
 }
@@ -36,7 +42,7 @@ move_up() {
 }
 
 move_down() {
-  if [[ "$selection" -lt 3 ]]; then
+  if [[ "$selection" -lt $((${#menu_items[@]} - 1)) ]]; then
     selection=$((selection + 1))
   fi
   emit_selection
@@ -66,6 +72,22 @@ perform_selection() {
       fi
       ;;
     3)
+      rm -rf "$git_repo_path"
+      if /usr/bin/git init -q "$git_repo_path" >/dev/null 2>&1 && [[ -f "$git_repo_path/.git/HEAD" ]]; then
+        echo "EVENT:NATIVE_GIT_OK:${git_repo_path}"
+      else
+        echo "EVENT:NATIVE_GIT_FAIL:${git_repo_path}"
+      fi
+      ;;
+    4)
+      rm -f "$make_output_path"
+      if /usr/bin/make -f "$makefile_path" safehouse-e2e >/dev/null 2>&1 && [[ -f "$make_output_path" ]]; then
+        echo "EVENT:NATIVE_MAKE_OK:${make_output_path}"
+      else
+        echo "EVENT:NATIVE_MAKE_FAIL:${make_output_path}"
+      fi
+      ;;
+    5)
       echo "EVENT:EXIT"
       return 1
       ;;
