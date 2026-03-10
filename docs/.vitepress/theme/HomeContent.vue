@@ -152,6 +152,7 @@ const agents = [
   { name: 'Codex', logo: 'https://github.com/openai.png?size=256', link: '/docs/agent-investigations/codex' },
   { name: 'OpenCode', logo: 'https://github.com/opencode-ai.png?size=256', link: '/docs/agent-investigations/opencode' },
   { name: 'Amp', logo: 'https://github.com/ampcode-com.png?size=256', link: '' },
+  { name: 'Copilot CLI', logo: 'https://github.com/github.png?size=256', link: '/docs/agent-investigations/copilot-cli' },
   { name: 'Gemini CLI', logo: 'https://geminicli.com/icon.png', link: '/docs/agent-investigations/gemini-cli' },
   { name: 'Aider', logo: 'https://github.com/Aider-AI.png?size=256', link: '/docs/agent-investigations/aider' },
   { name: 'Goose', logo: 'https://block.github.io/goose/img/logo_dark.png', link: '/docs/agent-investigations/goose' },

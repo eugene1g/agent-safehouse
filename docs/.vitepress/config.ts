@@ -71,6 +71,7 @@ export default defineConfig({
             { text: 'Claude Code', link: '/docs/agent-investigations/claude-code' },
             { text: 'Cline', link: '/docs/agent-investigations/cline' },
             { text: 'Codex', link: '/docs/agent-investigations/codex' },
+            { text: 'Copilot CLI', link: '/docs/agent-investigations/copilot-cli' },
             { text: 'Cursor Agent', link: '/docs/agent-investigations/cursor-agent' },
             { text: 'Droid (Factory CLI)', link: '/docs/agent-investigations/droid' },
             { text: 'Gemini CLI', link: '/docs/agent-investigations/gemini-cli' },

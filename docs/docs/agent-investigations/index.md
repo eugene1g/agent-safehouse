@@ -9,6 +9,7 @@ Detailed sandbox analysis reports for every coding agent supported by Agent Safe
 | [Claude Code](./claude-code.md) | Anthropic's proprietary AI coding agent (CLI/TUI) |
 | [Cline](./cline.md) | VS Code extension AI coding assistant |
 | [Codex](./codex.md) | OpenAI Codex CLI agent |
+| [Copilot CLI](./copilot-cli.md) | GitHub's terminal-native AI coding agent |
 | [Cursor Agent](./cursor-agent.md) | Cursor's built-in AI agent mode |
 | [Droid (Factory CLI)](./droid.md) | Factory's autonomous coding agent |
 | [Gemini CLI](./gemini-cli.md) | Google's Gemini-powered CLI agent |
