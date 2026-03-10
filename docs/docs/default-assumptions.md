@@ -16,6 +16,7 @@ These are baseline allowances intended to keep common workflows functional:
 - Selected workdir read/write (git root above CWD, otherwise CWD).
 - Core system/runtime paths required by shells, compilers, and package managers.
 - Toolchain profile access under `profiles/30-toolchains/`.
+- Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
 - Core integrations in `profiles/50-integrations-core/` (`git`, `scm-clis`).
 - Agent-specific profile selection for the wrapped command.
 - Network access (open by default).
@@ -34,7 +35,7 @@ Enable only when required for the current task:
 - `ssh`: extended SSH agent socket and system SSH config integration.
 - `browser-native-messaging`: browser host messaging integration.
 - `process-control`: host process enumeration/signalling for local supervision tools.
-- `lldb`: LLDB/debugserver toolchain access plus debugger-grade host process inspection.
+- `lldb`: LLDB/debugger toolchain access plus debugger-grade host process inspection.
 - `macos-gui`: GUI app-related integration paths.
 - `electron`: Electron integration (also enables `macos-gui`).
 - `all-agents`: load all agent profiles.
@@ -58,6 +59,7 @@ Enable only when required for the current task:
 - **Cross-repo read context**: add `--add-dirs-ro` for specific sibling paths or files.
 - **Cloud task burst**: enable `cloud-credentials` only for that run/session.
 - **Docker/k8s workflow**: enable `docker` and/or `kubectl` only while needed.
+- **Native builds via Apple shims**: common `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` flows work by default via the Apple toolchain core profile.
 - **Local process triage**: prefer `process-control`; reserve `lldb` for real debugger sessions.
 - **IDE app-hosted agents**: enable `electron` and add `all-agents` only if extension-hosted CLIs require it.
 

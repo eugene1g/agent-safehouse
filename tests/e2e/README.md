@@ -2,7 +2,7 @@
 
 This directory contains two end-to-end test layers for Agent Safehouse:
 
-1. **TUI simulation (tmux)**: A deterministic fake TUI agent is run under Safehouse and driven via `tmux` keystrokes. This validates sandbox policy basics across *every* configured agent profile without calling any real LLMs.
+1. **TUI simulation (tmux)**: A deterministic fake TUI agent is run under Safehouse and driven via `tmux` keystrokes. This validates sandbox policy basics across *every* configured agent profile without calling any real LLMs, including default workdir access, denied reads/writes outside the workdir, and native Apple `/usr/bin/git` and `/usr/bin/make` shim execution.
 2. **Live LLM checks (real agent CLIs)**: Real agent CLIs are executed under Safehouse in non-interactive mode to ensure they can actually talk to a provider (OpenAI/Anthropic/etc) and that Safehouse blocks forbidden disk reads.
 
 Both runners enumerate agent profiles from `profiles/60-agents/*.sb`.

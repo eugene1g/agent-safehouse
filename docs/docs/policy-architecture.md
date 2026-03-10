@@ -9,7 +9,7 @@ Policy assembly order:
 | `00-base.sb` | Default deny, helper functions, HOME replacement token |
 | `10-system-runtime.sb` | macOS runtime binaries, temp dirs, IPC |
 | `20-network.sb` | Network policy |
-| `30-toolchains/*.sb` | Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
+| `30-toolchains/*.sb` | Apple Toolchain Core, Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent modules |
 | `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `scm-clis`) |
 | `55-integrations-optional/*.sb` | Opt-in integrations (`--enable=...`) |

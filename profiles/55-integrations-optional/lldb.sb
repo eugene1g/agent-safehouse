@@ -5,9 +5,8 @@
 ;; $$require=55-integrations-optional/process-control.sb$$
 ;; ---------------------------------------------------------------------------
 
-;; Extends process-control with task-port and pid-info access, plus read access
-;; to the selected Apple developer toolchain roots that LLDB discovers through
-;; xcode-select/xcrun on macOS.
+;; Extends the default Apple toolchain core + process-control with LLDB-specific
+;; developer-root access and host inspection rights for debugger workflows.
 ;; Note: successful attach still depends on host macOS debugger policy
 ;; (taskgated, SIP/hardened targets, developer tooling installation, etc.).
 

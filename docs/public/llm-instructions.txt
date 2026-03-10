@@ -38,6 +38,7 @@ command -v mise asdf volta proto 2>/dev/null
 ```
 
 Map detections to the corresponding `30-toolchains/*.sb` profiles:
+- Always include `apple-toolchain-core.sb` on macOS to cover common Apple `/usr/bin` shim targets such as `git`, `make`, and `clang`.
 - `node`/`npm`/`pnpm`/`yarn`/`corepack` → include `node.sb` contents
 - `bun` → include `bun.sb` contents
 - `python3`/`pip`/`uv` → include `python.sb` contents
@@ -94,7 +95,7 @@ Save to `~/.config/sandbox-exec/agent.sb`. Follow these rules:
   1. `(version 1)`, HOME_DIR define, helper macros, `(deny default)` — from `00-base.sb`
   2. System runtime — from `10-system-runtime.sb` (include it fully; it is the minimum viable surface)
   3. Network — from `20-network.sb` (`(allow network*)`)
-  4. Detected toolchains — copy the relevant `30-toolchains/*.sb` file contents
+  4. Default Apple toolchain core plus detected language toolchains — copy the relevant `30-toolchains/*.sb` file contents
   5. Shared agent context — from `40-shared/agent-common.sb`
   6. Core integrations — always include `git.sb`, `scm-clis.sb`, `launch-services.sb`, and `container-runtime-default-deny.sb` from `50-integrations-core/`
   7. Agent profiles — from `60-agents/*.sb` for detected agents

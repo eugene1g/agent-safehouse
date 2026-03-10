@@ -21,6 +21,9 @@ TMP_ROOT=""
 WORKDIR=""
 AGENT_PATH=""
 CANARY_PATH=""
+MAKEFILE_PATH=""
+MAKE_OUTPUT_PATH=""
+GIT_REPO_PATH=""
 FORBIDDEN_PATH=""
 FORBIDDEN_PARENT=""
 FORBIDDEN_READ_PATH=""
@@ -195,6 +198,12 @@ run_tmux_interaction() {
   wait_for_pattern "EVENT:FORBIDDEN_READ_DENIED:${FORBIDDEN_READ_PATH}" "${TUI_TIMEOUT_SECS}" || fail "forbidden read deny event was not observed"
 
   tmux send-keys -t "${SESSION_NAME}:0.0" Down Enter
+  wait_for_pattern "EVENT:NATIVE_GIT_OK:${GIT_REPO_PATH}" "${TUI_TIMEOUT_SECS}" || fail "native git success event was not observed"
+
+  tmux send-keys -t "${SESSION_NAME}:0.0" Down Enter
+  wait_for_pattern "EVENT:NATIVE_MAKE_OK:${MAKE_OUTPUT_PATH}" "${TUI_TIMEOUT_SECS}" || fail "native make success event was not observed"
+
+  tmux send-keys -t "${SESSION_NAME}:0.0" Down Enter
   wait_for_pattern "EVENT:EXIT" "${TUI_TIMEOUT_SECS}" || fail "exit event was not observed"
   tmux send-keys -t "${SESSION_NAME}:0.0" "exit" C-m
 
@@ -217,11 +226,26 @@ assert_filesystem_outcomes() {
   if [[ "$(cat "${FORBIDDEN_READ_PATH}")" != "${FORBIDDEN_READ_SECRET}" ]]; then
     fail "forbidden read file content was unexpectedly modified"
   fi
+  if [[ ! -f "${GIT_REPO_PATH}/.git/HEAD" ]]; then
+    fail "native git did not initialize a repository inside the sandbox workdir"
+  fi
+  if [[ ! -f "${MAKE_OUTPUT_PATH}" ]]; then
+    fail "native make did not create its expected output file"
+  fi
+  if [[ "$(cat "${MAKE_OUTPUT_PATH}")" != "SAFEHOUSE_E2E_MAKE_OK" ]]; then
+    fail "native make output content did not match expected token"
+  fi
 }
 
 prepare_layout_for_agent() {
   mkdir -p "${WORKDIR}" "${FORBIDDEN_PARENT}" "${FORBIDDEN_READ_PARENT}"
   printf '%s\n' "${FORBIDDEN_READ_SECRET}" >"${FORBIDDEN_READ_PATH}"
+  cat >"${MAKEFILE_PATH}" <<'EOF'
+.PHONY: safehouse-e2e
+
+safehouse-e2e:
+	printf '%s\n' 'SAFEHOUSE_E2E_MAKE_OK' > safehouse-e2e-make-output.txt
+EOF
   cp /usr/bin/true "${AGENT_PATH}"
   chmod +x "${AGENT_PATH}"
 }
@@ -250,6 +274,9 @@ run_agent_case() {
   WORKDIR="${TMP_ROOT}/work-${profile_base}"
   AGENT_PATH="${WORKDIR}/${command_basename}"
   CANARY_PATH="${WORKDIR}/safehouse-e2e-canary-${profile_base}.txt"
+  MAKEFILE_PATH="${WORKDIR}/Makefile.safehouse-e2e"
+  MAKE_OUTPUT_PATH="${WORKDIR}/safehouse-e2e-make-output.txt"
+  GIT_REPO_PATH="${WORKDIR}/safehouse-e2e-git-repo"
   POLICY_PATH="${TMP_ROOT}/policy-${profile_base}.sb"
   PANE_LOG="${TMP_ROOT}/pane-${profile_base}.log"
   FORBIDDEN_PARENT="${HOME}/.safehouse-e2e-forbidden.${SESSION_NAME}"
@@ -319,6 +346,7 @@ run_all_profiles_sequential() {
 	echo "Running tmux-driven TUI E2E checks across all configured agent profiles..."
 
 	TMP_ROOT="$(mktemp -d /tmp/safehouse-e2e.XXXXXX)"
+	TMP_ROOT="$(cd "${TMP_ROOT}" && pwd -P)"
 
 	while IFS= read -r profile_path; do
 		[[ -n "${profile_path}" ]] || continue
@@ -340,6 +368,7 @@ run_all_profiles_parallel() {
 
 	script_path="${SCRIPT_DIR}/run.sh"
 	TMP_ROOT="$(mktemp -d /tmp/safehouse-e2e-tui-parallel.XXXXXX)"
+	TMP_ROOT="$(cd "${TMP_ROOT}" && pwd -P)"
 	profiles_file="${TMP_ROOT}/profiles.txt"
 	log_dir="${TMP_ROOT}/logs"
 	mkdir -p "${log_dir}"
@@ -432,6 +461,7 @@ if [[ -n "${PROFILE_ONLY}" ]]; then
 
 	preflight_sandbox_exec
 	TMP_ROOT="$(mktemp -d /tmp/safehouse-e2e.XXXXXX)"
+	TMP_ROOT="$(cd "${TMP_ROOT}" && pwd -P)"
 	run_agent_case "${PROFILE_ONLY}"
 
 	if [[ "${SAFEHOUSE_E2E_LIVE:-0}" == "1" ]]; then

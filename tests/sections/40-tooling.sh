@@ -2,10 +2,23 @@
 
 run_section_tooling() {
   local node_bin java_home_dir copilot_bin
+  local apple_toolchain_test_dir apple_toolchain_test_src apple_toolchain_test_bin
   local policy_claude_startup policy_amp_startup policy_copilot_startup
 
   section_begin "Toolchains"
   assert_allowed_if_exists "$POLICY_DEFAULT" "git --version" "git" /bin/sh -c 'git --version'
+  assert_allowed_strict "$POLICY_DEFAULT" "Apple /usr/bin/git --version" /usr/bin/git --version
+  assert_allowed_strict "$POLICY_DEFAULT" "Apple /usr/bin/make --version" /usr/bin/make --version
+  assert_allowed_strict "$POLICY_DEFAULT" "Apple /usr/bin/clang --version" /usr/bin/clang --version
+
+  apple_toolchain_test_dir="$(mktemp -d /tmp/safehouse-apple-toolchain-core.XXXXXX)"
+  apple_toolchain_test_src="${apple_toolchain_test_dir}/hello.c"
+  apple_toolchain_test_bin="${apple_toolchain_test_dir}/hello"
+  printf '%s\n' 'int main(void) { return 0; }' > "$apple_toolchain_test_src"
+  assert_allowed_strict "$POLICY_DEFAULT" "Apple /usr/bin/clang can compile and link a trivial program" /bin/sh -c '
+    /usr/bin/clang "$1" -o "$2" && "$2"
+  ' _ "$apple_toolchain_test_src" "$apple_toolchain_test_bin"
+  rm -rf "$apple_toolchain_test_dir"
 
   node_bin="$(command -v node 2>/dev/null || true)"
   if [[ -n "$node_bin" ]]; then
@@ -58,6 +71,7 @@ run_section_tooling() {
 
   section_begin "Git Operations"
   assert_allowed "$POLICY_DEFAULT" "git init in CWD" /bin/sh -c "cd '${TEST_CWD}' && git init -q"
+  assert_allowed "$POLICY_DEFAULT" "Apple /usr/bin/git init in CWD" /bin/sh -c "cd '${TEST_CWD}' && /usr/bin/git init -q"
   assert_allowed_if_exists "$POLICY_DEFAULT" "git config read" "git" /bin/sh -c 'git config --global --list'
   assert_allowed_if_exists "$POLICY_DEFAULT" "git ls-remote (network HTTPS)" "git" /bin/sh -c 'git ls-remote --exit-code https://github.com/git/git.git HEAD'
 }

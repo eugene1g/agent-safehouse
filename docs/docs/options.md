@@ -37,6 +37,8 @@
 - `all-apps`
 - `wide-read`
 
+Common Apple shimmed developer tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are available by default via `profiles/30-toolchains/apple-toolchain-core.sb`; this is not an optional `--enable` feature.
+
 ## Parsing and Separator Behavior
 
 - Path/feature flags accept both `--flag=value` and `--flag value`.
