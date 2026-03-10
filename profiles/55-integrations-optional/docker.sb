@@ -14,6 +14,18 @@
     (home-literal "/.rd/docker.sock")                                      ;; Rancher Desktop socket.
 )
 
+;; Re-allow connect() on Docker unix sockets (matches the network-outbound deny
+;; in container-runtime-default-deny.sb).
+(allow network-outbound
+    (remote unix-socket (path-literal "/var/run/docker.sock"))
+    (remote unix-socket (path-literal "/private/var/run/docker.sock"))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.docker/run/docker\\.sock$")))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.orbstack/run/docker\\.sock$")))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.colima/docker\\.sock$")))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.colima/[^/]+/docker\\.sock$")))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.rd/docker\\.sock$")))
+)
+
 ;; OrbStack (Docker Desktop alternative) — shell completions and CLI helpers.
 (allow file-read*
     (subpath "/Applications/OrbStack.app/Contents/Resources/completions")  ;; Zsh/bash completions sourced during shell init.
