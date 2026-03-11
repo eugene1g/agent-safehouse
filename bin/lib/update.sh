@@ -193,36 +193,43 @@ run_safehouse_update() {
     exit 1
   fi
 
-  tmp_path="$(mktemp "${target_path}.XXXXXX")"
+  (
+    tmp_path="$(mktemp "${target_path}.XXXXXX")"
+    trap 'rm -f "$tmp_path"' EXIT
 
-  if ! fetch_safehouse_update_source "$update_source" "$tmp_path"; then
-    rm -f "$tmp_path"
-    echo "Failed to download the requested safehouse update asset." >&2
-    echo "Source: ${update_source}" >&2
-    echo "Install curl or wget, or set SAFEHOUSE_SELF_UPDATE_URL to a reachable asset URL or local file path." >&2
-    exit 1
-  fi
+    if ! fetch_safehouse_update_source "$update_source" "$tmp_path"; then
+      echo "Failed to download the requested safehouse update asset." >&2
+      echo "Source: ${update_source}" >&2
+      echo "Install curl or wget, or set SAFEHOUSE_SELF_UPDATE_URL to a reachable asset URL or local file path." >&2
+      exit 1
+    fi
 
-  chmod 0755 "$tmp_path"
+    chmod 0755 "$tmp_path"
 
-  if ! safehouse_update_candidate_looks_valid "$tmp_path"; then
-    rm -f "$tmp_path"
-    echo "Downloaded update candidate does not look like a valid standalone safehouse release asset." >&2
-    echo "Source: ${update_source}" >&2
-    exit 1
-  fi
+    if ! safehouse_update_candidate_looks_valid "$tmp_path"; then
+      echo "Downloaded update candidate does not look like a valid standalone safehouse release asset." >&2
+      echo "Source: ${update_source}" >&2
+      exit 1
+    fi
 
-  if cmp -s "$tmp_path" "$target_path"; then
-    rm -f "$tmp_path"
-    printf 'Already up to date: %s %s\n' "$safehouse_project_name" "$safehouse_project_version"
-    return 0
-  fi
+    if cmp -s "$tmp_path" "$target_path"; then
+      printf 'Already up to date: %s %s\n' "$safehouse_project_name" "$safehouse_project_version"
+      exit 0
+    fi
 
-  candidate_version="$(extract_safehouse_embedded_version "$tmp_path")"
-  if [[ -z "$candidate_version" || "$candidate_version" == "__SAFEHOUSE_PROJECT_VERSION__" ]]; then
-    candidate_version="unknown"
-  fi
+    candidate_version="$(extract_safehouse_embedded_version "$tmp_path")"
+    if [[ -z "$candidate_version" || "$candidate_version" == "__SAFEHOUSE_PROJECT_VERSION__" ]]; then
+      candidate_version="unknown"
+    fi
 
-  mv "$tmp_path" "$target_path"
-  printf 'Updated %s from %s to %s\n' "$target_path" "$safehouse_project_version" "$candidate_version"
+    if ! mv "$tmp_path" "$target_path"; then
+      echo "Failed to replace the current safehouse install with the downloaded update." >&2
+      echo "Target: ${target_path}" >&2
+      echo "Source: ${update_source}" >&2
+      exit 1
+    fi
+
+    trap - EXIT
+    printf 'Updated %s from %s to %s\n' "$target_path" "$safehouse_project_version" "$candidate_version"
+  )
 }

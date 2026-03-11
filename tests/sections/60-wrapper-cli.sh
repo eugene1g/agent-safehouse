@@ -16,7 +16,11 @@ run_section_wrapper_and_cli() {
   local launcher_spec launcher_path launcher_label launcher_marker
   local expected_version cli_version help_output dist_version dist_help_output
   local update_validation_marker
+  local update_command_path
   local update_status update_output update_install_path update_candidate_path update_head_path update_head_candidate_path update_legacy_path update_legacy_candidate_path update_noop_path update_noop_candidate_path
+  local update_invalid_path update_invalid_candidate_path
+  local update_mv_fail_path update_mv_fail_candidate_path update_mv_fail_bin_dir
+  local update_mv_fail_resolved_path
   local update_symlink_target update_symlink_path update_reject_output
 
   section_begin "safehouse.sh Entry Point"
@@ -60,6 +64,45 @@ run_section_wrapper_and_cli() {
   else
     log_fail "safehouse.sh update rejects repo checkout"
   fi
+
+  update_command_path="${TEST_CWD}/update"
+  rm -f "$update_command_path"
+  cat > "$update_command_path" <<'EOF'
+#!/bin/sh
+printf 'wrapped-update\n'
+EOF
+  chmod 0755 "$update_command_path"
+
+  set +e
+  update_output="$(cd "$TEST_CWD" && PATH="${TEST_CWD}:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" "$SAFEHOUSE" --stdout update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -eq 0 && "$update_output" == "(version 1)"* ]]; then
+    log_pass "safehouse.sh --stdout update stays in policy output mode"
+  else
+    log_fail "safehouse.sh --stdout update stays in policy output mode"
+  fi
+
+  set +e
+  update_output="$(cd "$TEST_CWD" && PATH="${TEST_CWD}:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" "$SAFEHOUSE" --enable=docker update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -eq 0 && "$update_output" == "wrapped-update" ]]; then
+    log_pass "safehouse.sh policy options disable update subcommand parsing"
+  else
+    log_fail "safehouse.sh policy options disable update subcommand parsing"
+  fi
+
+  set +e
+  update_output="$(cd "$TEST_CWD" && PATH="${TEST_CWD}:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" "$SAFEHOUSE" -- update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -eq 0 && "$update_output" == "wrapped-update" ]]; then
+    log_pass "safehouse.sh -- treats update as a wrapped command"
+  else
+    log_fail "safehouse.sh -- treats update as a wrapped command"
+  fi
+  rm -f "$update_command_path"
 
   set +e
   no_command_policy="$("$SAFEHOUSE" 2>/dev/null)"
@@ -392,9 +435,15 @@ EOF
   update_legacy_candidate_path="${TEST_CWD}/safehouse-update-legacy-candidate.sh"
   update_noop_path="${TEST_CWD}/safehouse-update-noop.sh"
   update_noop_candidate_path="${TEST_CWD}/safehouse-update-noop-candidate.sh"
+  update_invalid_path="${TEST_CWD}/safehouse-update-invalid.sh"
+  update_invalid_candidate_path="${TEST_CWD}/safehouse-update-invalid-candidate.sh"
+  update_mv_fail_path="${TEST_CWD}/safehouse-update-mv-fail.sh"
+  update_mv_fail_candidate_path="${TEST_CWD}/safehouse-update-mv-fail-candidate.sh"
+  update_mv_fail_bin_dir="${TEST_CWD}/safehouse-update-mv-fail-bin"
   update_symlink_target="${TEST_CWD}/safehouse-update-symlink-target.sh"
   update_symlink_path="${TEST_CWD}/safehouse-update-symlink.sh"
-  rm -f "$update_install_path" "$update_candidate_path" "$update_head_path" "$update_head_candidate_path" "$update_legacy_path" "$update_legacy_candidate_path" "$update_noop_path" "$update_noop_candidate_path" "$update_symlink_target" "$update_symlink_path"
+  rm -rf "$update_mv_fail_bin_dir"
+  rm -f "$update_install_path" "$update_candidate_path" "$update_head_path" "$update_head_candidate_path" "$update_legacy_path" "$update_legacy_candidate_path" "$update_noop_path" "$update_noop_candidate_path" "$update_invalid_path" "$update_invalid_candidate_path" "$update_mv_fail_path" "$update_mv_fail_candidate_path" "$update_symlink_target" "$update_symlink_path"
 
   cp "$dist_path" "$update_install_path"
   cp "$dist_path" "$update_candidate_path"
@@ -456,6 +505,48 @@ EOF
     log_fail "dist safehouse update reports already up to date for identical asset"
   fi
 
+  cp "$dist_path" "$update_invalid_path"
+  chmod 0755 "$update_invalid_path"
+  cat > "$update_invalid_candidate_path" <<'EOF'
+#!/usr/bin/env bash
+echo "not-a-safehouse-release"
+EOF
+  chmod 0755 "$update_invalid_candidate_path"
+  set +e
+  update_output="$(SAFEHOUSE_SELF_UPDATE_URL="$update_invalid_candidate_path" "$update_invalid_path" update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -ne 0 && "$update_output" == *"does not look like a valid standalone safehouse release asset"* ]] && cmp -s "$update_invalid_path" "$dist_path"; then
+    log_pass "dist safehouse update rejects invalid update candidates without replacing the install"
+  else
+    log_fail "dist safehouse update rejects invalid update candidates without replacing the install"
+  fi
+
+  cp "$dist_path" "$update_mv_fail_path"
+  cp "$dist_path" "$update_mv_fail_candidate_path"
+  chmod 0755 "$update_mv_fail_path" "$update_mv_fail_candidate_path"
+  update_mv_fail_resolved_path="$(cd "$(dirname "$update_mv_fail_path")" && pwd -P)/$(basename "$update_mv_fail_path")"
+  printf '\n# safehouse-test-id:self-update-mv-fail\n' >> "$update_mv_fail_candidate_path"
+  mkdir -p "$update_mv_fail_bin_dir"
+  cat > "${update_mv_fail_bin_dir}/mv" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+  chmod 0755 "${update_mv_fail_bin_dir}/mv"
+  set +e
+  update_output="$(PATH="${update_mv_fail_bin_dir}:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" SAFEHOUSE_SELF_UPDATE_URL="$update_mv_fail_candidate_path" "$update_mv_fail_path" update 2>&1)"
+  update_status=$?
+  set -e
+  local -a update_mv_fail_leaks=()
+  shopt -s nullglob
+  update_mv_fail_leaks=("${update_mv_fail_path}".*)
+  shopt -u nullglob
+  if [[ "$update_status" -ne 0 && "$update_output" == *"Failed to replace the current safehouse install with the downloaded update."* && "$update_output" == *"Target: ${update_mv_fail_resolved_path}"* && ${#update_mv_fail_leaks[@]} -eq 0 ]] && cmp -s "$update_mv_fail_path" "$dist_path"; then
+    log_pass "dist safehouse update reports replacement failures and cleans temporary files"
+  else
+    log_fail "dist safehouse update reports replacement failures and cleans temporary files"
+  fi
+
   cp "$dist_path" "$update_symlink_target"
   chmod 0755 "$update_symlink_target"
   ln -sf "$update_symlink_target" "$update_symlink_path"
@@ -511,9 +602,9 @@ EOF
     log_fail "dist Claude.app command-scoped policy output matches bin/safehouse.sh byte-for-byte"
   fi
 
-  rm -rf "$dist_output_dir"
+  rm -rf "$dist_output_dir" "$update_mv_fail_bin_dir"
   rm -rf "$dist_fake_bin_dir" "${TEST_CWD}/dist-parity-app"
-  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex" "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app" "$dist_append_profile_file" "$dist_append_profile_policy" "$update_install_path" "$update_candidate_path" "$update_head_path" "$update_head_candidate_path" "$update_legacy_path" "$update_legacy_candidate_path" "$update_noop_path" "$update_noop_candidate_path" "$update_symlink_target" "$update_symlink_path"
+  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex" "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app" "$dist_append_profile_file" "$dist_append_profile_policy" "$update_install_path" "$update_candidate_path" "$update_head_path" "$update_head_candidate_path" "$update_legacy_path" "$update_legacy_candidate_path" "$update_noop_path" "$update_noop_candidate_path" "$update_invalid_path" "$update_invalid_candidate_path" "$update_mv_fail_path" "$update_mv_fail_candidate_path" "$update_symlink_target" "$update_symlink_path"
 }
 
 register_section run_section_wrapper_and_cli

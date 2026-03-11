@@ -281,7 +281,9 @@ main() {
 
       case "${1-}" in
         "")
-          run_safehouse_update "release"
+          if ! run_safehouse_update "release"; then
+            exit 1
+          fi
           ;;
         --head)
           shift
@@ -289,7 +291,9 @@ main() {
             echo "safehouse update --head does not accept additional arguments." >&2
             exit 1
           fi
-          run_safehouse_update "head"
+          if ! run_safehouse_update "head"; then
+            exit 1
+          fi
           ;;
         -h|--help)
           if [[ "$#" -ne 1 ]]; then
