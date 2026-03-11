@@ -1,7 +1,7 @@
 {
   "private": true,
   "license": "Apache-2.0",
-  "packageManager": "pnpm@10.29.3",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
@@ -13,6 +13,6 @@
   },
   "devDependencies": {
     "vitepress": "2.0.0-alpha.16",
-    "wrangler": "4.65.0"
+    "wrangler": "4.72.0"
   }
 }
