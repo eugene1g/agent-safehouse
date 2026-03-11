@@ -7,6 +7,7 @@ usage() {
 ${safehouse_project_name} ${safehouse_project_version}
 
 Usage:
+  $(basename "$0") update [--head]
   $(basename "$0") [policy options]
   $(basename "$0") [policy options] [--] <command> [args...]
 
@@ -23,6 +24,12 @@ How to use this CLI:
      Generates a policy and runs the command inside that policy.
 
 Common examples:
+  # Update a standalone safehouse install in place
+  $(basename "$0") update
+
+  # Update from the latest main branch dist build
+  $(basename "$0") update --head
+
   # Generate policy file path
   $(basename "$0")
 
@@ -99,6 +106,11 @@ Output options:
       Print effective workdir/grants/profile selection summary to stderr
 
 General:
+  update [--head]
+      Download the latest safehouse.sh release asset and replace this script
+      Use --head to download dist/safehouse.sh from the main branch instead
+      Standalone installs only; use brew upgrade agent-safehouse for Homebrew
+
   --version
       Show project version
 
@@ -120,6 +132,10 @@ Environment:
 
   SAFEHOUSE_ENV_PASS
       Comma-separated env var names to pass through (same format as --env-pass)
+
+  SAFEHOUSE_SELF_UPDATE_URL
+      Override update source for the update subcommand
+      Advanced use: accepts an asset URL or local file path
 
 Config file:
   <workdir>/.safehouse (optional, loaded only when trusted)
@@ -231,6 +247,7 @@ main() {
   local runtime_env_args_consumed=0
   local command_started=0
   local status=0
+  local update_subcommand_allowed=1
 
   runtime_env_pass_names=()
   if [[ "${SAFEHOUSE_ENV_PASS+x}" == "x" && -n "${SAFEHOUSE_ENV_PASS}" ]]; then
@@ -239,6 +256,7 @@ main() {
 
   while [[ $# -gt 0 ]]; do
     if consume_runtime_env_option "$1" "$#" "${2-}"; then
+      update_subcommand_allowed=0
       shift "$runtime_env_args_consumed"
       continue
     fi
@@ -258,6 +276,38 @@ main() {
       continue
     fi
 
+    if [[ "$update_subcommand_allowed" -eq 1 && "${#policy_args[@]}" -eq 0 && "${#command_args[@]}" -eq 0 && "$1" == "update" ]]; then
+      shift
+
+      case "${1-}" in
+        "")
+          run_safehouse_update "release"
+          ;;
+        --head)
+          shift
+          if [[ "$#" -ne 0 ]]; then
+            echo "safehouse update --head does not accept additional arguments." >&2
+            exit 1
+          fi
+          run_safehouse_update "head"
+          ;;
+        -h|--help)
+          if [[ "$#" -ne 1 ]]; then
+            echo "safehouse update --help does not accept additional arguments." >&2
+            exit 1
+          fi
+          print_update_usage
+          ;;
+        *)
+          echo "Unknown safehouse update option: $1" >&2
+          echo "Usage: $(basename "$0") update [--head]" >&2
+          echo "To run a wrapped command literally named update, pass it after --." >&2
+          exit 1
+          ;;
+      esac
+      exit 0
+    fi
+
     case "$1" in
       --version)
         print_version
@@ -268,14 +318,17 @@ main() {
         exit 0
         ;;
       --stdout)
+        update_subcommand_allowed=0
         stdout_policy=1
         shift
         ;;
       --explain)
+        update_subcommand_allowed=0
         policy_args+=("$1")
         shift
         ;;
       --trust-workdir-config|--trust-workdir-config=*)
+        update_subcommand_allowed=0
         policy_args+=("$1")
         shift
         ;;
@@ -286,10 +339,12 @@ main() {
         ;;
       --enable|--add-dirs-ro|--add-dirs|--workdir|--append-profile|--output)
         [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2; exit 1; }
+        update_subcommand_allowed=0
         policy_args+=("$1" "$2")
         shift 2
         ;;
       --enable=*|--add-dirs-ro=*|--add-dirs=*|--workdir=*|--append-profile=*|--output=*)
+        update_subcommand_allowed=0
         policy_args+=("$1")
         shift
         ;;

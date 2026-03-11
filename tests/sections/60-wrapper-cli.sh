@@ -15,9 +15,13 @@ run_section_wrapper_and_cli() {
   local static_policy_spec static_policy_path static_policy_label
   local launcher_spec launcher_path launcher_label launcher_marker
   local expected_version cli_version help_output dist_version dist_help_output
+  local update_validation_marker
+  local update_status update_output update_install_path update_candidate_path update_head_path update_head_candidate_path update_legacy_path update_legacy_candidate_path update_noop_path update_noop_candidate_path
+  local update_symlink_target update_symlink_path update_reject_output
 
   section_begin "safehouse.sh Entry Point"
   expected_version="$(awk 'NR == 1 { sub(/\r$/, "", $0); print; exit }' "${REPO_ROOT}/VERSION")"
+  update_validation_marker="SAFEHOUSE_SELF_UPDATE_VALIDATION_MARKER=standalone-release-asset-v1"
   cli_version="$("$SAFEHOUSE" --version 2>/dev/null)"
   if [[ -n "$expected_version" && "$cli_version" == "Agent Safehouse ${expected_version}" ]]; then
     log_pass "safehouse.sh --version prints project version"
@@ -35,6 +39,26 @@ run_section_wrapper_and_cli() {
     log_pass "safehouse.sh --help documents --version"
   else
     log_fail "safehouse.sh --help documents --version"
+  fi
+  if [[ "$help_output" == *"Download the latest safehouse.sh release asset and replace this script"* ]]; then
+    log_pass "safehouse.sh --help documents update subcommand"
+  else
+    log_fail "safehouse.sh --help documents update subcommand"
+  fi
+  if [[ "$help_output" == *"update [--head]"* ]]; then
+    log_pass "safehouse.sh --help documents update --head"
+  else
+    log_fail "safehouse.sh --help documents update --head"
+  fi
+
+  set +e
+  update_reject_output="$("$SAFEHOUSE" update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -ne 0 && "$update_reject_output" == *"standalone installed scripts"* ]]; then
+    log_pass "safehouse.sh update rejects repo checkout"
+  else
+    log_fail "safehouse.sh update rejects repo checkout"
   fi
 
   set +e
@@ -167,6 +191,7 @@ EOF
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes usymptomsd mach-lookup grant" "(global-name \"com.apple.usymptomsd\")"
   assert_policy_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header includes project homepage link" "# Project: https://agent-safehouse.dev"
   assert_policy_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header includes embedded profile UTC modified timestamp" "# Embedded Profiles Last Modified (UTC): "
+  assert_policy_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse embeds explicit self-update validation marker" "$update_validation_marker"
   assert_policy_not_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse header omits source commit hash" "# Source Commit: "
   assert_policy_not_contains "${REPO_ROOT}/dist/safehouse.sh" "dist safehouse omits stale apple-build-tools feature text" "apple-build-tools"
   if [[ -x "$dist_claude_launcher" ]]; then
@@ -301,6 +326,18 @@ EOF
   else
     log_fail "dist safehouse --help documents --version"
   fi
+  if [[ "$dist_help_output" == *"Download the latest safehouse.sh release asset and replace this script"* ]]; then
+    log_pass "dist safehouse --help documents update subcommand"
+  else
+    log_fail "dist safehouse --help documents update subcommand"
+  fi
+  if [[ "$dist_help_output" == *"update [--head]"* ]]; then
+    log_pass "dist safehouse --help documents update --head"
+  else
+    log_fail "dist safehouse --help documents update --head"
+  fi
+  assert_policy_contains "$dist_path" "dist safehouse embeds head update source URL" "https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/safehouse.sh"
+  assert_policy_contains "$dist_path" "dist safehouse embeds explicit self-update validation marker" "$update_validation_marker"
 
   set +e
   dist_no_command_policy="$("$dist_path" 2>/dev/null)"
@@ -347,6 +384,91 @@ EOF
 
   assert_command_exit_code 9 "dist safehouse returns wrapped command exit code" "$dist_path" -- /bin/sh -c 'exit 9'
 
+  update_install_path="${TEST_CWD}/safehouse-update-install.sh"
+  update_candidate_path="${TEST_CWD}/safehouse-update-candidate.sh"
+  update_head_path="${TEST_CWD}/safehouse-update-head.sh"
+  update_head_candidate_path="${TEST_CWD}/safehouse-update-head-candidate.sh"
+  update_legacy_path="${TEST_CWD}/safehouse-update-legacy.sh"
+  update_legacy_candidate_path="${TEST_CWD}/safehouse-update-legacy-candidate.sh"
+  update_noop_path="${TEST_CWD}/safehouse-update-noop.sh"
+  update_noop_candidate_path="${TEST_CWD}/safehouse-update-noop-candidate.sh"
+  update_symlink_target="${TEST_CWD}/safehouse-update-symlink-target.sh"
+  update_symlink_path="${TEST_CWD}/safehouse-update-symlink.sh"
+  rm -f "$update_install_path" "$update_candidate_path" "$update_head_path" "$update_head_candidate_path" "$update_legacy_path" "$update_legacy_candidate_path" "$update_noop_path" "$update_noop_candidate_path" "$update_symlink_target" "$update_symlink_path"
+
+  cp "$dist_path" "$update_install_path"
+  cp "$dist_path" "$update_candidate_path"
+  chmod 0755 "$update_install_path" "$update_candidate_path"
+  printf '\n# safehouse-test-id:self-update-updated\n' >> "$update_candidate_path"
+  set +e
+  update_output="$(SAFEHOUSE_SELF_UPDATE_URL="$update_candidate_path" "$update_install_path" update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -eq 0 && "$update_output" == Updated* ]] && cmp -s "$update_install_path" "$update_candidate_path"; then
+    log_pass "dist safehouse update replaces standalone install from local override source"
+  else
+    log_fail "dist safehouse update replaces standalone install from local override source"
+  fi
+
+  cp "$dist_path" "$update_head_path"
+  cp "$dist_path" "$update_head_candidate_path"
+  chmod 0755 "$update_head_path" "$update_head_candidate_path"
+  printf '\n# safehouse-test-id:self-update-head-updated\n' >> "$update_head_candidate_path"
+  set +e
+  update_output="$(SAFEHOUSE_SELF_UPDATE_URL="$update_head_candidate_path" "$update_head_path" update --head 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -eq 0 && "$update_output" == Updated* ]] && cmp -s "$update_head_path" "$update_head_candidate_path"; then
+    log_pass "dist safehouse update --head replaces standalone install from head source"
+  else
+    log_fail "dist safehouse update --head replaces standalone install from head source"
+  fi
+
+  cp "$dist_path" "$update_legacy_path"
+  cp "$dist_path" "$update_legacy_candidate_path"
+  chmod 0755 "$update_legacy_path" "$update_legacy_candidate_path"
+  awk '
+    $0 ~ /^safehouse_project_version_embedded="/ { next }
+    $0 ~ /^# SAFEHOUSE_SELF_UPDATE_VALIDATION_MARKER=/ { next }
+    { print }
+  ' "$update_legacy_candidate_path" > "${update_legacy_candidate_path}.tmp"
+  mv "${update_legacy_candidate_path}.tmp" "$update_legacy_candidate_path"
+  set +e
+  update_output="$(SAFEHOUSE_SELF_UPDATE_URL="$update_legacy_candidate_path" "$update_legacy_path" update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -eq 0 && "$update_output" == *" to unknown"* ]] && cmp -s "$update_legacy_path" "$update_legacy_candidate_path"; then
+    log_pass "dist safehouse update accepts legacy release assets without embedded version metadata"
+  else
+    log_fail "dist safehouse update accepts legacy release assets without embedded version metadata"
+  fi
+
+  cp "$dist_path" "$update_noop_path"
+  cp "$dist_path" "$update_noop_candidate_path"
+  chmod 0755 "$update_noop_path" "$update_noop_candidate_path"
+  set +e
+  update_output="$(SAFEHOUSE_SELF_UPDATE_URL="$update_noop_candidate_path" "$update_noop_path" update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -eq 0 && "$update_output" == *"Already up to date:"* ]] && cmp -s "$update_noop_path" "$update_noop_candidate_path"; then
+    log_pass "dist safehouse update reports already up to date for identical asset"
+  else
+    log_fail "dist safehouse update reports already up to date for identical asset"
+  fi
+
+  cp "$dist_path" "$update_symlink_target"
+  chmod 0755 "$update_symlink_target"
+  ln -sf "$update_symlink_target" "$update_symlink_path"
+  set +e
+  update_output="$(SAFEHOUSE_SELF_UPDATE_URL="$update_candidate_path" "$update_symlink_path" update 2>&1)"
+  update_status=$?
+  set -e
+  if [[ "$update_status" -ne 0 && "$update_output" == *"brew upgrade agent-safehouse"* && -L "$update_symlink_path" ]] && cmp -s "$update_symlink_target" "$dist_path"; then
+    log_pass "dist safehouse update rejects symlinked installs"
+  else
+    log_fail "dist safehouse update rejects symlinked installs"
+  fi
+
   assert_command_succeeds "bin safehouse writes parity policy file" "$SAFEHOUSE" --output "$dist_policy_from_bin"
   assert_command_succeeds "dist safehouse writes parity policy file" "$dist_path" --output "$dist_policy_from_dist"
   if cmp -s "$dist_policy_from_bin" "$dist_policy_from_dist"; then
@@ -391,7 +513,7 @@ EOF
 
   rm -rf "$dist_output_dir"
   rm -rf "$dist_fake_bin_dir" "${TEST_CWD}/dist-parity-app"
-  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex" "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app" "$dist_append_profile_file" "$dist_append_profile_policy"
+  rm -f "$dist_stdout_canary" "$dist_output_policy" "$dist_policy_from_bin" "$dist_policy_from_dist" "$dist_policy_from_bin_codex" "$dist_policy_from_dist_codex" "$dist_policy_from_bin_claude_app" "$dist_policy_from_dist_claude_app" "$dist_append_profile_file" "$dist_append_profile_policy" "$update_install_path" "$update_candidate_path" "$update_head_path" "$update_head_candidate_path" "$update_legacy_path" "$update_legacy_candidate_path" "$update_noop_path" "$update_noop_candidate_path" "$update_symlink_target" "$update_symlink_path"
 }
 
 register_section run_section_wrapper_and_cli

@@ -464,6 +464,8 @@ emit_inlined_runtime_sources() {
   echo ""
   cat "${ROOT_DIR}/bin/lib/cli.sh"
   echo ""
+  cat "${ROOT_DIR}/bin/lib/update.sh"
+  echo ""
 }
 
 emit_embedded_overrides() {
@@ -745,6 +747,13 @@ emit_dist_script_body() {
   emit_embedded_overrides
 }
 
+emit_self_update_validation_marker() {
+  cat <<'SCRIPT'
+# Self-update validation marker: generated standalone safehouse release asset.
+# SAFEHOUSE_SELF_UPDATE_VALIDATION_MARKER=standalone-release-asset-v1
+SCRIPT
+}
+
 write_dist_script() {
   local target_path="$1"
   local embedded_profiles_last_modified_utc="$2"
@@ -757,6 +766,7 @@ write_dist_script() {
   {
     emit_dist_script_body "$embedded_profiles_last_modified_utc" "$project_version"
     echo 'main "$@"'
+    emit_self_update_validation_marker
   } >"$tmp_output"
 
   chmod 0755 "$tmp_output"
