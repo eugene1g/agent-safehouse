@@ -139,6 +139,7 @@ run_section_cli_edge_cases() {
     assert_policy_contains "$policy_enable_all_agents" "--enable=all-agents includes expected marker (${policy_marker})" "$policy_marker"
   done
   assert_policy_not_contains "$policy_enable_all_agents" "--enable=all-agents does not include 65-apps profiles" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_not_contains "$policy_enable_all_agents" "--enable=all-agents does not include 65-apps profiles (codex)" ";; Source: 65-apps/codex-app.sb"
   assert_policy_not_contains "$policy_enable_all_agents" "--enable=all-agents does not include 65-apps profiles (vscode)" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "$policy_enable_all_agents" "all-agents policy grants ~/.claude directory with subpath scope" "(home-subpath \"/.claude\")"
   assert_policy_contains "$policy_enable_all_agents" "all-agents policy grants ~/.claude.json with file-prefix scope" "(home-prefix \"/.claude.json\")"
@@ -146,6 +147,7 @@ run_section_cli_edge_cases() {
   policy_enable_all_apps="${TEST_CWD}/policy-enable-all-apps.sb"
   assert_command_succeeds "--enable=all-apps loads all 65-apps profiles" "$GENERATOR" --output "$policy_enable_all_apps" --enable=all-apps
   assert_policy_contains "$policy_enable_all_apps" "--enable=all-apps includes claude desktop app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "$policy_enable_all_apps" "--enable=all-apps includes codex desktop app profile" ";; Source: 65-apps/codex-app.sb"
   assert_policy_contains "$policy_enable_all_apps" "--enable=all-apps includes vscode app profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_not_contains "$policy_enable_all_apps" "--enable=all-apps does not include unrelated 60-agents profile by default" ";; Source: 60-agents/codex.sb"
   policy_enable_all_scoped="${TEST_CWD}/policy-enable-all-scoped.sb"
@@ -410,6 +412,7 @@ EOF
   policy_agent_kilo="${TEST_CWD}/policy-agent-kilo.sb"
   policy_agent_unknown="${TEST_CWD}/policy-agent-unknown.sb"
   policy_agent_claude_app="${TEST_CWD}/policy-agent-claude-app.sb"
+  policy_agent_codex_app="${TEST_CWD}/policy-agent-codex-app.sb"
   policy_agent_vscode_app="${TEST_CWD}/policy-agent-vscode-app.sb"
   policy_agent_all_agents="${TEST_CWD}/policy-agent-all-agents.sb"
   policy_agent_all_scoped="${TEST_CWD}/policy-agent-all-scoped.sb"
@@ -431,6 +434,8 @@ EOF
   fake_xcrun_bin="${TEST_CWD}/xcrun"
   fake_claude_app_dir="${TEST_CWD}/Claude.app"
   fake_claude_app_bin="${fake_claude_app_dir}/Contents/MacOS/Claude"
+  fake_codex_app_dir="${TEST_CWD}/Codex.app"
+  fake_codex_app_bin="${fake_codex_app_dir}/Contents/MacOS/Codex"
   fake_vscode_app_dir="${TEST_CWD}/Visual Studio Code.app"
   fake_vscode_app_bin="${fake_vscode_app_dir}/Contents/MacOS/Electron"
 
@@ -447,6 +452,8 @@ EOF
   cp /usr/bin/true "$fake_xcrun_bin"
   mkdir -p "$(dirname "$fake_claude_app_bin")"
   cp /usr/bin/true "$fake_claude_app_bin"
+  mkdir -p "$(dirname "$fake_codex_app_bin")"
+  cp /usr/bin/true "$fake_codex_app_bin"
   mkdir -p "$(dirname "$fake_vscode_app_bin")"
   cp /usr/bin/true "$fake_vscode_app_bin"
 
@@ -509,6 +516,20 @@ EOF
   assert_policy_contains "$policy_agent_claude_app" "Claude.app preamble reports implicit optional integrations from profile requirements" "Optional integrations implicitly injected: macos-gui electron"
   assert_policy_not_contains "$policy_agent_claude_app" "Claude.app command omits claude-code profile" ";; Source: 60-agents/claude-code.sb"
 
+  assert_command_succeeds "safehouse detects Codex.app command path and includes codex-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_codex_app" -- "$fake_codex_app_bin"
+  for policy_marker in \
+    ";; Source: 65-apps/codex-app.sb" \
+    "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
+    ";; Integration: Keychain" \
+    ";; Integration: macOS GUI" \
+    "#safehouse-test-id:electron-integration#" \
+    "(global-name-regex #\"^com\\.openai\\.codex-spks\")"; do
+    assert_policy_contains "$policy_agent_codex_app" "Codex.app command includes expected marker (${policy_marker})" "$policy_marker"
+  done
+  assert_policy_contains "$policy_agent_codex_app" "Codex.app preamble reports implicit optional integrations from profile requirements" "Optional integrations implicitly injected: macos-gui electron"
+  assert_policy_not_contains "$policy_agent_codex_app" "Codex.app command omits codex CLI agent profile" ";; Source: 60-agents/codex.sb"
+  assert_policy_not_contains "$policy_agent_codex_app" "Codex.app command omits Claude desktop app profile" ";; Source: 65-apps/claude-app.sb"
+
   assert_command_succeeds "safehouse detects Visual Studio Code.app command path and includes vscode-app profile" "$SAFEHOUSE" --stdout --output "$policy_agent_vscode_app" -- "$fake_vscode_app_bin"
   for policy_marker in \
     ";; Source: 65-apps/vscode-app.sb" \
@@ -531,6 +552,7 @@ EOF
     assert_policy_contains "$policy_agent_all_agents" "all-agents execute mode includes expected marker (${policy_marker})" "$policy_marker"
   done
   assert_policy_not_contains "$policy_agent_all_agents" "all-agents execute mode omits 65-apps Claude profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_not_contains "$policy_agent_all_agents" "all-agents execute mode omits 65-apps Codex profile" ";; Source: 65-apps/codex-app.sb"
   assert_policy_not_contains "$policy_agent_all_agents" "all-agents execute mode omits 65-apps VS Code profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_not_contains "$policy_agent_all_agents" "all-agents execute mode omits app-driven Electron integration" "#safehouse-test-id:electron-integration#"
 
@@ -538,6 +560,7 @@ EOF
   for policy_marker in \
     ";; Source: 65-apps/claude-app.sb" \
     "(global-name \"com.apple.backgroundtaskmanagementagent\")" \
+    ";; Source: 65-apps/codex-app.sb" \
     ";; Source: 65-apps/vscode-app.sb" \
     ";; Source: 60-agents/codex.sb" \
     ";; Source: 60-agents/claude-code.sb" \
@@ -551,9 +574,9 @@ EOF
 
   rm -f "$fake_codex_bin" "$fake_copilot_bin" "$fake_goose_bin" "$fake_unknown_bin" "$fake_cline_bin" "$fake_aider_bin" "$kilo_cmd"
   rm -f "$fake_npx_bin" "$fake_bunx_bin" "$fake_uvx_bin" "$fake_pipx_bin" "$fake_xcrun_bin"
-  rm -f "$policy_agent_codex" "$policy_agent_copilot" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_vscode_app" "$policy_agent_all_agents" "$policy_agent_all_scoped"
+  rm -f "$policy_agent_codex" "$policy_agent_copilot" "$policy_agent_goose" "$policy_agent_kilo" "$policy_agent_unknown" "$policy_agent_claude_app" "$policy_agent_codex_app" "$policy_agent_vscode_app" "$policy_agent_all_agents" "$policy_agent_all_scoped"
   rm -f "$policy_agent_runner_npx" "$policy_agent_runner_bunx" "$policy_agent_runner_uvx" "$policy_agent_runner_pipx" "$policy_agent_runner_xcrun"
-  rm -rf "$fake_claude_app_dir" "$fake_vscode_app_dir"
+  rm -rf "$fake_claude_app_dir" "$fake_codex_app_dir" "$fake_vscode_app_dir"
 
   section_begin "Generator Path/Home Validation"
   missing_path="/tmp/safehouse-missing-path-$$"

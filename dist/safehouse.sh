@@ -63,6 +63,7 @@ PROFILE_KEYS=(
   "profiles/60-agents/opencode.sb"
   "profiles/60-agents/pi.sb"
   "profiles/65-apps/claude-app.sb"
+  "profiles/65-apps/codex-app.sb"
   "profiles/65-apps/vscode-app.sb"
 )
 
@@ -2308,6 +2309,49 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_pi_sb__
 )
 __SAFEHOUSE_EMBEDDED_profiles_65_apps_claude_app_sb__
       ;;
+    "profiles/65-apps/codex-app.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_codex_app_sb__'
+;; ---------------------------------------------------------------------------
+;; App: Codex Desktop
+;; Codex for Desktop (Electron) app bundle, preferences, and data paths.
+;; Source: 65-apps/codex-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Codex")
+    (home-subpath "/Library/Logs/com.openai.codex")
+    (home-subpath "/Library/HTTPStorages/com.openai.codex")
+    (home-prefix "/Library/HTTPStorages/com.openai.codex.binarycookies")
+)
+
+(allow file-read*
+    (subpath "/Applications/Codex.app")
+    (home-literal "/Library/Preferences/com.openai.codex.plist")
+)
+
+;; Codex Desktop persists app preferences via cfprefsd under its own domain.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.openai.codex")
+)
+
+;; Shared AppKit/Mach/fsctl allowances are provided by:
+;;   55-integrations-optional/macos-gui.sb
+;; This profile adds app-specific MachPortRendezvousServer IPC grants and codex-spks.
+(allow mach-lookup
+    (global-name-regex #"^com\.openai\.codex\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.openai\.codex-spks")
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.openai\.codex\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.openai\.codex-spks")
+)
+__SAFEHOUSE_EMBEDDED_profiles_65_apps_codex_app_sb__
+      ;;
     "profiles/65-apps/vscode-app.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_vscode_app_sb__'
 ;; ---------------------------------------------------------------------------
@@ -3298,6 +3342,9 @@ resolve_selected_agent_profiles() {
     claude.app)
       append_selected_agent_profile "claude-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
+    codex.app)
+      append_selected_agent_profile "codex-app.sb" "app bundle match: ${app_bundle_base}"
+      ;;
     "visual studio code.app"|"visual studio code - insiders.app")
       append_selected_agent_profile "vscode-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
@@ -3328,7 +3375,9 @@ resolve_selected_agent_profiles() {
       append_selected_agent_profile "copilot-cli.sb" "command basename match: ${cmd}"
       ;;
     codex)
-      append_selected_agent_profile "codex.sb" "command basename match: ${cmd}"
+      if [[ "$app_bundle_base" != "codex.app" ]]; then
+        append_selected_agent_profile "codex.sb" "command basename match: ${cmd}"
+      fi
       ;;
     cursor|cursor-agent|agent)
       append_selected_agent_profile "cursor-agent.sb" "command basename match: ${cmd}"
