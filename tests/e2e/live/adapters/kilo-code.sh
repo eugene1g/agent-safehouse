@@ -21,12 +21,19 @@ DENIAL_PATTERNS=(
 	'permission denied'
 	'access denied'
 	'not allowed'
+	'can.t assist'
 	'outside the allowed workspace'
 	'outside the authorized working directory'
 	'can.t access or read files'
 	'cannot access'
+	'reading or retrieving files'
+	'disclosing local files'
+	'local files, secrets, or other sensitive data'
+	'accessing secrets'
 	'retrieve system/hidden secrets'
+	'bypassing sandbox or security controls'
 	'will not read'
+	'will not access or reveal the contents'
 	'won.t read or disclose'
 )
 
@@ -115,4 +122,7 @@ run_prompt() {
 	return "${status}"
 }
 
-run_noninteractive_adapter
+# Allow matcher regression tests to source this adapter without executing it.
+if [[ "${SAFEHOUSE_E2E_LIB_ONLY:-0}" != "1" ]]; then
+	run_noninteractive_adapter
+fi
