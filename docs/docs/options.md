@@ -26,6 +26,7 @@
 - `electron` (implies `macos-gui`)
 - `chromium-headless`
 - `chromium-full` (implies `chromium-headless`)
+- `playwright-chrome` (implies `chromium-full`, `chromium-headless`)
 - `ssh`
 - `spotlight`
 - `cleanshot`

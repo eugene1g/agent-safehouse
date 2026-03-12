@@ -7,7 +7,7 @@ run_section_integrations() {
   local ssh_auth_sock
   local onepassword_group_container_dir onepassword_socket_dir onepassword_settings_file
   local onepassword_op_candidate onepassword_op_candidates
-  local policy_ssh policy_browser_native_messaging policy_onepassword policy_chromium_headless policy_chromium_full
+  local policy_ssh policy_browser_native_messaging policy_onepassword policy_chromium_headless policy_chromium_full policy_playwright_chrome
   local policy_keychain_agent policy_non_keychain_agent policy_claude_chrome
   local chromium_headless_marker chromium_full_marker macos_gui_marker electron_marker
 
@@ -117,12 +117,15 @@ run_section_integrations() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Chromium Headless integration profile" "#safehouse-test-id:chromium-headless-integration#"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Chromium Full integration profile" "#safehouse-test-id:chromium-full-integration#"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Playwright Chrome integration profile" "#safehouse-test-id:playwright-chrome-integration#"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy does not load agent-specific Claude Desktop profile when no command is provided" "(preference-domain \"com.anthropic.claudefordesktop\")"
 
   policy_chromium_headless="${TEST_CWD}/policy-enable-chromium-headless.sb"
   policy_chromium_full="${TEST_CWD}/policy-enable-chromium-full.sb"
+  policy_playwright_chrome="${TEST_CWD}/policy-enable-playwright-chrome.sb"
   assert_command_succeeds "safehouse generates policy with --enable=chromium-headless" "$GENERATOR" --output "$policy_chromium_headless" --enable=chromium-headless
   assert_command_succeeds "safehouse generates policy with --enable=chromium-full" "$GENERATOR" --output "$policy_chromium_full" --enable=chromium-full
+  assert_command_succeeds "safehouse generates policy with --enable=playwright-chrome" "$GENERATOR" --output "$policy_playwright_chrome" --enable=playwright-chrome
   for chromium_headless_marker in \
     "#safehouse-test-id:chromium-headless-integration#" \
     "#safehouse-test-id:chromium-headless-gpu#" \
@@ -159,6 +162,17 @@ run_section_integrations() {
 
   assert_allowed_if_exists "$policy_chromium_full" "--enable=chromium-full allows read access to Google Chrome.app bundle when installed" "/Applications/Google Chrome.app" /bin/ls "/Applications/Google Chrome.app"
   assert_allowed_if_exists "$policy_chromium_full" "--enable=chromium-full allows Google Chrome Crashpad state when present" "${HOME}/Library/Application Support/Google/Chrome/Crashpad" /bin/ls "${HOME}/Library/Application Support/Google/Chrome/Crashpad"
+
+  for playwright_chrome_marker in \
+    "#safehouse-test-id:playwright-chrome-integration#" \
+    "#safehouse-test-id:chromium-full-integration#" \
+    "#safehouse-test-id:chromium-headless-integration#" \
+    "Optional integrations explicitly enabled: playwright-chrome" \
+    "Optional integrations implicitly injected: chromium-headless chromium-full" \
+    '$$exec-env-default=PLAYWRIGHT_MCP_SANDBOX=false$$'; do
+    assert_policy_contains "$policy_playwright_chrome" "--enable=playwright-chrome includes required grant/marker (${playwright_chrome_marker})" "$playwright_chrome_marker"
+  done
+  assert_policy_not_contains "$policy_playwright_chrome" "--enable=playwright-chrome does not include agent-browser profile" "#safehouse-test-id:agent-browser-integration#"
 
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes macOS GUI integration profile" ";; Integration: macOS GUI"
   for macos_gui_marker in \

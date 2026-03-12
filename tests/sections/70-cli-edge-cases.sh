@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_agent_browser policy_enable_macos_gui policy_enable_electron policy_enable_chromium_headless policy_enable_chromium_full policy_enable_browser_native_messaging policy_enable_shell_init policy_enable_process_control policy_enable_lldb policy_enable_xcode policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_agent_browser policy_enable_macos_gui policy_enable_electron policy_enable_chromium_headless policy_enable_chromium_full policy_enable_playwright_chrome policy_enable_browser_native_messaging policy_enable_shell_init policy_enable_process_control policy_enable_lldb policy_enable_xcode policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_dedup_paths
   local policy_reentrant_first policy_reentrant_second
   local bad_path_with_newline
   local policy_env_workdir_empty policy_env_cli_workdir policy_workdir_config policy_workdir_config_ignored policy_workdir_config_env_trust missing_path home_not_dir
-  local env_file_missing env_file_overrides env_file_tilde
+  local env_file_missing env_file_overrides env_file_profile_default_override env_file_tilde
   local policy_tilde_flags policy_tilde_config policy_tilde_workdir policy_tilde_append_profile
-  local policy_explain explain_output_file explain_output_env_pass explain_output_env_file explain_output_env_named
+  local policy_explain explain_output_file explain_output_env_pass explain_output_env_file explain_output_env_named explain_output_profile_env_defaults
   local policy_append_profile policy_append_profile_multi append_profile_file append_profile_file_2
   local policy_agent_codex policy_agent_copilot policy_agent_goose policy_agent_kilo policy_agent_unknown policy_agent_claude_app policy_agent_vscode_app policy_agent_all_agents policy_agent_all_scoped
   local policy_agent_runner_npx policy_agent_runner_bunx policy_agent_runner_uvx policy_agent_runner_pipx policy_agent_runner_xcrun
@@ -58,6 +58,7 @@ run_section_cli_edge_cases() {
   policy_enable_agent_browser="${TEST_CWD}/policy-enable-agent-browser.sb"
   policy_enable_chromium_headless="${TEST_CWD}/policy-enable-chromium-headless.sb"
   policy_enable_chromium_full="${TEST_CWD}/policy-enable-chromium-full.sb"
+  policy_enable_playwright_chrome="${TEST_CWD}/policy-enable-playwright-chrome.sb"
   policy_enable_browser_native_messaging="${TEST_CWD}/policy-enable-browser-native-messaging.sb"
   policy_enable_shell_init="${TEST_CWD}/policy-enable-shell-init.sb"
   policy_enable_process_control="${TEST_CWD}/policy-enable-process-control.sb"
@@ -79,6 +80,13 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_chromium_full" "--enable chromium-full injects Chromium Headless integration" "#safehouse-test-id:chromium-headless-integration#"
   assert_policy_contains "$policy_enable_chromium_full" "--enable chromium-full preamble reports Chromium Headless as implicit dependency" "Optional integrations implicitly injected: chromium-headless"
   assert_policy_not_contains "$policy_enable_chromium_full" "--enable chromium-full does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
+  assert_command_succeeds "--enable playwright-chrome parses as separate argument form" "$GENERATOR" --output "$policy_enable_playwright_chrome" --enable playwright-chrome
+  assert_policy_contains "$policy_enable_playwright_chrome" "--enable playwright-chrome includes Playwright Chrome integration marker" "#safehouse-test-id:playwright-chrome-integration#"
+  assert_policy_contains "$policy_enable_playwright_chrome" "--enable playwright-chrome injects Chromium Full integration" "#safehouse-test-id:chromium-full-integration#"
+  assert_policy_contains "$policy_enable_playwright_chrome" "--enable playwright-chrome injects Chromium Headless integration" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_enable_playwright_chrome" "--enable playwright-chrome preamble reports Playwright Chrome as explicit" "Optional integrations explicitly enabled: playwright-chrome"
+  assert_policy_contains "$policy_enable_playwright_chrome" "--enable playwright-chrome preamble reports Chromium deps as implicit" "Optional integrations implicitly injected: chromium-headless chromium-full"
+  assert_policy_not_contains "$policy_enable_playwright_chrome" "--enable playwright-chrome does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
   assert_command_succeeds "--enable agent-browser parses as separate argument form" "$GENERATOR" --output "$policy_enable_agent_browser" --enable agent-browser
   assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser includes agent-browser integration marker" "#safehouse-test-id:agent-browser-integration#"
   assert_policy_contains "$policy_enable_agent_browser" "--enable agent-browser includes agent-browser state grant" "(home-subpath \"/.agent-browser\")"
@@ -214,10 +222,14 @@ run_section_cli_edge_cases() {
   assert_command_fails "--env=FILE fails when file does not exist" "$SAFEHOUSE" --env="$env_file_missing" -- /usr/bin/true
   assert_command_succeeds "safehouse sanitizes non-allowlisted environment vars by default" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" -- /bin/sh -c '[ -z "${SAFEHOUSE_TEST_SECRET+x}" ] && [ -n "${HOME:-}" ] && [ -n "${PATH:-}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
   assert_command_succeeds "safehouse preserves SDKROOT from host env in default sanitized mode" /usr/bin/env SDKROOT="/tmp/safehouse-sdkroot" "$SAFEHOUSE" -- /bin/sh -c '[ "${SDKROOT:-}" = "/tmp/safehouse-sdkroot" ]'
-  assert_command_succeeds "safehouse preserves proxy/custom-CA/browser env vars in default sanitized mode" /usr/bin/env HTTP_PROXY="http://proxy.example:8080" HTTPS_PROXY="https://proxy.example:8443" NO_PROXY="localhost,127.0.0.1" http_proxy="http://proxy-lower.example:8080" https_proxy="https://proxy-lower.example:8443" no_proxy="localhost,.internal" NODE_EXTRA_CA_CERTS="/tmp/safehouse-extra-ca.pem" NO_BROWSER="true" "$SAFEHOUSE" -- /bin/sh -c '[ "${HTTP_PROXY:-}" = "http://proxy.example:8080" ] && [ "${HTTPS_PROXY:-}" = "https://proxy.example:8443" ] && [ "${NO_PROXY:-}" = "localhost,127.0.0.1" ] && [ "${http_proxy:-}" = "http://proxy-lower.example:8080" ] && [ "${https_proxy:-}" = "https://proxy-lower.example:8443" ] && [ "${no_proxy:-}" = "localhost,.internal" ] && [ "${NODE_EXTRA_CA_CERTS:-}" = "/tmp/safehouse-extra-ca.pem" ] && [ "${NO_BROWSER:-}" = "true" ]'
+  assert_command_succeeds "safehouse preserves proxy/custom-CA/browser env vars in default sanitized mode" /usr/bin/env HTTP_PROXY="http://proxy.example:8080" HTTPS_PROXY="https://proxy.example:8443" NO_PROXY="localhost,127.0.0.1" http_proxy="http://proxy-lower.example:8080" https_proxy="https://proxy-lower.example:8443" no_proxy="localhost,.internal" NODE_EXTRA_CA_CERTS="/tmp/safehouse-extra-ca.pem" NO_BROWSER="true" PLAYWRIGHT_MCP_SANDBOX="false" "$SAFEHOUSE" -- /bin/sh -c '[ "${HTTP_PROXY:-}" = "http://proxy.example:8080" ] && [ "${HTTPS_PROXY:-}" = "https://proxy.example:8443" ] && [ "${NO_PROXY:-}" = "localhost,127.0.0.1" ] && [ "${http_proxy:-}" = "http://proxy-lower.example:8080" ] && [ "${https_proxy:-}" = "https://proxy-lower.example:8443" ] && [ "${no_proxy:-}" = "localhost,.internal" ] && [ "${NODE_EXTRA_CA_CERTS:-}" = "/tmp/safehouse-extra-ca.pem" ] && [ "${NO_BROWSER:-}" = "true" ] && [ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "false" ]'
+  assert_command_succeeds "chromium-full leaves PLAYWRIGHT_MCP_SANDBOX unset in sanitized mode" "$SAFEHOUSE" --enable=chromium-full -- /bin/sh -c '[ -z "${PLAYWRIGHT_MCP_SANDBOX+x}" ]'
+  assert_command_succeeds "playwright-chrome injects PLAYWRIGHT_MCP_SANDBOX=false as a profile env default in sanitized mode" "$SAFEHOUSE" --enable=playwright-chrome -- /bin/sh -c '[ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "false" ]'
+  assert_command_succeeds "caller-provided PLAYWRIGHT_MCP_SANDBOX overrides playwright-chrome profile env default in sanitized mode" /usr/bin/env PLAYWRIGHT_MCP_SANDBOX="true" "$SAFEHOUSE" --enable=playwright-chrome -- /bin/sh -c '[ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "true" ]'
   assert_command_succeeds "safehouse appends common macOS dev paths to sanitized PATH" /usr/bin/env -i HOME="$HOME" USER="$USER" LOGNAME="$LOGNAME" TMPDIR="${TMPDIR:-/tmp}" PATH="/usr/bin:/bin:/usr/sbin:/sbin" "$SAFEHOUSE" -- /bin/sh -c 'case ":${PATH}:" in *:/usr/local/bin:*) : ;; *) exit 1 ;; esac && case ":${PATH}:" in *:/opt/homebrew/bin:*) : ;; *) exit 1 ;; esac && case ":${PATH}:" in *:"${HOME}/.local/bin":*) : ;; *) exit 1 ;; esac'
   assert_command_succeeds "--env preserves inherited environment vars for wrapped commands" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" --env -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'
   assert_command_succeeds "--env parses after command token before -- separator" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" /bin/sh --env -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'
+  assert_command_succeeds "playwright-chrome injects PLAYWRIGHT_MCP_SANDBOX=false in --env pass-through mode when the caller does not set it" /usr/bin/env -i HOME="$HOME" USER="$USER" LOGNAME="$LOGNAME" TMPDIR="${TMPDIR:-/tmp}" PATH="/usr/bin:/bin:/usr/sbin:/sbin" "$SAFEHOUSE" --enable=playwright-chrome --env -- /bin/sh -c '[ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "false" ]'
   assert_command_fails "--env cannot be combined with --env-pass" "$SAFEHOUSE" --env --env-pass=SAFEHOUSE_TEST_SECRET -- /usr/bin/true
   assert_command_fails "--env=FILE cannot be combined with --env" "$SAFEHOUSE" --env=./agent.env --env -- /usr/bin/true
 
@@ -236,6 +248,11 @@ HOME=/safehouse/env-home
 EOF
   assert_command_succeeds "--env=FILE loads vars and overrides sanitized defaults" /usr/bin/env SAFEHOUSE_TEST_HOST_ONLY="host-only" "$SAFEHOUSE" --env="$env_file_overrides" -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "file-secret" ] && [ "${PATH:-}" = "/safehouse/env-path" ] && [ "${HOME:-}" = "/safehouse/env-home" ] && [ -z "${SAFEHOUSE_TEST_HOST_ONLY+x}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
   assert_command_succeeds "--env-pass overrides matching values sourced from --env=FILE" /usr/bin/env SAFEHOUSE_TEST_SECRET="host-secret" "$SAFEHOUSE" --env="$env_file_overrides" --env-pass=SAFEHOUSE_TEST_SECRET -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "host-secret" ] && [ "${PATH:-}" = "/safehouse/env-path" ] && [ "${HOME:-}" = "/safehouse/env-home" ]'
+  env_file_profile_default_override="${TEST_CWD}/safehouse-env-profile-default-override.env"
+  cat > "$env_file_profile_default_override" <<EOF
+PLAYWRIGHT_MCP_SANDBOX=true
+EOF
+  assert_command_succeeds "--env=FILE overrides playwright-chrome profile env defaults" "$SAFEHOUSE" --enable=playwright-chrome --env="$env_file_profile_default_override" -- /bin/sh -c '[ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "true" ]'
   env_file_tilde="${HOME}/.safehouse-env-tilde-$$.env"
   cat > "$env_file_tilde" <<EOF
 SAFEHOUSE_TEST_SECRET=tilde-secret
@@ -245,7 +262,8 @@ EOF
   explain_output_env_pass="${TEST_CWD}/policy-explain-env-pass-output.txt"
   explain_output_env_file="${TEST_CWD}/policy-explain-env-file-output.txt"
   explain_output_env_named="${TEST_CWD}/policy-explain-env-named-output.txt"
-  rm -f "$explain_output_env_pass" "$explain_output_env_file" "$explain_output_env_named"
+  explain_output_profile_env_defaults="${TEST_CWD}/policy-explain-profile-env-defaults-output.txt"
+  rm -f "$explain_output_env_pass" "$explain_output_env_file" "$explain_output_env_named" "$explain_output_profile_env_defaults"
   set +e
   "$SAFEHOUSE" --env --explain --stdout >/dev/null 2>"$explain_output_env_pass"
   local explain_env_pass_status=$?
@@ -253,6 +271,8 @@ EOF
   local explain_env_file_status=$?
   "$SAFEHOUSE" --env-pass=SAFEHOUSE_TEST_EXPLAIN --explain --stdout >/dev/null 2>"$explain_output_env_named"
   local explain_env_named_status=$?
+  "$SAFEHOUSE" --enable=playwright-chrome --explain --stdout >/dev/null 2>"$explain_output_profile_env_defaults"
+  local explain_profile_env_defaults_status=$?
   set -e
   if [[ "$explain_env_pass_status" -eq 0 ]] && [[ -f "$explain_output_env_pass" ]] && grep -Fq "execution environment: pass-through (enabled via --env)" "$explain_output_env_pass"; then
     log_pass "--env explain output reports pass-through mode"
@@ -269,8 +289,14 @@ EOF
   else
     log_fail "--env-pass explain output reports named host var mode"
   fi
-  rm -f "$explain_output_env_pass" "$explain_output_env_file" "$explain_output_env_named"
+  if [[ "$explain_profile_env_defaults_status" -eq 0 ]] && [[ -f "$explain_output_profile_env_defaults" ]] && grep -Fq "profile env defaults: PLAYWRIGHT_MCP_SANDBOX=false" "$explain_output_profile_env_defaults"; then
+    log_pass "profile env defaults appear in explain output when playwright-chrome is enabled"
+  else
+    log_fail "profile env defaults appear in explain output when playwright-chrome is enabled"
+  fi
+  rm -f "$explain_output_env_pass" "$explain_output_env_file" "$explain_output_env_named" "$explain_output_profile_env_defaults"
   rm -f "$env_file_overrides"
+  rm -f "$env_file_profile_default_override"
   rm -f "$env_file_tilde"
 
   section_begin "Path Grant Deduplication"

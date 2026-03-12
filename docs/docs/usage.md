@@ -115,15 +115,20 @@ safehouse --workdir=~/server --enable=electron,all-agents,wide-read -- "/Applica
 
 Troubleshooting: `forbidden-sandbox-reinit` or `sandbox initialization failed: Operation not permitted` usually means nested sandbox re-init was attempted; launch with `--no-sandbox`.
 
-## Chromium
+## Chromium / Playwright
 
 Use `--enable=chromium-full` when a launcher needs the system Google Chrome
 bundle or Chrome for Testing bundle under Safehouse.
 
+Use `--enable=playwright-chrome` when Playwright is launching Chrome-family
+channels and Safehouse should inject `PLAYWRIGHT_MCP_SANDBOX=false` alongside
+the full Chrome policy allowances.
+
 If browser logs still show `sandbox initialization failed: Operation not
 permitted`, Chrome is trying to re-initialize its own inner Seatbelt sandbox.
 That is not fixable with extra Safehouse allow rules; pass `--no-sandbox` to
-the browser launch layer.
+the browser launch layer (or configure your Playwright launcher to add
+`--no-sandbox` for Chrome channels).
 
 ## Inspect Policy Output
 

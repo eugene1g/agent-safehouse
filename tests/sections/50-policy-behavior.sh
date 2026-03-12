@@ -4,7 +4,7 @@ run_section_policy_behavior() {
   local policy_all_agents
   local policy_clipboard
   local policy_agent_browser policy_browser_native_messaging policy_cloud_credentials policy_onepassword
-  local policy_chromium_headless policy_chromium_full
+  local policy_chromium_headless policy_chromium_full policy_playwright_chrome
   local policy_ssh policy_spotlight policy_cleanshot policy_process_control policy_lldb policy_xcode
   local policy_docker_wide_read policy_docker_workdir_root policy_docker_append_allow
   local append_docker_allow append_docker_allow_marker
@@ -28,6 +28,7 @@ run_section_policy_behavior() {
   assert_policy_contains "$POLICY_DEFAULT" "default policy container deny block includes Colima socket regex" "/\\\\.colima/[^/]+/docker\\\\.sock$"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits chromium-headless integration marker" "#safehouse-test-id:chromium-headless-integration#"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits chromium-full integration marker" "#safehouse-test-id:chromium-full-integration#"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Playwright Chrome integration marker" "#safehouse-test-id:playwright-chrome-integration#"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits agent-browser state grant" "/.agent-browser"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits agent-browser Chromium mach rendezvous grant" "MachPortRendezvousServer"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits browser native messaging grants" "/NativeMessagingHosts"
@@ -76,6 +77,7 @@ run_section_policy_behavior() {
   policy_onepassword="${TEST_CWD}/policy-feature-1password.sb"
   policy_chromium_headless="${TEST_CWD}/policy-feature-chromium-headless.sb"
   policy_chromium_full="${TEST_CWD}/policy-feature-chromium-full.sb"
+  policy_playwright_chrome="${TEST_CWD}/policy-feature-playwright-chrome.sb"
   policy_ssh="${TEST_CWD}/policy-feature-ssh.sb"
   policy_spotlight="${TEST_CWD}/policy-feature-spotlight.sb"
   policy_cleanshot="${TEST_CWD}/policy-feature-cleanshot.sb"
@@ -86,6 +88,7 @@ run_section_policy_behavior() {
 
   assert_command_succeeds "--enable=chromium-headless includes Chromium Headless profile" "$GENERATOR" --output "$policy_chromium_headless" --enable=chromium-headless
   assert_command_succeeds "--enable=chromium-full includes Chromium Full profile" "$GENERATOR" --output "$policy_chromium_full" --enable=chromium-full
+  assert_command_succeeds "--enable=playwright-chrome includes Playwright Chrome profile" "$GENERATOR" --output "$policy_playwright_chrome" --enable=playwright-chrome
   assert_command_succeeds "--enable=agent-browser includes agent-browser profile" "$GENERATOR" --output "$policy_agent_browser" --enable=agent-browser
   assert_command_succeeds "--enable=browser-native-messaging includes browser native messaging profile" "$GENERATOR" --output "$policy_browser_native_messaging" --enable=browser-native-messaging
   assert_command_succeeds "--enable=cloud-credentials includes cloud credentials profile" "$GENERATOR" --output "$policy_cloud_credentials" --enable=cloud-credentials
@@ -129,6 +132,14 @@ run_section_policy_behavior() {
     assert_denied_if_exists "$POLICY_DEFAULT" "read Google Chrome framework denied by default (${chrome_framework})" "$chrome_framework" /usr/bin/stat "$chrome_framework"
     assert_allowed_if_exists "$policy_chromium_full" "read Google Chrome framework allowed with --enable=chromium-full (${chrome_framework})" "$chrome_framework" /usr/bin/stat "$chrome_framework"
   done
+
+  assert_policy_contains "$policy_playwright_chrome" "--enable=playwright-chrome includes Playwright Chrome profile marker" "#safehouse-test-id:playwright-chrome-integration#"
+  assert_policy_contains "$policy_playwright_chrome" "--enable=playwright-chrome includes Chromium Full profile marker" "#safehouse-test-id:chromium-full-integration#"
+  assert_policy_contains "$policy_playwright_chrome" "--enable=playwright-chrome includes Chromium Headless profile marker" "#safehouse-test-id:chromium-headless-integration#"
+  assert_policy_contains "$policy_playwright_chrome" "--enable=playwright-chrome reports explicit optional integration inclusion" "Optional integrations explicitly enabled: playwright-chrome"
+  assert_policy_contains "$policy_playwright_chrome" "--enable=playwright-chrome reports Chromium dependencies as implicit" "Optional integrations implicitly injected: chromium-headless chromium-full"
+  assert_policy_contains "$policy_playwright_chrome" "--enable=playwright-chrome carries Playwright sandbox env default metadata" '$$exec-env-default=PLAYWRIGHT_MCP_SANDBOX=false$$'
+  assert_policy_not_contains "$policy_playwright_chrome" "--enable=playwright-chrome does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
 
   assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes Agent Browser profile marker" "#safehouse-test-id:agent-browser-integration#"
   assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes agent-browser state grant" "(home-subpath \"/.agent-browser\")"

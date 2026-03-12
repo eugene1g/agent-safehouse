@@ -41,6 +41,7 @@ default_sanitized_exec_passthrough_vars=(
 
   # Common non-secret runtime toggles.
   NO_BROWSER
+  PLAYWRIGHT_MCP_SANDBOX
   SSH_AUTH_SOCK
   SDKROOT
 )
