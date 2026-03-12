@@ -1,3 +1,50 @@
+default_sanitized_exec_passthrough_vars=(
+  # Terminal/session metadata.
+  TERM
+  COLORTERM
+  TERM_PROGRAM
+  TERM_PROGRAM_VERSION
+
+  # Temp and locale settings.
+  TMP
+  TEMP
+  LANG
+  LC_ALL
+  LC_CTYPE
+  LC_COLLATE
+  LC_NUMERIC
+  LC_TIME
+  LC_MESSAGES
+  LC_MONETARY
+  LC_PAPER
+  LC_NAME
+  LC_ADDRESS
+  LC_TELEPHONE
+  LC_MEASUREMENT
+  LC_IDENTIFICATION
+  TZ
+
+  # Common runtime integration points.
+  XDG_CONFIG_HOME
+  XDG_CACHE_HOME
+  XDG_STATE_HOME
+  XDG_DATA_HOME
+
+  # Network / TLS settings respected by multiple supported CLIs.
+  HTTP_PROXY
+  HTTPS_PROXY
+  NO_PROXY
+  http_proxy
+  https_proxy
+  no_proxy
+  NODE_EXTRA_CA_CERTS
+
+  # Common non-secret runtime toggles.
+  NO_BROWSER
+  SSH_AUTH_SOCK
+  SDKROOT
+)
+
 preflight_runtime() {
   local os_name
   os_name="$(uname -s 2>/dev/null || printf 'unknown')"
@@ -16,8 +63,18 @@ preflight_runtime() {
   fi
 }
 
+append_existing_vars_to_sanitized_exec_environment() {
+  local var_name
+
+  for var_name in "$@"; do
+    if [[ "${!var_name+x}" == "x" ]]; then
+      sanitized_exec_environment+=("${var_name}=${!var_name}")
+    fi
+  done
+}
+
 build_sanitized_exec_environment() {
-  local resolved_pwd resolved_user resolved_logname sanitized_path var
+  local resolved_pwd resolved_user resolved_logname sanitized_path
 
   sanitized_exec_environment=()
 
@@ -51,11 +108,7 @@ build_sanitized_exec_environment() {
     sanitized_exec_environment+=("LOGNAME=${resolved_logname}")
   fi
 
-  for var in TERM TMP TEMP LANG LC_ALL LC_CTYPE LC_COLLATE LC_NUMERIC LC_TIME LC_MESSAGES LC_MONETARY LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION TZ COLORTERM TERM_PROGRAM TERM_PROGRAM_VERSION XDG_CONFIG_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_DATA_HOME SSH_AUTH_SOCK SDKROOT; do
-    if [[ "${!var+x}" == "x" ]]; then
-      sanitized_exec_environment+=("${var}=${!var}")
-    fi
-  done
+  append_existing_vars_to_sanitized_exec_environment "${default_sanitized_exec_passthrough_vars[@]}"
 }
 
 build_sanitized_exec_path() {
