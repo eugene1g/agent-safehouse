@@ -33,6 +33,7 @@
 - `shell-init`
 - `process-control`
 - `lldb`
+- `xcode`
 - `all-agents`
 - `all-apps`
 - `wide-read`

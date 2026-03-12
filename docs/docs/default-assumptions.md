@@ -20,7 +20,7 @@ These are baseline allowances intended to keep common workflows functional:
 - Core integrations in `profiles/50-integrations-core/` (`git`, `scm-clis`).
 - Agent-specific profile selection for the wrapped command.
 - Network access (open by default).
-- Sanitized runtime environment (not full shell env by default).
+- Sanitized runtime environment (not full shell env by default; preserves `SDKROOT` when set).
 - SSH metadata read support (`~/.ssh/config`, `~/.ssh/known_hosts`) for git-over-ssh workflows.
 
 ## Opt-In (Disabled by Default)
@@ -36,6 +36,7 @@ Enable only when required for the current task:
 - `browser-native-messaging`: browser host messaging integration.
 - `process-control`: host process enumeration/signalling for local supervision tools.
 - `lldb`: LLDB/debugger toolchain access plus debugger-grade host process inspection.
+- `xcode`: full Xcode developer roots plus Xcode/CoreSimulator user state.
 - `macos-gui`: GUI app-related integration paths.
 - `electron`: Electron integration (also enables `macos-gui`).
 - `all-agents`: load all agent profiles.
@@ -50,6 +51,7 @@ Enable only when required for the current task:
 - Clipboard access unless `clipboard` is enabled.
 - Host process enumeration/control unless `process-control` or `lldb` is enabled.
 - LLDB/debugger toolchain and task-port access unless `lldb` is enabled.
+- Full Xcode developer roots and Xcode/CoreSimulator state unless `xcode` is enabled.
 - Broad raw device access under `/dev`.
 - Setuid/setgid executable paths (`forbidden-exec-sugid`).
 
@@ -60,6 +62,7 @@ Enable only when required for the current task:
 - **Cloud task burst**: enable `cloud-credentials` only for that run/session.
 - **Docker/k8s workflow**: enable `docker` and/or `kubectl` only while needed.
 - **Native builds via Apple shims**: common `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` flows work by default via the Apple toolchain core profile.
+- **Full Xcode builds / simulator flows**: add `--enable=xcode`; reserve `--enable=lldb` for debugger sessions.
 - **Local process triage**: prefer `process-control`; reserve `lldb` for real debugger sessions.
 - **IDE app-hosted agents**: enable `electron` and add `all-agents` only if extension-hosted CLIs require it.
 

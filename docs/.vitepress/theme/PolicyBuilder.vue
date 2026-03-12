@@ -29,6 +29,7 @@ onMounted(() => {
       'profiles/55-integrations-optional/shell-init.sb',
       'profiles/55-integrations-optional/spotlight.sb',
       'profiles/55-integrations-optional/ssh.sb',
+      'profiles/55-integrations-optional/xcode.sb',
     ]
     var OPTIONAL_INTEGRATION_BY_TOKEN: Record<string, string> = {}
     OPTIONAL_INTEGRATION_MODULES.forEach(function (p) {
@@ -88,6 +89,7 @@ onMounted(() => {
       { key: 'shell-init', label: 'Shell init files', path: 'profiles/55-integrations-optional/shell-init.sb', group: 'extra', feature: 'shellStartup', glyph: '\uD83D\uDDC2', on: false, desc: 'Allow reading zsh and fish startup files under ~/.zsh*, ~/.config/fish, and /private/etc.' },
       { key: 'spotlight', label: 'Spotlight', path: 'profiles/55-integrations-optional/spotlight.sb', group: 'extra', feature: 'spotlight', glyph: '\uD83D\uDD0E', on: false },
       { key: 'ssh', label: 'SSH', path: 'profiles/55-integrations-optional/ssh.sb', group: 'extra', feature: 'ssh', glyph: '>_', on: false },
+      { key: 'xcode', label: 'Xcode', path: 'profiles/55-integrations-optional/xcode.sb', group: 'extra', feature: 'xcode', glyph: '\u2692', on: false, desc: 'Allow full Xcode developer roots plus DerivedData and CoreSimulator state for xcodebuild, simctl, and devicectl.' },
       { key: 'wide-read', label: 'Access entire file system (read-only)', group: 'extra', feature: 'wideRead', glyph: '\uD83D\uDC41', on: false },
     ] as any[]
 
@@ -274,6 +276,7 @@ onMounted(() => {
       if (!s.clipboard) offOpt.push('clipboard')
       if (!s.cloudCredentials) offOpt.push('cloud-credentials'); if (!s.browserNativeMessaging) offOpt.push('browser-native-messaging')
       if (!s.shellStartup) offOpt.push('shell-init')
+      if (!s.xcode) offOpt.push('xcode')
       if (offOpt.length) {
         l.push(';; Opt-in integrations not enabled: ' + offOpt.join(' '))
         l.push(';; Use --enable=<feature> (comma-separated) to include them.')
@@ -407,6 +410,7 @@ onMounted(() => {
         cloudCredentials: !!byKey['cloud-credentials'],
         browserNativeMessaging: !!byKey['browser-native-messaging'],
         shellStartup: !!byKey['shell-init'],
+        xcode: !!byKey['xcode'],
         wideRead: !!byKey['wide-read'],
         shellType: shellType,
         errors: errors,
@@ -443,6 +447,7 @@ onMounted(() => {
         cloudCredentials: state.cloudCredentials,
         browserNativeMessaging: state.browserNativeMessaging,
         shellStartup: state.shellStartup,
+        xcode: state.xcode,
         wideRead: state.wideRead,
         shellType: state.shellType,
       }
@@ -460,6 +465,7 @@ onMounted(() => {
       if (s.cleanshot) feats.push('cleanshot'); if (s.clipboard) feats.push('clipboard'); if (s.onepassword) feats.push('1password')
       if (s.cloudCredentials) feats.push('cloud-credentials'); if (s.browserNativeMessaging) feats.push('browser-native-messaging')
       if (s.shellStartup) feats.push('shell-init')
+      if (s.xcode) feats.push('xcode')
       if (s.wideRead) feats.push('wide-read')
       var flags: string[] = []
       if (feats.length) flags.push('--enable=' + feats.join(','))
@@ -486,6 +492,7 @@ onMounted(() => {
       if (state.cloudCredentials) feats.push('cloud-credentials')
       if (state.browserNativeMessaging) feats.push('browser-native-messaging')
       if (state.shellStartup) feats.push('shell-init')
+      if (state.xcode) feats.push('xcode')
       if (state.wideRead) feats.push('wide-read')
 
       var flags: string[] = []

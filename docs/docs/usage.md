@@ -69,6 +69,9 @@ safehouse --enable=process-control -- claude --dangerously-skip-permissions
 # LLDB/debugger allowances for agent-driven native debugging
 safehouse --enable=lldb -- claude --dangerously-skip-permissions
 
+# Full Xcode developer roots plus DerivedData / CoreSimulator state
+safehouse --enable=xcode -- xcodebuild -scheme MyApp build
+
 # Broad read-only visibility across /
 safehouse --enable=wide-read -- claude --dangerously-skip-permissions
 ```
@@ -76,6 +79,8 @@ safehouse --enable=wide-read -- claude --dangerously-skip-permissions
 Common Apple shimmed tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are covered by the default `apple-toolchain-core` toolchain profile.
 
 `--enable=lldb` opens the sandbox side for LLDB/debugger workflows, but macOS can still deny attach to protected or non-debuggable targets.
+
+`--enable=xcode` is for Xcode builds, simulator/device tooling, and per-user Xcode state. It does not grant debugger task-port access; keep `--enable=lldb` separate for real debugger sessions.
 
 ## Environment Modes
 

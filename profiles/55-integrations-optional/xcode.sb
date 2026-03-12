@@ -1,0 +1,79 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Xcode
+;; Xcode command-line developer roots plus scoped user build/simulator state.
+;; Source: 55-integrations-optional/xcode.sb
+;; #safehouse-test-id:xcode-integration#
+;; ---------------------------------------------------------------------------
+
+;; Enables Xcode-specific developer roots and the standard per-user Xcode /
+;; CoreSimulator state locations used by xcodebuild, simctl, and devicectl.
+;; This intentionally does NOT include debugger-grade host inspection; keep
+;; LLDB/debugserver opt-in via 55-integrations-optional/lldb.sb.
+
+(allow file-read*
+    ;; Apple developer roots selected via xcode-select / DEVELOPER_DIR.
+    ;; #safehouse-test-id:xcode-developer-ro#
+    (literal "/Library")                                               ;; Ancestor traversal for developer roots.
+    (literal "/Library/Developer")
+    (literal "/Library/Developer/CommandLineTools")
+    (subpath "/Library/Developer/CommandLineTools")                    ;; Full CLT tree for Xcode shims and private frameworks.
+    (literal "/Library/Developer/PrivateFrameworks")
+    (subpath "/Library/Developer/PrivateFrameworks")                   ;; CoreDevice/CoreSimulator private frameworks when installed globally.
+    (literal "/Library/Developer/CoreSimulator")
+    (subpath "/Library/Developer/CoreSimulator")                       ;; Shared simulator runtimes/profiles installed under /Library/Developer.
+
+    ;; Full Xcode app bundles. Some Xcode CLI tools load SharedFrameworks and
+    ;; plugins outside Contents/Developer, so keep the bundle read-only.
+    (literal "/Applications")
+    (subpath "/Applications/Xcode.app")
+    (subpath "/Applications/Xcode-beta.app")
+    (regex #"^/Applications/Xcode[^/]*\.app(/.*)?$")                 ;; Version-suffixed or renamed Xcode bundles selected via xcode-select.
+
+    ;; Compatibility aliases seen on some path-resolution flows.
+    (literal "/System")
+    (literal "/System/Volumes")
+    (literal "/System/Volumes/Data")
+    (literal "/System/Volumes/Data/Applications")
+    (subpath "/System/Volumes/Data/Applications/Xcode.app")
+    (subpath "/System/Volumes/Data/Applications/Xcode-beta.app")
+    (regex #"^/System/Volumes/Data/Applications/Xcode[^/]*\.app(/.*)?$")
+
+    ;; Direct plist read path used by cfprefsd-backed preference sync.
+    (home-literal "/Library/Preferences/com.apple.dt.Xcode.plist")
+)
+
+(allow file-read* file-write*
+    ;; Per-user Xcode build, archive, device-support, and simulator state.
+    ;; #safehouse-test-id:xcode-user-state#
+    (home-subpath "/Library/Developer/Xcode")
+    (home-subpath "/Library/Developer/CoreSimulator")
+    (home-subpath "/Library/Developer/XCTestDevices")
+    (home-subpath "/Library/Developer/CoreDevice")
+    (home-subpath "/Library/Caches/com.apple.dt.Xcode")
+)
+
+(allow file-write*
+    ;; Allow initial directory creation and direct plist updates.
+    (home-literal "/Library")
+    (home-literal "/Library/Developer")
+    (home-literal "/Library/Developer/Xcode")
+    (home-literal "/Library/Developer/CoreSimulator")
+    (home-literal "/Library/Developer/XCTestDevices")
+    (home-literal "/Library/Developer/CoreDevice")
+    (home-literal "/Library/Caches")
+    (home-literal "/Library/Caches/com.apple.dt.Xcode")
+    (home-literal "/Library/Preferences/com.apple.dt.Xcode.plist")
+)
+
+;; Xcode persists some preferences through cfprefsd under this domain.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.apple.dt.Xcode")
+)
+
+;; Simulator/device tooling uses these developer services when present.
+(allow mach-lookup
+    (global-name "com.apple.CoreSimulator.CoreSimulatorService")
+    (global-name "com.apple.remoted.coredevice")                     ;; CoreDevice transport used by physical-device tooling.
+    (global-name "com.apple.CoreDevice.remotepairingd")              ;; Remote pairing service used by devicectl/device flows.
+    (global-name-regex #"^com\.apple\.coredevice\.devicemanager(\.|$)")  ;; CoreDevice manager variants for paired-device operations.
+)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 run_section_cli_edge_cases() {
-  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_agent_browser policy_enable_macos_gui policy_enable_electron policy_enable_chromium_headless policy_enable_chromium_full policy_enable_browser_native_messaging policy_enable_shell_init policy_enable_process_control policy_enable_lldb policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
+  local policy_enable_arg policy_enable_csv policy_enable_kubectl policy_enable_agent_browser policy_enable_macos_gui policy_enable_electron policy_enable_chromium_headless policy_enable_chromium_full policy_enable_browser_native_messaging policy_enable_shell_init policy_enable_process_control policy_enable_lldb policy_enable_xcode policy_enable_all_agents policy_enable_all_apps policy_enable_all_scoped policy_enable_wide_read policy_workdir_empty_eq policy_env_grants policy_env_workdir
   local policy_dedup_paths
   local policy_reentrant_first policy_reentrant_second
   local bad_path_with_newline
@@ -51,6 +51,7 @@ run_section_cli_edge_cases() {
   policy_enable_shell_init="${TEST_CWD}/policy-enable-shell-init.sb"
   policy_enable_process_control="${TEST_CWD}/policy-enable-process-control.sb"
   policy_enable_lldb="${TEST_CWD}/policy-enable-lldb.sb"
+  policy_enable_xcode="${TEST_CWD}/policy-enable-xcode.sb"
   assert_command_succeeds "--enable docker parses as separate argument form" "$GENERATOR" --output "$policy_enable_arg" --enable docker
   assert_policy_contains "$policy_enable_arg" "--enable docker includes docker grants" "/var/run/docker.sock"
   assert_policy_contains "$policy_enable_arg" "--enable docker preamble reports explicit optional integration inclusion" "Optional integrations explicitly enabled: docker"
@@ -91,10 +92,15 @@ run_section_cli_edge_cases() {
   assert_policy_contains "$policy_enable_process_control" "--enable process-control includes Process Control integration marker" ";; Integration: Process Control"
   assert_command_succeeds "--enable lldb parses as separate argument form" "$GENERATOR" --output "$policy_enable_lldb" --enable lldb
   assert_policy_contains "$policy_enable_lldb" "--enable lldb includes LLDB integration marker" ";; Integration: LLDB"
-  assert_command_succeeds "--enable=docker,electron,kubectl parses CSV with whitespace" "$GENERATOR" --output "$policy_enable_csv" "--enable=docker, electron, kubectl"
+  assert_command_succeeds "--enable xcode parses as separate argument form" "$GENERATOR" --output "$policy_enable_xcode" --enable xcode
+  assert_policy_contains "$policy_enable_xcode" "--enable xcode includes Xcode integration marker" ";; Integration: Xcode"
+  assert_policy_contains "$policy_enable_xcode" "--enable xcode includes Xcode user-state grant" "(home-subpath \"/Library/Developer/Xcode\")"
+  assert_policy_not_contains "$policy_enable_xcode" "--enable xcode does not include LLDB integration marker" ";; Integration: LLDB"
+  assert_command_succeeds "--enable=docker,electron,kubectl,xcode parses CSV with whitespace" "$GENERATOR" --output "$policy_enable_csv" "--enable=docker, electron, kubectl, xcode"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes docker grants" "/var/run/docker.sock"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes electron grants" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "$policy_enable_csv" "CSV --enable includes kubectl grants" "#safehouse-test-id:kubectl-integration#"
+  assert_policy_contains "$policy_enable_csv" "CSV --enable includes xcode grants" "#safehouse-test-id:xcode-integration#"
   assert_policy_contains "$policy_enable_csv" "CSV --enable=electron implies macOS GUI integration" ";; Integration: macOS GUI"
   policy_enable_macos_gui="${TEST_CWD}/policy-enable-macos-gui.sb"
   policy_enable_electron="${TEST_CWD}/policy-enable-electron.sb"
@@ -196,6 +202,7 @@ run_section_cli_edge_cases() {
   env_file_missing="${TEST_CWD}/safehouse-env-missing.env"
   assert_command_fails "--env=FILE fails when file does not exist" "$SAFEHOUSE" --env="$env_file_missing" -- /usr/bin/true
   assert_command_succeeds "safehouse sanitizes non-allowlisted environment vars by default" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" -- /bin/sh -c '[ -z "${SAFEHOUSE_TEST_SECRET+x}" ] && [ -n "${HOME:-}" ] && [ -n "${PATH:-}" ] && [ -n "${SHELL:-}" ] && [ -n "${TMPDIR:-}" ]'
+  assert_command_succeeds "safehouse preserves SDKROOT from host env in default sanitized mode" /usr/bin/env SDKROOT="/tmp/safehouse-sdkroot" "$SAFEHOUSE" -- /bin/sh -c '[ "${SDKROOT:-}" = "/tmp/safehouse-sdkroot" ]'
   assert_command_succeeds "safehouse appends common macOS dev paths to sanitized PATH" /usr/bin/env -i HOME="$HOME" USER="$USER" LOGNAME="$LOGNAME" TMPDIR="${TMPDIR:-/tmp}" PATH="/usr/bin:/bin:/usr/sbin:/sbin" "$SAFEHOUSE" -- /bin/sh -c 'case ":${PATH}:" in *:/usr/local/bin:*) : ;; *) exit 1 ;; esac && case ":${PATH}:" in *:/opt/homebrew/bin:*) : ;; *) exit 1 ;; esac && case ":${PATH}:" in *:"${HOME}/.local/bin":*) : ;; *) exit 1 ;; esac'
   assert_command_succeeds "--env preserves inherited environment vars for wrapped commands" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" --env -- /bin/sh -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'
   assert_command_succeeds "--env parses after command token before -- separator" /usr/bin/env SAFEHOUSE_TEST_SECRET="safehouse-secret" "$SAFEHOUSE" /bin/sh --env -c '[ "${SAFEHOUSE_TEST_SECRET:-}" = "safehouse-secret" ]'

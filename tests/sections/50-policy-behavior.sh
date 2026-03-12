@@ -5,7 +5,7 @@ run_section_policy_behavior() {
   local policy_clipboard
   local policy_agent_browser policy_browser_native_messaging policy_cloud_credentials policy_onepassword
   local policy_chromium_headless policy_chromium_full
-  local policy_ssh policy_spotlight policy_cleanshot policy_process_control policy_lldb
+  local policy_ssh policy_spotlight policy_cleanshot policy_process_control policy_lldb policy_xcode
   local policy_docker_wide_read policy_docker_workdir_root policy_docker_append_allow
   local append_docker_allow append_docker_allow_marker
   local policy_override_same_literal policy_override_subpath_literal policy_override_wide_read
@@ -62,6 +62,7 @@ run_section_policy_behavior() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default Apple toolchain core omits lldb binary" "/Library/Developer/CommandLineTools/usr/bin/lldb"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits process control integration profile" ";; Integration: Process Control"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits LLDB integration profile" ";; Integration: LLDB"
+  assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Xcode integration profile" ";; Integration: Xcode"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy no longer grants broad file-read* access to /private/var/run" "Resolver/daemon sockets and pid files used by networking flows."
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes metadata-only /private/var/run grant" "Metadata traversal for /private/var/run socket namespace."
 
@@ -77,6 +78,7 @@ run_section_policy_behavior() {
   policy_clipboard="${TEST_CWD}/policy-feature-clipboard.sb"
   policy_process_control="${TEST_CWD}/policy-feature-process-control.sb"
   policy_lldb="${TEST_CWD}/policy-feature-lldb.sb"
+  policy_xcode="${TEST_CWD}/policy-feature-xcode.sb"
 
   assert_command_succeeds "--enable=chromium-headless includes Chromium Headless profile" "$GENERATOR" --output "$policy_chromium_headless" --enable=chromium-headless
   assert_command_succeeds "--enable=chromium-full includes Chromium Full profile" "$GENERATOR" --output "$policy_chromium_full" --enable=chromium-full
@@ -90,6 +92,7 @@ run_section_policy_behavior() {
   assert_command_succeeds "--enable=clipboard includes Clipboard profile" "$GENERATOR" --output "$policy_clipboard" --enable=clipboard
   assert_command_succeeds "--enable=process-control includes Process Control profile" "$GENERATOR" --output "$policy_process_control" --enable=process-control
   assert_command_succeeds "--enable=lldb includes LLDB profile" "$GENERATOR" --output "$policy_lldb" --enable=lldb
+  assert_command_succeeds "--enable=xcode includes Xcode profile" "$GENERATOR" --output "$policy_xcode" --enable=xcode
 
   assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes Chromium Headless profile marker" "#safehouse-test-id:chromium-headless-integration#"
   assert_policy_contains "$policy_chromium_headless" "--enable=chromium-headless includes Chromium mach rendezvous marker" "#safehouse-test-id:chromium-headless-rendezvous#"
@@ -157,6 +160,24 @@ run_section_policy_behavior() {
   assert_policy_contains "$policy_lldb" "--enable=lldb includes task-port grant" "(allow mach-priv-task-port)"
   assert_policy_contains "$policy_lldb" "--enable=lldb implicitly injects process-control integration" "Optional integrations implicitly injected: process-control"
   assert_policy_contains "$policy_lldb" "--enable=lldb includes Process Control profile via dependency" ";; Integration: Process Control"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes Xcode profile marker" ";; Integration: Xcode"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes developer-root read marker" "#safehouse-test-id:xcode-developer-ro#"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes user state marker" "#safehouse-test-id:xcode-user-state#"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes Xcode app bundle grant" "/Applications/Xcode.app"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes versioned Xcode app regex grant" "(regex #\"^/Applications/Xcode[^/]*\\.app(/.*)?$\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes Data-backed versioned Xcode app regex grant" "(regex #\"^/System/Volumes/Data/Applications/Xcode[^/]*\\.app(/.*)?$\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes full CLT tree grant" "/Library/Developer/CommandLineTools"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes CoreSimulator shared runtime grant" "/Library/Developer/CoreSimulator"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes Xcode user state grant" "(home-subpath \"/Library/Developer/Xcode\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes CoreSimulator user state grant" "(home-subpath \"/Library/Developer/CoreSimulator\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes Xcode preferences domain grant" "(preference-domain \"com.apple.dt.Xcode\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes CoreSimulator service lookup" "(global-name \"com.apple.CoreSimulator.CoreSimulatorService\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes remoted coredevice lookup" "(global-name \"com.apple.remoted.coredevice\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes CoreDevice remote pairing lookup" "(global-name \"com.apple.CoreDevice.remotepairingd\")"
+  assert_policy_contains "$policy_xcode" "--enable=xcode includes CoreDevice manager regex lookup" "(global-name-regex #\"^com\\.apple\\.coredevice\\.devicemanager(\\.|$)\")"
+  assert_policy_not_contains "$policy_xcode" "--enable=xcode does not include debugger task-port grant" "(allow mach-priv-task-port)"
+  assert_policy_not_contains "$policy_xcode" "--enable=xcode does not include LLDB integration marker" ";; Integration: LLDB"
+  assert_policy_not_contains "$policy_xcode" "--enable=xcode does not include Process Control integration marker" ";; Integration: Process Control"
 
   policy_all_agents="${TEST_CWD}/policy-all-agents-feature-toggle.sb"
   assert_command_succeeds "--enable=all-agents restores legacy agent-specific grants in policy mode" "$GENERATOR" --output "$policy_all_agents" --enable=all-agents
@@ -164,7 +185,7 @@ run_section_policy_behavior() {
   assert_policy_contains "$policy_all_agents" "all-agents policy includes opentui data grant" "/.local/share/opentui"
   assert_policy_contains "$policy_all_agents" "all-agents policy includes goose config grant" "/.config/goose"
   assert_policy_contains "$policy_all_agents" "all-agents policy includes kilocode binary grant" "/.local/bin/kilocode"
-  rm -f "$policy_all_agents" "$policy_clipboard" "$policy_process_control" "$policy_lldb" "$policy_chromium_headless" "$policy_chromium_full"
+  rm -f "$policy_all_agents" "$policy_clipboard" "$policy_process_control" "$policy_lldb" "$policy_xcode" "$policy_chromium_headless" "$policy_chromium_full"
 
   for docker_sock in \
     "/var/run/docker.sock" \

@@ -54,6 +54,7 @@ Policy scope options:
       Note: shell-init enables shell startup file reads
       Note: process-control enables host process enumeration/signalling
       Note: lldb enables LLDB toolchain + task-port access and implies process-control
+      Note: xcode enables Xcode developer roots plus scoped build/simulator state
       Note: all-agents loads every 60-agents profile
       Note: all-apps loads every 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)

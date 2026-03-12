@@ -25,10 +25,11 @@ Each policy rule should answer one question:
 - Process execution/forking so normal dev subprocess trees work.
 - Host process enumeration/signalling only when `--enable=process-control` or `--enable=lldb` is selected.
 - LLDB/debugger toolchain access only when `--enable=lldb` is selected.
+- Xcode developer roots and per-user build/simulator state only when `--enable=xcode` is selected.
 - Agent/app-specific config grants scoped to the wrapped command.
 - Keychain/security integration when selected profiles declare keychain dependency metadata.
 - Core SCM integrations (`git`, `gh`, `glab`) so repo workflows keep working.
-- Sanitized runtime environment by default, with explicit opt-in controls for env pass-through.
+- Sanitized runtime environment by default, with explicit opt-in controls for env pass-through and `SDKROOT` preserved when set.
 - Network access by default for registries, APIs, remotes, and MCP servers.
 - Temporary directories and runtime IPC services required by common CLI workflows.
 
@@ -40,6 +41,7 @@ Each policy rule should answer one question:
 - Clipboard access unless `--enable=clipboard` is used.
 - Host process enumeration/control unless `--enable=process-control` or `--enable=lldb` is used.
 - LLDB/debugger toolchain and task-port access unless `--enable=lldb` is used.
+- Full Xcode developer roots, DerivedData, and CoreSimulator state unless `--enable=xcode` is used.
 - Broad raw device access under `/dev`.
 - Setuid/setgid executable paths (`forbidden-exec-sugid`).
 
