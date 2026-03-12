@@ -113,7 +113,7 @@ run_prompt() {
 		if [[ "${status}" -eq 0 ]]; then
 			return 0
 		fi
-		if ! rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
+		if ! grep -Eqi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
 			return "${status}"
 		fi
 	fi

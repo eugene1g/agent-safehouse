@@ -150,7 +150,7 @@ parse_args() {
 }
 
 list_profiles() {
-	fd -t f '\.sb$' "${AGENT_PROFILES_DIR}" | sort | while IFS= read -r p; do
+	find "${AGENT_PROFILES_DIR}" -type f -name '*.sb' | sort | while IFS= read -r p; do
 		[[ -n "${p}" ]] || continue
 		basename "${p}" .sb
 	done
@@ -330,8 +330,6 @@ main() {
 	local secret_token response_token denial_token
 
 	require_command sandbox-exec
-	require_command rg
-	require_command fd
 	require_command perl
 
 	if declare -F safehouse_e2e_apply_model_defaults >/dev/null 2>&1; then
@@ -565,7 +563,7 @@ exit "${rc}"
 		[[ -n "${profile_path}" ]] || continue
 		profile_base="$(basename "${profile_path}" .sb)"
 		run_one_profile "${profile_base}" || true
-	done < <(fd -t f '\.sb$' "${AGENT_PROFILES_DIR}" | sort)
+	done < <(find "${AGENT_PROFILES_DIR}" -type f -name '*.sb' | sort)
 
 	echo ""
 	echo "Live LLM E2E summary: total=${total_count} attempted=${attempted_count} pass=${pass_count} skip=${skip_count} fail=${fail_count} executed=${executed_count}"
@@ -585,7 +583,6 @@ trap cleanup EXIT
 parse_args "$@"
 
 if [[ "${LIST_PROFILES}" == "1" ]]; then
-	require_command fd
 	list_profiles
 	exit 0
 fi

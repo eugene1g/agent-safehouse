@@ -47,7 +47,7 @@ run_prompt() {
 		return 0
 	fi
 
-	if [[ -n "${fallback_model}" ]] && [[ "${fallback_model}" != "${gemini_model}" ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
+	if [[ -n "${fallback_model}" ]] && [[ "${fallback_model}" != "${gemini_model}" ]] && grep -Eqi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
 		run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			--prompt "${prompt}" \
@@ -57,7 +57,7 @@ run_prompt() {
 		return $?
 	fi
 
-	if rg -qi -- 'unknown option.*model' "${output_file}"; then
+	if grep -Eqi -- 'unknown option.*model' "${output_file}"; then
 		run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \
 			--prompt "${prompt}" \

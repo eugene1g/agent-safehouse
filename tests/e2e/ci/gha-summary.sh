@@ -20,14 +20,6 @@ append() {
 list_profiles_to_file() {
 	local out_file="$1"
 
-	if command -v fd >/dev/null 2>&1; then
-		fd -t f '\.sb$' "${AGENT_PROFILES_DIR}" | sort | while IFS= read -r p; do
-			[[ -n "${p}" ]] || continue
-			basename "${p}" .sb
-		done >"${out_file}"
-		return 0
-	fi
-
 	find "${AGENT_PROFILES_DIR}" -type f -name '*.sb' | sort | while IFS= read -r p; do
 		[[ -n "${p}" ]] || continue
 		basename "${p}" .sb

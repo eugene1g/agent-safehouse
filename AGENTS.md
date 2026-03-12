@@ -8,8 +8,8 @@ Core sandbox wrapper is pure Bash + Sandbox Profile Language (`.sb`) and has no 
 
 ## Fast Working Rules
 
-- Use `rg` for text search.
-- Use `fd` for file listing/find.
+- Use `grep` for text search.
+- Use `find` for file listing/find.
 - Make least-privilege policy edits; avoid broad `subpath` grants unless required.
 - Do not hand-edit `dist/*`; edit `bin/` and `profiles/`, then regenerate dist artifacts.
 - If you change any `.sb` file or policy assembly/runtime logic (`bin/safehouse.sh`, `bin/lib/*.sh`), run `./scripts/generate-dist.sh`.

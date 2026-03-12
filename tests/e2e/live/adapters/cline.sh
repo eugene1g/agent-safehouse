@@ -65,7 +65,7 @@ ensure_cline_auth() {
 
 	auth_out="${TRANSCRIPT_PATH%.log}.auth.log"
 	if ! run_cline_auth "${auth_out}" "${provider}" "${key}" "${model_id}"; then
-		if [[ -n "${fallback_model_id}" ]] && [[ "${fallback_model_id}" != "${model_id}" ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${auth_out}"; then
+		if [[ -n "${fallback_model_id}" ]] && [[ "${fallback_model_id}" != "${model_id}" ]] && grep -Eqi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${auth_out}"; then
 			if run_cline_auth "${auth_out}" "${provider}" "${key}" "${fallback_model_id}"; then
 				CLINE_AUTH_DONE=1
 				return 0

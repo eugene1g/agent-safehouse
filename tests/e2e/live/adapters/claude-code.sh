@@ -71,7 +71,7 @@ run_prompt() {
 		return 0
 	fi
 
-	if rg -qi -- "${model_error_pattern}" "${output_file}"; then
+	if grep -Eqi -- "${model_error_pattern}" "${output_file}"; then
 		if [[ -n "${claude_fallback_model}" ]] && [[ "${claude_fallback_model}" != "${claude_model}" ]]; then
 			set +e
 			run_safehouse_command "${output_file}" \

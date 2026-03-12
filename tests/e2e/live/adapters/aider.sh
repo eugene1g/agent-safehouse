@@ -68,7 +68,7 @@ run_prompt() {
 
 	# Fallback for older/newer aider model catalogs if the preferred cheap model
 	# alias is unavailable in a given environment.
-	if [[ "${status}" -ne 0 ]] && [[ ${#model_args[@]} -gt 0 ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model|unknown option.*model' "${output_file}"; then
+	if [[ "${status}" -ne 0 ]] && [[ ${#model_args[@]} -gt 0 ]] && grep -Eqi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model|unknown option.*model' "${output_file}"; then
 		set +e
 		run_safehouse_command "${output_file}" \
 			"${AGENT_BIN}" \

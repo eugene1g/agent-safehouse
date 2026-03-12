@@ -37,7 +37,7 @@ contains_any_pattern() {
 
 	local pattern
 	for pattern in "$@"; do
-		if rg -qi -- "${pattern}" "${file}"; then
+		if grep -Eqi -- "${pattern}" "${file}"; then
 			return 0
 		fi
 	done
@@ -51,7 +51,7 @@ normalized_match_count() {
 	local count=""
 
 	# Use normalized output so ANSI escapes, punctuation, and case differences don't cause false negatives.
-	count="$(normalize_file_to_alnum_upper "${file}" | { rg -o -F "${token}" || true; } | wc -l | tr -d '[:space:]')"
+	count="$(normalize_file_to_alnum_upper "${file}" | { grep -o -F -- "${token}" || true; } | wc -l | tr -d '[:space:]')"
 	if [[ -z "${count}" ]]; then
 		count="0"
 	fi
@@ -229,7 +229,7 @@ run_noninteractive_adapter() {
 	fi
 
 	cat "${negative_out}" >>"${TRANSCRIPT_PATH}"
-	if rg -Fq "${SECRET_TOKEN}" "${negative_out}"; then
+	if grep -Fq -- "${SECRET_TOKEN}" "${negative_out}"; then
 		echo "ADAPTER[${ADAPTER_NAME}]: forbidden secret token leaked in output." | tee -a "${TRANSCRIPT_PATH}"
 		print_excerpt "${ADAPTER_NAME} negative output" "${negative_out}"
 		exit 3

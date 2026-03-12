@@ -38,7 +38,7 @@ run_prompt() {
 			set -e
 
 			# Fallback for Amp builds that do not support --mode with --execute.
-			if [[ "${status}" -ne 0 ]] && rg -qi -- 'unknown option.*mode|unrecognized option.*mode|unexpected argument.*mode|execute mode is not permitted with --mode' "${output_file}"; then
+			if [[ "${status}" -ne 0 ]] && grep -Eqi -- 'unknown option.*mode|unrecognized option.*mode|unexpected argument.*mode|execute mode is not permitted with --mode' "${output_file}"; then
 				if run_safehouse_command "${output_file}" \
 					"${AGENT_BIN}" \
 					--dangerously-allow-all \
@@ -56,14 +56,14 @@ run_prompt() {
 		fi
 
 			# Amp CLI occasionally exits after a stalled stream; retry once to reduce flakiness.
-			if rg -qi -- "stream stalled|no data received|timed out|timeout" "${output_file}"; then
+			if grep -Eqi -- "stream stalled|no data received|timed out|timeout" "${output_file}"; then
 				attempt=$((attempt + 1))
 				sleep 2
 				continue
 			fi
 
 			# Some Amp builds emit the denial token but still exit non-zero on restricted paths.
-			if [[ "${prompt}" == *"${FORBIDDEN_FILE}"* ]] && rg -Fq "${DENIAL_TOKEN}" "${output_file}"; then
+			if [[ "${prompt}" == *"${FORBIDDEN_FILE}"* ]] && grep -Fq -- "${DENIAL_TOKEN}" "${output_file}"; then
 				return 0
 			fi
 

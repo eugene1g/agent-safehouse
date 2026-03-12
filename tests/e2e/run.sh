@@ -120,7 +120,7 @@ wait_for_pattern() {
   local deadline=$((SECONDS + timeout_secs))
 
   while ((SECONDS < deadline)); do
-    if [[ -f "${PANE_LOG}" ]] && rg -Fq -- "${pattern}" "${PANE_LOG}"; then
+    if [[ -f "${PANE_LOG}" ]] && grep -Fq -- "${pattern}" "${PANE_LOG}"; then
       return 0
     fi
     sleep 1
@@ -174,7 +174,7 @@ assert_policy_selected_agent() {
   local profile_base="$1"
   local marker=";; Source: 60-agents/${profile_base}.sb"
 
-  if ! rg -Fq -- "${marker}" "${POLICY_PATH}"; then
+  if ! grep -Fq -- "${marker}" "${POLICY_PATH}"; then
     fail "expected policy marker missing: ${marker}"
   fi
 }
@@ -336,7 +336,7 @@ parse_args() {
 }
 
 list_profiles() {
-	fd -t f '\.sb$' "${AGENT_PROFILES_DIR}" | sort | while IFS= read -r p; do
+	find "${AGENT_PROFILES_DIR}" -type f -name '*.sb' | sort | while IFS= read -r p; do
 		[[ -n "${p}" ]] || continue
 		basename "${p}" .sb
 	done
@@ -352,7 +352,7 @@ run_all_profiles_sequential() {
 		[[ -n "${profile_path}" ]] || continue
 		TOTAL_COUNT=$((TOTAL_COUNT + 1))
 		run_agent_case "$(basename "${profile_path}" .sb)"
-	done < <(fd -t f '\.sb$' "${AGENT_PROFILES_DIR}" | sort)
+	done < <(find "${AGENT_PROFILES_DIR}" -type f -name '*.sb' | sort)
 
 	if [[ "${TOTAL_COUNT}" -eq 0 ]]; then
 		fail "no agent profiles were discovered under ${AGENT_PROFILES_DIR}"
@@ -437,7 +437,6 @@ exit "${rc}"
 parse_args "$@"
 
 if [[ "${LIST_PROFILES}" == "1" ]]; then
-	require_command fd
 	list_profiles
 	exit 0
 fi
@@ -446,8 +445,6 @@ if [[ -n "${PROFILE_ONLY}" ]]; then
 	# Single-profile mode (used by parallel runner).
 	require_command sandbox-exec
 	require_command tmux
-	require_command rg
-	require_command fd
 
 	if [[ ! -x "${SAFEHOUSE}" ]]; then
 		fail "safehouse wrapper is missing or not executable: ${SAFEHOUSE}"
@@ -476,8 +473,6 @@ echo "Running tmux-driven TUI E2E checks across all configured agent profiles...
 
 require_command sandbox-exec
 require_command tmux
-require_command rg
-require_command fd
 
 if [[ ! -x "${SAFEHOUSE}" ]]; then
   fail "safehouse wrapper is missing or not executable: ${SAFEHOUSE}"

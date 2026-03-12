@@ -90,7 +90,7 @@ run_prompt() {
 		return 0
 	fi
 
-	if [[ -n "${kilo_fallback_model}" ]] && [[ "${kilo_fallback_model}" != "${kilo_model}" ]] && rg -qi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
+	if [[ -n "${kilo_fallback_model}" ]] && [[ "${kilo_fallback_model}" != "${kilo_model}" ]] && grep -Eqi -- 'model .* not found|unknown model|invalid model|invalid value|unsupported model' "${output_file}"; then
 		XDG_STATE_HOME="${state_home}" \
 			XDG_CACHE_HOME="${cache_home}" \
 			XDG_CONFIG_HOME="${config_home}" \
@@ -105,7 +105,7 @@ run_prompt() {
 		return $?
 	fi
 
-	if rg -qi -- 'unknown option.*model' "${output_file}"; then
+	if grep -Eqi -- 'unknown option.*model' "${output_file}"; then
 		XDG_STATE_HOME="${state_home}" \
 			XDG_CACHE_HOME="${cache_home}" \
 			XDG_CONFIG_HOME="${config_home}" \

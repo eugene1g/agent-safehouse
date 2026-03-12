@@ -98,14 +98,12 @@ jobs:
             e2e-live-agent-installs-${{ runner.os }}-${{ steps.live-agent-cache-epoch.outputs.week }}-
 
       # ── Install CLI tools via brew (single call, no auto-update) ──
-      - name: Ensure tmux, rg, fd are available
+      - name: Ensure tmux is available
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
           missing=()
           command -v tmux >/dev/null 2>&1 || missing+=(tmux)
-          command -v rg   >/dev/null 2>&1 || missing+=(ripgrep)
-          command -v fd   >/dev/null 2>&1 || missing+=(fd)
           if [ "${#missing[@]}" -gt 0 ]; then
             brew install "${missing[@]}"
           fi
