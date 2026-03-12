@@ -1,6 +1,30 @@
 # Policy assembly and rule emission.
 policy_chunks=()
 optional_integrations_classified=0
+sorted_profile_paths_buffer=()
+
+collect_sorted_profile_paths_in_dir() {
+	local base_dir="$1"
+	local file
+	local nullglob_was_set=0
+	local LC_ALL=C
+
+	sorted_profile_paths_buffer=()
+
+	if shopt -q nullglob; then
+		nullglob_was_set=1
+	fi
+	shopt -s nullglob
+
+	for file in "${base_dir%/}/"*.sb; do
+		[[ -f "$file" ]] || continue
+		sorted_profile_paths_buffer+=("$file")
+	done
+
+	if [[ "$nullglob_was_set" -ne 1 ]]; then
+		shopt -u nullglob
+	fi
+}
 
 append_policy_chunk() {
 	local chunk="$1"
@@ -105,6 +129,7 @@ append_all_module_profiles() {
 	local target="$1"
 	local base_dir="$2"
 	local file
+	local -a module_profile_paths=()
 	local found_any=0
 	local appended_any=0
 	local is_scoped_profile_dir=0
@@ -120,17 +145,33 @@ append_all_module_profiles() {
 		;;
 	esac
 
-	while IFS= read -r file; do
-		[[ -n "$file" ]] || continue
-		found_any=1
+	case "$base_dir" in
+	"${PROFILES_DIR}/60-agents" | "profiles/60-agents")
+		resolve_agent_app_profile_paths
+		module_profile_paths=("${agent_profile_paths[@]}")
+		;;
+	"${PROFILES_DIR}/65-apps" | "profiles/65-apps")
+		resolve_agent_app_profile_paths
+		module_profile_paths=("${app_profile_paths[@]}")
+		;;
+	*)
+		collect_sorted_profile_paths_in_dir "$base_dir"
+		module_profile_paths=("${sorted_profile_paths_buffer[@]}")
+		;;
+	esac
 
+	if [[ "${#module_profile_paths[@]}" -gt 0 ]]; then
+		found_any=1
+	fi
+
+	for file in "${module_profile_paths[@]}"; do
 		if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$file"; then
 			continue
 		fi
 
 		appended_any=1
 		append_profile "$target" "$file"
-	done < <(find "$base_dir" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
+	done
 
 	if [[ "$found_any" -eq 0 ]]; then
 		echo "No module profiles found in: ${base_dir}" >&2
@@ -266,19 +307,32 @@ append_optional_integration_profiles() {
 	local base_dir="$2"
 	local file
 	local base_name
+	local -a module_profile_paths=()
 	local found_any=0
 
 	ensure_optional_integrations_classified
 
-	while IFS= read -r file; do
-		[[ -n "$file" ]] || continue
-		found_any=1
+	case "$base_dir" in
+	"${PROFILES_DIR}/55-integrations-optional" | "profiles/55-integrations-optional")
+		resolve_optional_integration_profile_paths
+		module_profile_paths=("${optional_integration_profile_paths[@]}")
+		;;
+	*)
+		collect_sorted_profile_paths_in_dir "$base_dir"
+		module_profile_paths=("${sorted_profile_paths_buffer[@]}")
+		;;
+	esac
 
+	if [[ "${#module_profile_paths[@]}" -gt 0 ]]; then
+		found_any=1
+	fi
+
+	for file in "${module_profile_paths[@]}"; do
 		base_name="${file##*/}"
 		optional_integration_classified_included "$base_name" || continue
 
 		append_profile "$target" "$file"
-	done < <(find "$base_dir" -maxdepth 1 -type f -name '*.sb' | LC_ALL=C sort)
+	done
 
 	if [[ "$found_any" -eq 0 ]]; then
 		echo "No optional integration profiles found in: ${base_dir}" >&2
@@ -511,12 +565,13 @@ append_cli_profiles() {
 
 emit_explain_summary() {
 	local idx reason profile
-	local workdir_status config_status keychain_status exec_env_status env_pass_names_status
+	local workdir_status config_status keychain_status exec_env_status env_pass_names_status profile_env_defaults_status
 
 	[[ "$explain_mode" -eq 1 ]] || return 0
 
 	resolve_selected_agent_profiles
 	ensure_optional_integrations_classified
+	resolve_profile_runtime_env_defaults
 
 	if [[ -n "$effective_workdir" ]]; then
 		workdir_status="${effective_workdir}"
@@ -534,6 +589,12 @@ emit_explain_summary() {
 		env_pass_names_status="${runtime_env_pass_names[*]}"
 	else
 		env_pass_names_status=""
+	fi
+
+	if [[ "${#profile_runtime_env_defaults[@]}" -gt 0 ]]; then
+		profile_env_defaults_status="$(join_by_space "${profile_runtime_env_defaults[@]-}")"
+	else
+		profile_env_defaults_status="(none)"
 	fi
 
 	case "${runtime_env_mode:-sanitized}" in
@@ -585,6 +646,7 @@ emit_explain_summary() {
 		echo "  optional integrations not included: $(join_by_space "${optional_integrations_not_included[@]-}")"
 		echo "  keychain integration: ${keychain_status}"
 		echo "  execution environment: ${exec_env_status}"
+		echo "  profile env defaults: ${profile_env_defaults_status}"
 		if [[ -n "${invoked_command_path:-}" ]]; then
 			echo "  invoked command: ${invoked_command_path}"
 		fi

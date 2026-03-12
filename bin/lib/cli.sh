@@ -240,6 +240,7 @@ main() {
   local -a policy_args=()
   local -a command_args=()
   local policy_path=""
+  local policy_path_output_file=""
   local keep_policy_file=0
   local detected_app_bundle=""
   local execution_env_mode="sanitized"
@@ -407,11 +408,20 @@ main() {
     invoked_command_app_bundle="${detected_app_bundle:-}"
   fi
 
+  policy_path_output_file="$(mktemp "${TMPDIR:-/tmp}/safehouse-policy-path.XXXXXX")"
   if [[ "${#policy_args[@]}" -gt 0 ]]; then
-    policy_path="$(generate_policy_file "${policy_args[@]}")"
+    if ! generate_policy_file "${policy_args[@]}" >"$policy_path_output_file"; then
+      rm -f "$policy_path_output_file"
+      exit 1
+    fi
   else
-    policy_path="$(generate_policy_file)"
+    if ! generate_policy_file >"$policy_path_output_file"; then
+      rm -f "$policy_path_output_file"
+      exit 1
+    fi
   fi
+  policy_path="$(<"$policy_path_output_file")"
+  rm -f "$policy_path_output_file"
   if [[ ! -f "$policy_path" ]]; then
     echo "Generator returned non-existent policy file: ${policy_path}" >&2
     exit 1
@@ -451,6 +461,9 @@ main() {
     build_sanitized_exec_environment
     execution_environment=("${sanitized_exec_environment[@]}")
   fi
+
+  merge_exec_environment_with_profile_defaults "${execution_environment[@]}"
+  execution_environment=("${profile_default_merged_exec_environment[@]}")
 
   if [[ "$runtime_env_mode" != "passthrough" ]] && [[ "${#runtime_env_pass_names[@]}" -gt 0 ]]; then
     merge_exec_environment_with_env_pass "${execution_environment[@]}"

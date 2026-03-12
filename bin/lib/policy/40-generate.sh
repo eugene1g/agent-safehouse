@@ -79,8 +79,17 @@ reset_policy_generation_state() {
   selected_agent_profile_basenames=()
   selected_agent_profile_reasons=()
   selected_agent_profiles_resolved=0
+  agent_profile_paths=()
+  app_profile_paths=()
+  agent_app_profile_paths_resolved=0
   selected_profiles_require_keychain=0
   selected_profiles_require_keychain_resolved=0
+  selected_profile_requirement_tokens=()
+  selected_profile_requirement_tokens_resolved=0
+  optional_integration_profile_paths=()
+  optional_integration_profile_paths_resolved=0
+  enabled_optional_requirement_tokens=()
+  enabled_optional_requirement_tokens_resolved=0
 
   optional_integrations_explicit_included=()
   optional_integrations_implicit_included=()
@@ -93,6 +102,8 @@ reset_policy_generation_state() {
   rw_count=0
 
   explain_mode=0
+  profile_runtime_env_defaults=()
+  profile_runtime_env_defaults_resolved=0
 }
 
 generate_policy_file() {

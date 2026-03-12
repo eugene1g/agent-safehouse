@@ -208,16 +208,9 @@ optional_integration_profile_path_from_feature() {
 
 optional_enabled_integrations_require_integration() {
   local integration="$1"
-  local feature profile_path
+  local integration_normalized
 
-  for feature in "${optional_integration_features[@]-}"; do
-    optional_integration_feature_enabled "$feature" || continue
-
-    profile_path="$(optional_integration_profile_path_from_feature "$feature")" || continue
-    if profile_declares_requirement "$profile_path" "$integration"; then
-      return 0
-    fi
-  done
-
-  return 1
+  integration_normalized="$(to_lowercase "$integration")"
+  resolve_enabled_optional_requirement_tokens
+  array_contains_exact "$integration_normalized" "${enabled_optional_requirement_tokens[@]-}"
 }

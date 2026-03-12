@@ -486,89 +486,97 @@ profile_key_from_source() {
   printf '%s\n' "$source"
 }
 
-profile_declares_requirement() {
+emit_profile_lines() {
   local profile_path="$1"
-  local required_integration="$2"
-  local required_normalized line raw_requirements entry normalized_entry profile_key
-  local -a requirement_entries=()
+  local profile_key
 
-  required_normalized="$(to_lowercase "$required_integration")"
   profile_key="$(profile_key_from_source "$profile_path")"
 
   if embedded_profile_body "$profile_key" >/dev/null 2>&1; then
-    while IFS= read -r line; do
-      [[ "$line" == *'$$require='*'$$'* ]] || continue
-      raw_requirements="${line#*\$\$require=}"
-      raw_requirements="${raw_requirements%%\$\$*}"
-      raw_requirements="$(trim_whitespace "$raw_requirements")"
-      [[ -n "$raw_requirements" ]] || continue
-
-      IFS=',' read -r -a requirement_entries <<< "$raw_requirements"
-      for entry in "${requirement_entries[@]}"; do
-        normalized_entry="$(to_lowercase "$(trim_whitespace "$entry")")"
-        [[ -n "$normalized_entry" ]] || continue
-        if [[ "$normalized_entry" == "$required_normalized" ]]; then
-          return 0
-        fi
-      done
-    done < <(embedded_profile_body "$profile_key")
-    return 1
+    embedded_profile_body "$profile_key"
+    return 0
   fi
 
-  if [[ ! -f "$profile_path" ]]; then
-    return 1
+  [[ -f "$profile_path" ]] || return 1
+  cat "$profile_path"
+}
+
+collect_sorted_profile_paths_in_dir() {
+  local base_dir="$1"
+  local profile_prefix=""
+  local key
+
+  sorted_profile_paths_buffer=()
+
+  case "$base_dir" in
+    "${PROFILES_DIR}/30-toolchains"|"profiles/30-toolchains")
+      profile_prefix="profiles/30-toolchains/"
+      ;;
+    "${PROFILES_DIR}/40-shared"|"profiles/40-shared")
+      profile_prefix="profiles/40-shared/"
+      ;;
+    "${PROFILES_DIR}/50-integrations-core"|"profiles/50-integrations-core")
+      profile_prefix="profiles/50-integrations-core/"
+      ;;
+    "${PROFILES_DIR}/55-integrations-optional"|"profiles/55-integrations-optional")
+      profile_prefix="profiles/55-integrations-optional/"
+      ;;
+    "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
+      profile_prefix="profiles/60-agents/"
+      ;;
+    "${PROFILES_DIR}/65-apps"|"profiles/65-apps")
+      profile_prefix="profiles/65-apps/"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  for key in "${PROFILE_KEYS[@]}"; do
+    [[ "$key" == "${profile_prefix}"* ]] || continue
+    sorted_profile_paths_buffer+=("$key")
+  done
+}
+
+resolve_agent_app_profile_paths() {
+  if [[ "$agent_app_profile_paths_resolved" -eq 1 ]]; then
+    return 0
   fi
 
-  while IFS= read -r line; do
+  collect_sorted_profile_paths_in_dir "${PROFILES_DIR}/60-agents"
+  agent_profile_paths=("${sorted_profile_paths_buffer[@]-}")
+  collect_sorted_profile_paths_in_dir "${PROFILES_DIR}/65-apps"
+  app_profile_paths=("${sorted_profile_paths_buffer[@]-}")
+  agent_app_profile_paths_resolved=1
+}
+
+resolve_optional_integration_profile_paths() {
+  if [[ "$optional_integration_profile_paths_resolved" -eq 1 ]]; then
+    return 0
+  fi
+
+  collect_sorted_profile_paths_in_dir "${PROFILES_DIR}/55-integrations-optional"
+  optional_integration_profile_paths=("${sorted_profile_paths_buffer[@]-}")
+  optional_integration_profile_paths_resolved=1
+}
+
+append_profile_requirement_tokens_to_cache() {
+  local profile_path="$1"
+  local target="$2"
+  local profile_content=""
+  local line raw_requirements
+
+  profile_content="$(emit_profile_lines "$profile_path" 2>/dev/null || true)"
+  [[ -n "$profile_content" ]] || return 0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
     [[ "$line" == *'$$require='*'$$'* ]] || continue
     raw_requirements="${line#*\$\$require=}"
     raw_requirements="${raw_requirements%%\$\$*}"
     raw_requirements="$(trim_whitespace "$raw_requirements")"
     [[ -n "$raw_requirements" ]] || continue
-
-    IFS=',' read -r -a requirement_entries <<< "$raw_requirements"
-    for entry in "${requirement_entries[@]}"; do
-      normalized_entry="$(to_lowercase "$(trim_whitespace "$entry")")"
-      [[ -n "$normalized_entry" ]] || continue
-      if [[ "$normalized_entry" == "$required_normalized" ]]; then
-        return 0
-      fi
-    done
-  done < "$profile_path"
-
-  return 1
-}
-
-selected_profiles_require_integration() {
-  local integration="$1"
-  local integration_normalized profile_key
-  local requires_integration=0
-
-  integration_normalized="$(to_lowercase "$integration")"
-
-  if [[ "$integration_normalized" == "$keychain_requirement_token" && "$selected_profiles_require_keychain_resolved" -eq 1 ]]; then
-    [[ "$selected_profiles_require_keychain" -eq 1 ]]
-    return
-  fi
-
-  for profile_key in "${PROFILE_KEYS[@]}"; do
-    case "$profile_key" in
-      profiles/60-agents/*.sb|profiles/65-apps/*.sb)
-        should_include_agent_profile_file "$profile_key" || continue
-        if profile_declares_requirement "$profile_key" "$integration_normalized"; then
-          requires_integration=1
-          break
-        fi
-        ;;
-    esac
-  done
-
-  if [[ "$integration_normalized" == "$keychain_requirement_token" ]]; then
-    selected_profiles_require_keychain="$requires_integration"
-    selected_profiles_require_keychain_resolved=1
-  fi
-
-  [[ "$requires_integration" -eq 1 ]]
+    append_requirement_tokens_from_csv "$raw_requirements" "$target"
+  done <<< "$profile_content"
 }
 
 append_profile() {
@@ -623,113 +631,22 @@ append_resolved_base_profile() {
   append_policy_chunk ""
 }
 
-append_all_module_profiles() {
-  local target="$1"
-  local base_dir="$2"
-  local found_any=0
-  local appended_any=0
-  local is_scoped_profile_dir=0
-  local emit_no_match_note=0
-  local key profile_prefix
+append_profile_runtime_env_defaults_from_file() {
+  local profile_path="$1"
+  local profile_content=""
+  local line metadata_entry
 
-  case "$base_dir" in
-    "${PROFILES_DIR}/30-toolchains"|"profiles/30-toolchains")
-      profile_prefix="profiles/30-toolchains/"
-      ;;
-    "${PROFILES_DIR}/40-shared"|"profiles/40-shared")
-      profile_prefix="profiles/40-shared/"
-      ;;
-    "${PROFILES_DIR}/50-integrations-core"|"profiles/50-integrations-core")
-      profile_prefix="profiles/50-integrations-core/"
-      ;;
-    "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
-      profile_prefix="profiles/60-agents/"
-      is_scoped_profile_dir=1
-      emit_no_match_note=1
-      ;;
-    "${PROFILES_DIR}/65-apps"|"profiles/65-apps")
-      profile_prefix="profiles/65-apps/"
-      is_scoped_profile_dir=1
-      ;;
-    *)
-      echo "No module profiles found in: ${base_dir}" >&2
-      exit 1
-      ;;
-  esac
+  profile_content="$(emit_profile_lines "$profile_path" 2>/dev/null || true)"
+  [[ -n "$profile_content" ]] || return 0
 
-  for key in "${PROFILE_KEYS[@]}"; do
-    [[ "$key" == "${profile_prefix}"* ]] || continue
-    found_any=1
-
-    if [[ "$is_scoped_profile_dir" -eq 1 ]] && ! should_include_agent_profile_file "$key"; then
-      continue
-    fi
-    appended_any=1
-    append_profile "$target" "$key"
-  done
-
-  if [[ "$found_any" -eq 0 ]]; then
-    echo "No module profiles found in: ${base_dir}" >&2
-    exit 1
-  fi
-
-  if [[ "$is_scoped_profile_dir" -eq 1 ]]; then
-    if [[ ( "$base_dir" == "${PROFILES_DIR}/60-agents" || "$base_dir" == "profiles/60-agents" ) && "$enable_all_agents_profiles" -eq 1 ]]; then
-      return 0
-    fi
-
-    if [[ ( "$base_dir" == "${PROFILES_DIR}/65-apps" || "$base_dir" == "profiles/65-apps" ) && "$enable_all_apps_profiles" -eq 1 ]]; then
-      return 0
-    fi
-
-    if [[ "$appended_any" -eq 0 && "$emit_no_match_note" -eq 1 ]]; then
-      resolve_selected_agent_profiles
-      if [[ "${#selected_agent_profile_basenames[@]}" -eq 0 ]]; then
-        append_policy_chunk ";; No command-matched app/agent profile selected; skipping 60-agents and 65-apps modules."
-        append_policy_chunk ";; Use --enable=all-agents,all-apps to restore legacy all-profile behavior."
-        append_policy_chunk ""
-      fi
-    fi
-    return 0
-  fi
-
-  if [[ "$appended_any" -eq 0 ]]; then
-    echo "No module profiles selected in: ${base_dir}" >&2
-    exit 1
-  fi
-}
-
-append_optional_integration_profiles() {
-  local target="$1"
-  local base_dir="$2"
-  local key base_name
-  local found_any=0
-
-  case "$base_dir" in
-    "${PROFILES_DIR}/55-integrations-optional"|"profiles/55-integrations-optional")
-      ;;
-    *)
-      echo "No optional integration profiles found in: ${base_dir}" >&2
-      exit 1
-      ;;
-  esac
-
-  ensure_optional_integrations_classified
-
-  for key in "${PROFILE_KEYS[@]}"; do
-    [[ "$key" == "profiles/55-integrations-optional/"* ]] || continue
-    found_any=1
-
-    base_name="${key##*/}"
-    optional_integration_classified_included "$base_name" || continue
-
-    append_profile "$target" "$key"
-  done
-
-  if [[ "$found_any" -eq 0 ]]; then
-    echo "No optional integration profiles found in: ${base_dir}" >&2
-    exit 1
-  fi
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" == *'$$exec-env-default='*'$$'* ]] || continue
+    metadata_entry="${line#*\$\$exec-env-default=}"
+    metadata_entry="${metadata_entry%%\$\$*}"
+    metadata_entry="$(trim_whitespace "$metadata_entry")"
+    [[ -n "$metadata_entry" ]] || continue
+    append_profile_runtime_env_default "$metadata_entry" "$profile_path"
+  done <<< "$profile_content"
 }
 
 SCRIPT

@@ -39,6 +39,17 @@ run_section_cli_edge_cases() {
   assert_command_succeeds "bin/safehouse.sh works from /tmp via absolute path (execute mode)" /bin/sh -c "cd /tmp && '${SAFEHOUSE}' -- /usr/bin/true"
   assert_command_succeeds "bin/safehouse.sh runs wrapped command without requiring --" /bin/sh -c "cd /tmp && '${SAFEHOUSE}' /usr/bin/true"
   assert_command_succeeds "bin/safehouse.sh with no command generates a policy path" /usr/bin/env SAFEHOUSE_BIN="$SAFEHOUSE" /bin/sh -c 'cd /tmp && policy_path="$($SAFEHOUSE_BIN)" && [ -n "$policy_path" ] && [ -f "$policy_path" ] && rm -f "$policy_path"'
+  assert_command_succeeds "bin/safehouse.sh generates an all-agents policy under a low per-process FD limit" /bin/bash -c '
+    set -euo pipefail
+    safehouse_bin="$1"
+    output_path="$2"
+    ulimit -n 256
+
+    "$safehouse_bin" --enable=all-agents --output "$output_path" --workdir=
+  ' _ "$SAFEHOUSE" "${TEST_CWD}/policy-fd-pressure.sb"
+  assert_policy_contains "${TEST_CWD}/policy-fd-pressure.sb" "fd-pressure policy generation still emits a valid policy" "(version 1)"
+  assert_policy_contains "${TEST_CWD}/policy-fd-pressure.sb" "fd-pressure policy generation still includes scoped agent modules" ";; Source: 60-agents/codex.sb"
+  rm -f "${TEST_CWD}/policy-fd-pressure.sb"
 
   section_begin "Enable Flag Parsing"
   policy_enable_arg="${TEST_CWD}/policy-enable-arg.sb"

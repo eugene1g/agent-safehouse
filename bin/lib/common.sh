@@ -304,6 +304,30 @@ merge_exec_environment_with_env_pass() {
   done
 }
 
+merge_exec_environment_with_profile_defaults() {
+  local entry key idx exists
+
+  profile_default_merged_exec_environment=("$@")
+  resolve_profile_runtime_env_defaults
+
+  for entry in "${profile_runtime_env_defaults[@]-}"; do
+    key="${entry%%=*}"
+    [[ -n "$key" ]] || continue
+
+    exists=0
+    for idx in "${!profile_default_merged_exec_environment[@]}"; do
+      if [[ "${profile_default_merged_exec_environment[$idx]%%=*}" == "$key" ]]; then
+        exists=1
+        break
+      fi
+    done
+
+    if [[ "$exists" -eq 0 ]]; then
+      profile_default_merged_exec_environment+=("$entry")
+    fi
+  done
+}
+
 detect_app_bundle() {
   local cmd_path="$1"
   local check_path="$cmd_path"

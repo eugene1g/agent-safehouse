@@ -119,9 +119,18 @@ invoked_command_app_bundle=""
 selected_agent_profile_basenames=()
 selected_agent_profile_reasons=()
 selected_agent_profiles_resolved=0
+agent_profile_paths=()
+app_profile_paths=()
+agent_app_profile_paths_resolved=0
 keychain_requirement_token="55-integrations-optional/keychain.sb"
 selected_profiles_require_keychain=0
 selected_profiles_require_keychain_resolved=0
+selected_profile_requirement_tokens=()
+selected_profile_requirement_tokens_resolved=0
+optional_integration_profile_paths=()
+optional_integration_profile_paths_resolved=0
+enabled_optional_requirement_tokens=()
+enabled_optional_requirement_tokens_resolved=0
 optional_integrations_explicit_included=()
 optional_integrations_implicit_included=()
 optional_integrations_not_included=()
@@ -137,6 +146,8 @@ runtime_env_mode="sanitized"
 runtime_env_file=""
 runtime_env_file_resolved=""
 runtime_env_pass_names=()
+profile_runtime_env_defaults=()
+profile_runtime_env_defaults_resolved=0
 
 if [[ "${SAFEHOUSE_WORKDIR+x}" == "x" ]]; then
   workdir_env_set=1
