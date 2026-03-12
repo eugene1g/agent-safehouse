@@ -40,6 +40,9 @@ resolve_selected_agent_profiles() {
     claude.app)
       append_selected_agent_profile "claude-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
+    codex.app)
+      append_selected_agent_profile "codex-app.sb" "app bundle match: ${app_bundle_base}"
+      ;;
     "visual studio code.app"|"visual studio code - insiders.app")
       append_selected_agent_profile "vscode-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
@@ -70,7 +73,9 @@ resolve_selected_agent_profiles() {
       append_selected_agent_profile "copilot-cli.sb" "command basename match: ${cmd}"
       ;;
     codex)
-      append_selected_agent_profile "codex.sb" "command basename match: ${cmd}"
+      if [[ "$app_bundle_base" != "codex.app" ]]; then
+        append_selected_agent_profile "codex.sb" "command basename match: ${cmd}"
+      fi
       ;;
     cursor|cursor-agent|agent)
       append_selected_agent_profile "cursor-agent.sb" "command basename match: ${cmd}"

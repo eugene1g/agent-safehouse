@@ -228,6 +228,7 @@ EOF
   done
   assert_policy_not_contains "${REPO_ROOT}/dist/profiles/safehouse.generated.sb" "default static policy excludes app profile layers without --enable=all-apps" ";; Source: 65-apps/claude-app.sb"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes Claude desktop app profile" ";; Source: 65-apps/claude-app.sb"
+  assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes Codex desktop app profile" ";; Source: 65-apps/codex-app.sb"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes VS Code app profile" ";; Source: 65-apps/vscode-app.sb"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes electron integration profile" "#safehouse-test-id:electron-integration#"
   assert_policy_contains "${REPO_ROOT}/dist/profiles/safehouse-for-apps.generated.sb" "apps static policy includes macOS GUI integration profile" ";; Integration: macOS GUI"
