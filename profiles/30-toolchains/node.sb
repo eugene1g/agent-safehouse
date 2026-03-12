@@ -54,6 +54,7 @@
     ;; browser automation / test runners
     (home-subpath "/Library/Caches/ms-playwright")
     (home-subpath "/Library/Caches/Cypress")
+    (home-subpath "/.cache/puppeteer")
 
     ;; Node ecosystem caches used by CLIs and language tooling
     (home-subpath "/Library/Caches/typescript")
