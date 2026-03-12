@@ -404,8 +404,15 @@
 
 ;; Includes common Maven/Gradle/SBT/Coursier and Java runtime manager locations.
 
-(allow file-read* file-write*
+;; System-wide JDK/JRE bundles are read-only: agents need to discover and execute
+;; them, but must not modify globally installed runtimes under /Library.
+(allow file-read*
     (subpath "/Library/Java")                                         ;; System-wide JDK/JRE bundles live here on macOS and are probed by /usr/bin/java.
+)
+
+;; User-local Java state remains read-write for runtime managers, caches, and
+;; per-user JDK installs under ~/Library/Java.
+(allow file-read* file-write*
     (home-subpath "/.m2")
     (home-subpath "/.gradle")
     (home-subpath "/.ivy2")

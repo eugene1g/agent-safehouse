@@ -65,6 +65,9 @@ run_section_policy_behavior() {
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Xcode integration profile" ";; Integration: Xcode"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy no longer grants broad file-read* access to /private/var/run" "Resolver/daemon sockets and pid files used by networking flows."
   assert_policy_contains "$POLICY_DEFAULT" "default policy includes metadata-only /private/var/run grant" "Metadata traversal for /private/var/run socket namespace."
+  assert_policy_allow_header_contains "$POLICY_DEFAULT" "default policy grants read access to system /Library/Java" "(subpath \"/Library/Java\")" "file-read*"
+  assert_policy_allow_header_not_contains "$POLICY_DEFAULT" "default policy keeps system /Library/Java read-only" "(subpath \"/Library/Java\")" "file-write*"
+  assert_policy_allow_header_contains "$POLICY_DEFAULT" "default policy keeps user ~/Library/Java read-write" "(home-subpath \"/Library/Java\")" "file-write*"
 
   policy_agent_browser="${TEST_CWD}/policy-feature-agent-browser.sb"
   policy_browser_native_messaging="${TEST_CWD}/policy-feature-browser-native-messaging.sb"

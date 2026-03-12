@@ -162,6 +162,67 @@ assert_policy_not_contains() {
   fi
 }
 
+policy_allow_header_for_entry() {
+  local policy="$1"
+  local entry="$2"
+  local entry_line
+
+  entry_line="$(awk -v needle="$entry" 'index($0, needle) { print NR; exit }' "$policy")"
+  if [[ -z "$entry_line" ]]; then
+    return 1
+  fi
+
+  awk -v target="$entry_line" '
+    NR <= target && /^\(allow / { header = $0 }
+    END {
+      if (header == "") {
+        exit 1
+      }
+      print header
+    }
+  ' "$policy"
+}
+
+assert_policy_allow_header_contains() {
+  local policy="$1"
+  local description="$2"
+  local entry="$3"
+  local expected="$4"
+  local header
+
+  header="$(policy_allow_header_for_entry "$policy" "$entry" || true)"
+  if [[ -z "$header" ]]; then
+    log_fail "$description (policy entry not found: $entry)"
+    return
+  fi
+
+  if [[ "$header" == *"$expected"* ]]; then
+    log_pass "$description"
+  else
+    log_fail "$description (expected allow header to contain: $expected)"
+  fi
+}
+
+assert_policy_allow_header_not_contains() {
+  local policy="$1"
+  local description="$2"
+  local entry="$3"
+  local forbidden="$4"
+  local header
+
+  header="$(policy_allow_header_for_entry "$policy" "$entry" || true)"
+  if [[ -z "$header" ]]; then
+    log_fail "$description (policy entry not found: $entry)"
+    return
+  fi
+
+  if [[ "$header" == *"$forbidden"* ]]; then
+    log_fail "$description (expected allow header to omit: $forbidden)"
+  else
+    log_pass "$description"
+  fi
+}
+
 assert_policy_order_literal() {
   local policy="$1"
   local description="$2"
