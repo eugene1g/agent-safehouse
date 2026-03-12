@@ -1,7 +1,7 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: Chromium Full
-;; Additional headed/full-window Chrome for Testing allowances layered on top
-;; of Chromium Headless.
+;; Additional full-browser Chrome channel allowances layered on top of
+;; Chromium Headless.
 ;; Source: 55-integrations-optional/chromium-full.sb
 ;; #safehouse-test-id:chromium-full-integration#
 ;; #safehouse-test-id:chromium-full-rendezvous#
@@ -9,34 +9,51 @@
 ;; $$require=55-integrations-optional/chromium-headless.sb$$
 ;; ---------------------------------------------------------------------------
 
-;; Keep this integration scoped to the extra probes observed from headed Chrome
-;; for Testing launches. Headless Chromium startup allowances continue to come
-;; from the shared chromium-headless integration.
+;; Keep this integration scoped to the extra probes observed from full-browser
+;; Chrome-family launches on macOS (regular Google Chrome plus Chrome for
+;; Testing). Headless Chromium startup allowances continue to come from the
+;; shared chromium-headless integration.
+;;
+;; Like Electron, system Chrome app bundles may still need `--no-sandbox` at
+;; the browser launch layer. Chrome's internal helper sandbox re-init is
+;; blocked once Safehouse is already enforcing the outer Seatbelt sandbox.
 
 (allow file-read-metadata
     (home-literal "/Library/Application Support/Google")
     (home-literal "/Library/Application Support/Google/Chrome")
+    (home-literal "/Library/Application Support/Google/Chrome/Crashpad")
     (home-literal "/Library/Application Support/Google/Chrome for Testing")
     (home-literal "/Library/Application Support/Google/Chrome for Testing/Crashpad")
     (home-literal "/Library/Google")
 )
 
 (allow file-read*
+    (literal "/Applications")                                          ;; Full Chrome launches resolve the system Google Chrome bundle from /Applications.
+    (subpath "/Applications/Google Chrome.app")                        ;; Allow Chrome stable bundle frameworks/resources when the browser is launched from the app bundle.
+    (literal "/System")                                                ;; Compatibility aliases seen in some bundle/framework resolution flows.
+    (literal "/System/Volumes")
+    (literal "/System/Volumes/Data")
+    (literal "/System/Volumes/Data/Applications")
+    (subpath "/System/Volumes/Data/Applications/Google Chrome.app")
     (literal "/Library")                                              ;; Headed Chrome probes the Library root during desktop app bootstrap.
+    (home-literal "/Library/Preferences/com.google.Chrome.plist")
     (home-literal "/Library/Preferences/com.google.chrome.for.testing.plist")
     (home-literal "/Library/Google/Google Chrome Brand.plist")
 )
 
 (allow file-read* file-write*
-    (home-literal "/Library/Application Support/Google/Chrome/DevToolsActivePort")        ;; Playwright-style full-browser launches wait on this exact DevTools handshake file.
+    (home-literal "/Library/Application Support/Google/Chrome/DevToolsActivePort")        ;; Full-browser Chrome launches wait on this exact DevTools handshake file.
+    (home-subpath "/Library/Application Support/Google/Chrome/Crashpad")                   ;; Chrome stable keeps Crashpad state under the regular Google Chrome app-support tree.
     (home-subpath "/Library/Application Support/Google/Chrome for Testing/Crashpad")       ;; Crashpad keeps its database and metadata under the Chrome for Testing app-support tree.
 )
 
 (allow mach-register
+    (global-name-regex #"^com\.google\.Chrome\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.google\.chrome\.for\.testing\.MachPortRendezvousServer\.")
 )
 
 (allow mach-lookup
+    (global-name-regex #"^com\.google\.Chrome\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.google\.chrome\.for\.testing\.MachPortRendezvousServer\.")
     (global-name "com.apple.pasteboard.1")
     (global-name "com.apple.system.opendirectoryd.api")

@@ -24,6 +24,8 @@
 - `kubectl`
 - `macos-gui`
 - `electron` (implies `macos-gui`)
+- `chromium-headless`
+- `chromium-full` (implies `chromium-headless`)
 - `ssh`
 - `spotlight`
 - `cleanshot`

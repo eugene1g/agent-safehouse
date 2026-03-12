@@ -11,6 +11,7 @@ run_section_policy_behavior() {
   local policy_override_same_literal policy_override_subpath_literal policy_override_wide_read
   local append_override_same_literal append_override_subpath_literal append_override_wide_read
   local override_test_dir override_literal_file override_subpath_dir override_subpath_allowed_file override_subpath_blocked_file override_wide_read_file
+  local chrome_framework
 
   section_begin "Feature Toggles"
   assert_policy_not_contains "$POLICY_DEFAULT" "default policy omits Docker integration profile marker" ";; Integration: Docker"
@@ -107,15 +108,27 @@ run_section_policy_behavior() {
 
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chromium Full profile marker" "#safehouse-test-id:chromium-full-integration#"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chromium Full rendezvous marker" "#safehouse-test-id:chromium-full-rendezvous#"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Google Chrome app bundle grant" "/Applications/Google Chrome.app"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Data-backed Google Chrome app bundle grant" "/System/Volumes/Data/Applications/Google Chrome.app"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Google Chrome prefs grant" "/Library/Preferences/com.google.Chrome.plist"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chrome for Testing prefs grant" "/Library/Preferences/com.google.chrome.for.testing.plist"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chrome DevToolsActivePort grant" "/Library/Application Support/Google/Chrome/DevToolsActivePort"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Google Chrome Crashpad grant" "/Library/Application Support/Google/Chrome/Crashpad"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Chrome Crashpad grant" "/Library/Application Support/Google/Chrome for Testing/Crashpad"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes pasteboard lookup grant" "(global-name \"com.apple.pasteboard.1\")"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes OpenDirectory lookup grant" "(global-name \"com.apple.system.opendirectoryd.api\")"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes token-client lookup grant" "(global-name \"com.apple.ctkd.token-client\")"
+  assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes Google Chrome mach rendezvous grant" "com\\.google\\.Chrome\\.MachPortRendezvousServer"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full implicitly injects Chromium Headless integration" "#safehouse-test-id:chromium-headless-integration#"
   assert_policy_contains "$policy_chromium_full" "--enable=chromium-full preamble reports Chromium Headless as implicitly injected" "Optional integrations implicitly injected: chromium-headless"
   assert_policy_not_contains "$policy_chromium_full" "--enable=chromium-full does not include agent-browser state grant" "(home-subpath \"/.agent-browser\")"
+  assert_denied_if_exists "$POLICY_DEFAULT" "read Google Chrome app bundle denied by default" "/Applications/Google Chrome.app" /usr/bin/stat "/Applications/Google Chrome.app"
+  assert_allowed_if_exists "$policy_chromium_full" "read Google Chrome app bundle allowed with --enable=chromium-full" "/Applications/Google Chrome.app" /usr/bin/stat "/Applications/Google Chrome.app"
+  for chrome_framework in /Applications/Google\ Chrome.app/Contents/Frameworks/Google\ Chrome\ Framework.framework/Versions/*/Google\ Chrome\ Framework; do
+    [[ -e "$chrome_framework" ]] || continue
+    assert_denied_if_exists "$POLICY_DEFAULT" "read Google Chrome framework denied by default (${chrome_framework})" "$chrome_framework" /usr/bin/stat "$chrome_framework"
+    assert_allowed_if_exists "$policy_chromium_full" "read Google Chrome framework allowed with --enable=chromium-full (${chrome_framework})" "$chrome_framework" /usr/bin/stat "$chrome_framework"
+  done
 
   assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes Agent Browser profile marker" "#safehouse-test-id:agent-browser-integration#"
   assert_policy_contains "$policy_agent_browser" "--enable=agent-browser includes agent-browser state grant" "(home-subpath \"/.agent-browser\")"

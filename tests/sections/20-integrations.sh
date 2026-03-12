@@ -144,13 +144,21 @@ run_section_integrations() {
     "(global-name \"com.apple.pasteboard.1\")" \
     "(global-name \"com.apple.system.opendirectoryd.api\")" \
     "(global-name \"com.apple.ctkd.token-client\")" \
+    "/Applications/Google Chrome.app" \
+    "/System/Volumes/Data/Applications/Google Chrome.app" \
+    "/Library/Preferences/com.google.Chrome.plist" \
     "/Library/Preferences/com.google.chrome.for.testing.plist" \
     "/Library/Application Support/Google/Chrome/DevToolsActivePort" \
+    "/Library/Application Support/Google/Chrome/Crashpad" \
     "/Library/Application Support/Google/Chrome for Testing/Crashpad" \
+    "com\\.google\\.Chrome\\.MachPortRendezvousServer" \
     "com\\.google\\.chrome\\.for\\.testing\\.MachPortRendezvousServer"; do
     assert_policy_contains "$policy_chromium_full" "--enable=chromium-full includes required grant/marker (${chromium_full_marker})" "$chromium_full_marker"
   done
   assert_policy_not_contains "$policy_chromium_full" "--enable=chromium-full does not include agent-browser profile" "#safehouse-test-id:agent-browser-integration#"
+
+  assert_allowed_if_exists "$policy_chromium_full" "--enable=chromium-full allows read access to Google Chrome.app bundle when installed" "/Applications/Google Chrome.app" /bin/ls "/Applications/Google Chrome.app"
+  assert_allowed_if_exists "$policy_chromium_full" "--enable=chromium-full allows Google Chrome Crashpad state when present" "${HOME}/Library/Application Support/Google/Chrome/Crashpad" /bin/ls "${HOME}/Library/Application Support/Google/Chrome/Crashpad"
 
   assert_policy_contains "$POLICY_MACOS_GUI" "--enable=macos-gui includes macOS GUI integration profile" ";; Integration: macOS GUI"
   for macos_gui_marker in \

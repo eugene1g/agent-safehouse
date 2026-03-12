@@ -115,6 +115,16 @@ safehouse --workdir=~/server --enable=electron,all-agents,wide-read -- "/Applica
 
 Troubleshooting: `forbidden-sandbox-reinit` or `sandbox initialization failed: Operation not permitted` usually means nested sandbox re-init was attempted; launch with `--no-sandbox`.
 
+## Chromium
+
+Use `--enable=chromium-full` when a launcher needs the system Google Chrome
+bundle or Chrome for Testing bundle under Safehouse.
+
+If browser logs still show `sandbox initialization failed: Operation not
+permitted`, Chrome is trying to re-initialize its own inner Seatbelt sandbox.
+That is not fixable with extra Safehouse allow rules; pass `--no-sandbox` to
+the browser launch layer.
+
 ## Inspect Policy Output
 
 ```bash
