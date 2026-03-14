@@ -471,6 +471,8 @@ main() {
     execution_environment=("${env_pass_merged_exec_environment[@]}")
   fi
 
+  execution_environment+=("APP_SANDBOX_CONTAINER_ID=agent-safehouse")
+
   sandbox-exec -f "$policy_path" -- /usr/bin/env -i "${execution_environment[@]}" "${command_args[@]}"
   status=$?
   set -e
