@@ -12,7 +12,7 @@ load agent_tui_harness.bash
   local agent_home="${AGENT_TUI_WORKDIR}/codex-home"
   local config_dir="${AGENT_TUI_WORKDIR}/codex-config"
   local auth_log_path="${AGENT_TUI_ROOT}/codex-login.log"
-  local input_ready_pattern='>_ OpenAI Codex'
+  local input_ready_pattern='OpenAI Codex|Use /skills to list available skills'
   local trust_gate_pattern='Do you trust the contents of this directory'
   local permission_gate_pattern=""
   local restart_gate_pattern=""
