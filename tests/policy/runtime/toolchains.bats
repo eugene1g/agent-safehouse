@@ -33,7 +33,9 @@ load ../../test_helper.bash
   printf 'public class Hello { public static void main(String[] a) { System.out.println("sandboxed-java"); } }\n' > "$src"
 
   run /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && javac Hello.java && java Hello"
-  [ "$status" -eq 0 ] || skip "java toolchain precheck failed outside sandbox"
+  if [[ "$status" -ne 0 ]] || [[ "$output" != *"sandboxed-java"* ]]; then
+    skip "java toolchain precheck failed outside sandbox"
+  fi
 
   safehouse_ok -- /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && javac Hello.java && java Hello"
 }

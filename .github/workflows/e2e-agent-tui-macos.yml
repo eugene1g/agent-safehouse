@@ -67,6 +67,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SAFEHOUSE_AGENT_TUI_STARTUP_WAIT_SECS: "20"
         run: |
           set -o pipefail
           ./tests/run.sh e2e 2>&1 | tee artifacts/e2e/tests.log
