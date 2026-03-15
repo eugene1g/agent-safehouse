@@ -28,7 +28,7 @@ Each policy rule should answer one question:
 - Xcode developer roots and per-user build/simulator state only when `--enable=xcode` is selected.
 - Agent/app-specific config grants scoped to the wrapped command.
 - Keychain/security integration when selected profiles declare keychain dependency metadata.
-- Core SCM integrations (`git`, `gh`, `glab`) so repo workflows keep working.
+- Core SCM integration profiles and related defaults for tools such as `git`, `gh`, and `glab`.
 - Sanitized runtime environment by default, with explicit opt-in controls for env pass-through and `SDKROOT` preserved when set.
 - Network access by default for registries, APIs, remotes, and MCP servers.
 - Temporary directories and runtime IPC services required by common CLI workflows.
@@ -37,13 +37,14 @@ Each policy rule should answer one question:
 
 - SSH private keys under `~/.ssh`.
 - Shell startup files unless `--enable=shell-init` is used.
-- Browser profile data unless `--enable=browser-native-messaging` is used.
+- Sensitive browser profile data such as cookies, login data, history, and bookmarks.
 - Clipboard access unless `--enable=clipboard` is used.
 - Host process enumeration/control unless `--enable=process-control` or `--enable=lldb` is used.
 - LLDB/debugger toolchain and task-port access unless `--enable=lldb` is used.
 - Full Xcode developer roots, DerivedData, and CoreSimulator state unless `--enable=xcode` is used.
 - Broad raw device access under `/dev`.
-- Setuid/setgid executable paths (`forbidden-exec-sugid`).
+
+`--enable=browser-native-messaging` opens native-messaging manifest registration paths and extension-manifest reads. It does not grant browsing data.
 
 ## Important Limitations
 

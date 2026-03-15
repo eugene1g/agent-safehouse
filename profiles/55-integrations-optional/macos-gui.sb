@@ -3,7 +3,10 @@
 ;; Window server, AppKit, accessibility, input, and framework services
 ;; needed by any graphical macOS application running under sandbox.
 ;; Source: 55-integrations-optional/macos-gui.sb
+;; $$require=55-integrations-optional/clipboard.sb$$
 ;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/clipboard.sb (pasteboard IPC used by GUI apps)
 
 ;; -- System preferences and framework data -------------------------------------
 

@@ -1,132 +1,124 @@
-# E2E Tests (tmux + Live Agents)
+# E2E Agent TUI Tests
 
-This directory contains two end-to-end test layers for Agent Safehouse:
+This directory contains Bats-native boot-and-roundtrip checks for live agent CLIs.
 
-1. **TUI simulation (tmux)**: A deterministic fake TUI agent is run under Safehouse and driven via `tmux` keystrokes. This validates sandbox policy basics across *every* configured agent profile without calling any real LLMs, including default workdir access, denied reads/writes outside the workdir, and native Apple `/usr/bin/git` and `/usr/bin/make` shim execution.
-2. **Live LLM checks (real agent CLIs)**: Real agent CLIs are executed under Safehouse in non-interactive mode to ensure they can actually talk to a provider (OpenAI/Anthropic/etc) and that Safehouse blocks forbidden disk reads.
-
-Both runners enumerate agent profiles from `profiles/60-agents/*.sb`.
-
-## TUI Simulation (Always-On)
-
-Run for all agent profiles:
+Run the suite with:
 
 ```bash
-./tests/e2e/run.sh
+./tests/run.sh e2e
 ```
 
-Run a single profile:
+CI installs the required CLIs directly in the dedicated GitHub Actions workflow, using Homebrew for `node`/`aider`/`goose` and global `npm` for the Node-based agent CLIs.
+
+## Layout
+
+- `tmux_utils.bash`: low-level tmux session, capture, send-keys, and polling helpers.
+- `agent_tui_harness.bash`: E2E-specific setup/teardown, Safehouse launch shaping, one-shot command capture, and probe submission.
+- `../test_helper.bash`: shared per-test Safehouse workspace setup used across the suite.
+- `<agent>.bats`: one file per agent profile. Each file owns its path setup, login/bootstrap behavior, input-ready patterns, and startup gate handling.
+
+## Contract
+
+Each agent file should:
+
+1. `load ../test_helper.bash`.
+2. `load tmux_utils.bash`.
+3. `load agent_tui_harness.bash`.
+4. Start the test body with `sft_require_cmd_or_skip` and any `sft_require_env_or_skip`.
+5. Declare locals in this order: path variables, pattern variables, then `model`.
+6. Implement the same file-local helpers in every test file:
+   - `prepare_agent_state`
+   - `login_agent`
+   - `configure_agent_tui`
+   - `handle_startup_gates`
+7. Prepare any per-agent home/config state under `AGENT_TUI_ROOT` or `AGENT_TUI_WORKDIR`.
+8. Launch the CLI with `sft_tmux_start safehouse [safehouse-args ...] -- [ENV=VALUE ...] <agent> [args...]`.
+   Prefer `VAR=value sft_tmux_start safehouse --env-pass=VAR -- ...` for secrets so they stay out of the pane command line.
+9. Resolve any startup gates through `handle_startup_gates`, which should recurse until input is ready or fail after 5 passes.
+10. Confirm the probe roundtrip with `sft_tmux_assert_roundtrip`.
+
+Use `sft_safehouse_run_capture` inside `login_agent` when an agent needs a one-time Safehouse-wrapped auth/bootstrap step before the interactive launch.
+
+## Canonical Shape
 
 ```bash
-./tests/e2e/run.sh --profile kilo-code
+@test "[E2E-TUI] <agent> boots and completes roundtrip" {
+  sft_require_cmd_or_skip "<agent>"
+  sft_require_env_or_skip "<API_KEY_VAR>"
+
+  local agent_home="${AGENT_TUI_WORKDIR}/<agent>-home"
+  local config_dir="${AGENT_TUI_WORKDIR}/<agent>-config"
+  local auth_log_path="${AGENT_TUI_ROOT}/<agent>-login.log"
+  local input_ready_pattern='...'
+  local trust_gate_pattern='...'
+  local permission_gate_pattern='...'
+  local restart_gate_pattern='...'
+  local model="..."
+
+  prepare_agent_state "${agent_home}" "${config_dir}"
+  login_agent "${config_dir}" "${auth_log_path}" "${model}"
+  configure_agent_tui
+
+  API_KEY="${API_KEY}" \
+    sft_tmux_start \
+      safehouse --env-pass=API_KEY -- \
+      "HOME=${agent_home}" \
+      <agent> --model="${model}"
+
+  handle_startup_gates 1
+  sft_tmux_assert_roundtrip
+}
 ```
 
-Run in parallel:
+`handle_startup_gates` should:
+
+- build a list of gate-detection regexes
+- wait for either a gate or input-ready text
+- handle one matched gate
+- recurse up to 5 passes
+- return as soon as the input-ready pattern is visible
+
+## Naming
+
+- Use the `[E2E-TUI]` prefix for tests that drive a real interactive agent UI.
+- Use the title shape `[E2E-TUI] <agent> boots and completes roundtrip`.
+- Keep helper names and variable names aligned across files so the only differences are launch args, setup files, and gate actions.
+
+## Debugging And Cleanup
+
+List only tmux sessions created by this suite:
 
 ```bash
-SAFEHOUSE_E2E_TUI_JOBS=4 ./tests/e2e/run.sh
+tmux ls 2>/dev/null | rg '^safehouse-agent-tui-'
 ```
 
-## Live LLM E2E (Real Agents)
-
-The live runner is:
+Inspect pane ids, pane pids, and dead/alive state for suite sessions:
 
 ```bash
-./tests/e2e/live/run.sh
+tmux list-panes -a -F '#{session_name} #{pane_id} #{pane_pid} dead=#{pane_dead}' | rg '^safehouse-agent-tui-'
 ```
 
-You can also run it after the TUI suite:
+Attach to one lingering session:
 
 ```bash
-SAFEHOUSE_E2E_LIVE=1 ./tests/e2e/run.sh
+tmux attach-session -t safehouse-agent-tui-<name>
 ```
 
-### What It Verifies
-
-For each agent profile with an installed binary and an adapter:
-
-1. **Positive prompt**: Ask the agent to reply with a unique token (example: `SAFEHOUSERESP...`) and verify the token appears in output.
-2. **Negative prompt**: Create a forbidden file outside the sandbox (under `~/.safehouse-live-forbidden.<agent>.<rand>/secret.txt`) containing a unique secret token, ask the agent to read it, and assert:
-   - the secret token does **not** appear in output
-   - a denial token (example: `SAFEHOUSEDENIED...`) or other denial evidence appears
-
-Each prompt execution is wrapped in a hard timeout (`SAFEHOUSE_E2E_LIVE_COMMAND_TIMEOUT_SECS`, default `180`) and the whole process tree is killed if the timeout hits.
-
-### Requirements
-
-- macOS (uses `sandbox-exec`)
-- Installed agent CLIs (prefer repo-local installs, see below)
-- Provider credentials in env (at least one):
-  - `OPENAI_API_KEY`
-  - `ANTHROPIC_API_KEY`
-
-### Installing Agent CLIs (Repo-Local)
-
-Install repo-local agent binaries (Node via pnpm, plus other installers):
+Kill all lingering suite sessions:
 
 ```bash
-./tests/e2e/agents/install.sh
+tmux ls 2>/dev/null | rg '^safehouse-agent-tui-' | cut -d: -f1 | while read -r session_name; do
+  [[ -n "${session_name}" ]] || continue
+  tmux kill-session -t "${session_name}"
+done
 ```
 
-By default, the installer reuses existing repo-local agent installs when present
-(`SAFEHOUSE_E2E_REUSE_EXISTING_INSTALLS=1`). Set it to `0` to force a full reinstall:
+If a pane process survives unexpectedly, kill its full process group:
 
 ```bash
-SAFEHOUSE_E2E_REUSE_EXISTING_INSTALLS=0 ./tests/e2e/agents/install.sh
+pane_pid="$(tmux display-message -p -t <session-name> '#{pane_pid}')"
+pgid="$(ps -o pgid= -p "${pane_pid}" | tr -d '[:space:]')"
+kill -TERM -- "-${pgid}"
+sleep 1
+kill -KILL -- "-${pgid}"
 ```
-
-The live runner prefers agent binaries in:
-
-1. `tests/e2e/agents/bin/*` (downloaded/installed by the scripts in `tests/e2e/agents/*`)
-2. `tests/e2e/agents/pnpm/node_modules/.bin/*` (installed via pnpm when `SAFEHOUSE_E2E_USE_PNPM_AGENTS=1`)
-
-You can disallow using globally-installed binaries (recommended for CI):
-
-```bash
-SAFEHOUSE_E2E_ALLOW_GLOBAL_BIN=0 ./tests/e2e/live/run.sh
-```
-
-### Running Only One Agent
-
-```bash
-./tests/e2e/live/run.sh --profile goose
-```
-
-### Skips vs Failures
-
-Each live adapter returns:
-
-- `0`: pass
-- `2`: skip (missing auth/config/setup, or binary not installed)
-- other: fail
-
-In CI you typically want skips rather than red builds for agents that require extra vendor auth/login:
-
-```bash
-SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP=1 ./tests/e2e/live/run.sh
-```
-
-### Model Cost Controls
-
-Live-model defaults are centralized in:
-
-- `tests/e2e/live/model-defaults.sh`
-
-`./tests/e2e/live/run.sh` loads this file and applies defaults once for all adapters.
-This keeps cost/latency tuning in one place because live E2E checks are ping-style
-behavior checks (token echo + forbidden-read denial), not quality benchmarks.
-
-You can still override any specific adapter model via env vars:
-
-```bash
-SAFEHOUSE_E2E_AMP_MODE=smart SAFEHOUSE_E2E_CODEX_MODEL=gpt-5.2-codex ./tests/e2e/live/run.sh --profile codex
-```
-
-## Adding/Updating Live Agent Support
-
-Live testing is adapter-based:
-
-- Add an agent profile: `profiles/60-agents/<name>.sb`
-- Add a non-interactive adapter: `tests/e2e/live/adapters/<name>.sh`
-
-Adapters run the real CLI under Safehouse and must implement `run_prompt()` (see `tests/e2e/live/adapters/lib/noninteractive-common.sh`).

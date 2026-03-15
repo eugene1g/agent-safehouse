@@ -3,11 +3,11 @@
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
 ;; including DeveloperTools state and optional extension pairing storage.
 ;; Source: 65-apps/vscode-app.sb
-;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/macos-gui.sb,55-integrations-optional/electron.sb$$
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/electron.sb$$
 ;; ---------------------------------------------------------------------------
 
-;; Requires: 55-integrations-optional/macos-gui.sb   (window server, AppKit, input, accessibility)
-;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView)
+;; Requires: 55-integrations-optional/keychain.sb     (desktop auth flows)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView; transitively pulls macos-gui)
 
 (allow file-read* file-write*
     ;; Stable

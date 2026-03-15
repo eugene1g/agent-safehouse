@@ -1,10 +1,8 @@
-Generate a custom macOS `sandbox-exec` profile for me, modelled on Agent Safehouse.
+Generate a custom macOS `sandbox-exec` profile for me, modeled on Agent Safehouse.
 
-## How to do it
+## Step 1: Inspect the real references first
 
-### Step 1: Read the reference profiles
-
-Read these Agent Safehouse files to learn the deny-first SBPL structure, helper macros, comment style, and least-privilege patterns. Do NOT invent your own patterns — mirror the ones you find here:
+Read these sources before you propose any profile:
 
 - https://github.com/eugene1g/agent-safehouse/blob/main/profiles/00-base.sb
 - https://github.com/eugene1g/agent-safehouse/blob/main/profiles/10-system-runtime.sb
@@ -15,171 +13,89 @@ Read these Agent Safehouse files to learn the deny-first SBPL structure, helper 
 - https://github.com/eugene1g/agent-safehouse/tree/main/profiles/55-integrations-optional
 - https://github.com/eugene1g/agent-safehouse/tree/main/profiles/60-agents
 - https://github.com/eugene1g/agent-safehouse/tree/main/profiles/65-apps
-- https://github.com/eugene1g/agent-safehouse/blob/main/bin/lib/policy.sh
+- https://github.com/eugene1g/agent-safehouse/blob/main/bin/lib/bootstrap/source-manifest.sh
+- https://github.com/eugene1g/agent-safehouse/blob/main/bin/lib/policy/request.sh
+- https://github.com/eugene1g/agent-safehouse/blob/main/bin/lib/policy/plan.sh
+- https://github.com/eugene1g/agent-safehouse/blob/main/bin/lib/policy/render.sh
 - https://github.com/eugene1g/agent-safehouse/blob/main/bin/safehouse.sh
 
-### Step 2: Auto-detect everything you can
+Use those as style and capability guides. Mirror the least-privilege patterns you find there. Do not invent a completely different structure.
 
-Do NOT ask the user a long list of questions. Detect as much as possible automatically, then confirm your choices and ask only what you cannot figure out.
+## Step 2: Auto-detect as much as you can
 
-**Home directory** — run `echo $HOME` (or read the environment). Use the exact absolute path.
+Do not ask me a long questionnaire up front. Detect what you can first.
 
-**Installed toolchains** — check which of these exist and include only matching toolchain profiles:
+Detect:
 
-```bash
-# Node ecosystem
-command -v node npm pnpm yarn bun corepack 2>/dev/null
-# Python ecosystem
-command -v python3 python pip uv uvx 2>/dev/null
-# Compiled languages
-command -v go rustc cargo 2>/dev/null
-# Runtime managers
-command -v mise asdf volta proto 2>/dev/null
-```
+- my absolute home directory path
+- my current shell and the shell config file to edit
+- installed toolchains such as Node, Bun, Python, uv, Go, Rust, and runtime managers
+- installed agent CLIs such as Claude, Codex, Gemini, Aider, Cursor, and similar tools
+- common machine-global dotfiles such as `~/.gitconfig`, `~/.gitignore_global`, `~/.npmrc`, `~/.yarnrc.yml`
 
-Map detections to the corresponding `30-toolchains/*.sb` profiles:
-- Always include `apple-toolchain-core.sb` on macOS to cover common Apple `/usr/bin` shim targets such as `git`, `make`, and `clang`.
-- `node`/`npm`/`pnpm`/`yarn`/`corepack` → include `node.sb` contents
-- `bun` → include `bun.sb` contents
-- `python3`/`pip`/`uv` → include `python.sb` contents
-- `go` → include `go.sb` contents
-- `rustc`/`cargo` → include `rust.sb` contents
-- `mise`/`asdf`/`volta`/`proto` → include `runtime-managers.sb` contents
+Map detections to the matching Safehouse profile areas:
 
-**Installed agents** — check which agent CLIs exist and include only matching agent profiles:
+- `00-base.sb`
+- `10-system-runtime.sb`
+- `20-network.sb`
+- only the relevant `30-toolchains/*.sb`
+- `40-shared/agent-common.sb`
+- the always-on `50-integrations-core/*.sb`
+- only the needed `55` / `60` / `65` modules
 
-```bash
-command -v claude amp codex aider cursor gemini 2>/dev/null
-```
+## Step 3: Ask me one combined follow-up question
 
-Map to `60-agents/*.sb` profiles. Always include the agent profile for whichever agent is running this prompt (it is sandboxing itself).
+After detection, summarize what you found and ask one combined question that covers:
 
-**Shell** — check `basename "$SHELL"` and map it to the right config file and syntax:
-- `zsh` → `~/.zshrc`
-- `bash` → `~/.bashrc`
-- `fish` → `~/.config/fish/config.fish` with `function ... end`, `set -gx`, and `$argv` instead of POSIX shell syntax.
-If you show more than one shell variant, label the blocks explicitly as `POSIX shells (zsh/bash)` and `fish`.
+- which project directories should be read/write
+- which extra paths, if any, should be read-only
+- which paths, if any, should be explicitly denied
+- anything detected that I want removed or added
 
-**Existing dotfiles** — check which common dotfiles exist to decide read-only grants:
+Do not ask separate questions for HOME, shell, wrapper script, or toolchains unless detection failed.
 
-```bash
-ls -d ~/.gitconfig ~/.gitignore_global ~/.npmrc ~/.yarnrc.yml 2>/dev/null
-```
+## Step 4: Generate all outputs
 
-### Step 3: Ask the user ONE question
+Produce all of these in one response:
 
-After detection, present a short summary of what you found and ask one combined question:
+1. A complete `.sb` profile, default save path `~/.config/sandbox-exec/agent.sb`
+2. A small wrapper script, if useful, default save path `~/.config/sandbox-exec/run-sandboxed.sh`
+3. A clearly labeled shell snippet for my shell config
+4. A short table explaining each access grant
+5. A short verification checklist
 
-> Here is what I detected: [list toolchains, agents, dotfiles found].
-> What project directories should I grant read-write access to?
-> (Example: `~/projects`, `~/work/myapp`)
-> Anything above you want me to remove or add?
+## Requirements
 
-That is the only question. Do not ask about:
-- Home directory (you detected it)
-- Shell type (you detected it)
-- Whether to make a wrapper script (always make one)
-- Whether dotfiles should be read-only (default: yes, read-only)
-- Save path (default: `~/.config/sandbox-exec/agent.sb`)
-- Network policy (default: allow all, matching Agent Safehouse's threat model)
+- Start from deny-by-default.
+- Do not grant my whole home directory unless I explicitly ask for it.
+- Mirror Agent Safehouse's assembly order and comment style.
+- Prefer `literal`, `prefix`, and narrow `subpath` rules over broad recursive grants.
+- Keep global dotfile access minimal and explicit.
+- Separate read-only grants from read/write grants.
+- Use the HOME helper macros from `00-base.sb` for home-relative paths.
+- Use ancestor `literal` read grants for every explicit directory you allow, following Safehouse's `emit_path_ancestor_literals()` behavior.
+- Keep Docker sockets, SSH agent sockets, browser data, shell startup files, and other sensitive integrations denied unless the task clearly needs them.
+- Keep the final profile commented and easy to audit.
 
-### Step 4: Generate all outputs
+## Wrapper behavior
 
-Produce all of these in one shot:
+If you generate a wrapper script, make it behave like this:
 
-#### 4a. The `.sb` profile
+- accept an optional `--workdir=/path`
+- resolve effective workdir as: explicit flag, then `git rev-parse --show-toplevel`, then `pwd -P`
+- generate the ancestor `literal` rules for that workdir at launch time
+- generate the workdir read/write rules at launch time
+- write a temporary policy file, then run `sandbox-exec` with that file
+- clean up temporary files with `trap`
 
-Save to `~/.config/sandbox-exec/agent.sb`. Follow these rules:
+Do not invent placeholder tokens such as `__SAFEHOUSE_WORKDIR__`. Do not rely on marker-based post-processing blocks. Generate the concrete workdir rules directly when the wrapper runs.
 
-- **Structure**: mirror the Agent Safehouse assembly order:
-  1. `(version 1)`, HOME_DIR define, helper macros, `(deny default)` — from `00-base.sb`
-  2. System runtime — from `10-system-runtime.sb` (include it fully; it is the minimum viable surface)
-  3. Network — from `20-network.sb` (`(allow network*)`)
-  4. Default Apple toolchain core plus detected language toolchains — copy the relevant `30-toolchains/*.sb` file contents
-  5. Shared agent context — from `40-shared/agent-common.sb`
-  6. Core integrations — always include `git.sb`, `scm-clis.sb`, `launch-services.sb`, and `container-runtime-default-deny.sb` from `50-integrations-core/`
-  7. Agent profiles — from `60-agents/*.sb` for detected agents
-  8. Static project directory grants (from user answer)
-  9. Dynamic workdir block with `__SAFEHOUSE_WORKDIR__` token (for the wrapper script)
+## Expected outputs
 
-- **HOME_DIR**: hardcode the detected absolute home path (e.g., `(define HOME_DIR "/Users/alice")`).
-- **Matchers**: use `(literal ...)` for single files, `(subpath ...)` for directory trees, `(home-prefix ...)` for dotfile families (e.g., `.gitconfig*`). Never grant `(subpath HOME_DIR)`.
-- **Dotfiles**: grant detected dotfiles as read-only via `(allow file-read* ...)`.
-- **Comments**: use `;;` block headers with section name and source reference, and `;;` inline on each path explaining why.
-- **Ancestor literals**: for every granted project directory, emit `(allow file-read* (literal ...))` for each ancestor up to `/`, following Agent Safehouse's `emit_path_ancestor_literals()` pattern. This is required because agents call `readdir()` on parent directories.
-- **Workdir block**: wrap the dynamic workdir grants in `__WORKDIR_BLOCK_START__` / `__WORKDIR_BLOCK_END__` markers so the wrapper script can find and replace them:
+The result should usually look like this:
 
-```scheme
-;; __WORKDIR_BLOCK_START__
-(allow file-read*
-    (literal "__SAFEHOUSE_WORKDIR__")
-)
-(allow file-read* file-write*
-    (subpath "__SAFEHOUSE_WORKDIR__")
-)
-;; __WORKDIR_BLOCK_END__
-```
+- one durable machine-local profile at `~/.config/sandbox-exec/agent.sb`
+- one small wrapper that grants the current project directory
+- one shell snippet that adds shortcuts such as `safe-claude`, `safe-codex`, or `safe-cursor`
 
-#### 4b. The wrapper script
-
-Save to `~/.config/sandbox-exec/run-sandboxed.sh` and `chmod +x` it.
-
-Behavior:
-- Accept `[--workdir=/path] <command> [args...]`
-- Resolve effective workdir: explicit `--workdir` flag → `git rev-parse --show-toplevel` → `pwd -P`
-- Build ancestor `(literal ...)` rules for the resolved workdir (walk dirname up to `/`)
-- Use `sed` to replace `__SAFEHOUSE_WORKDIR__` with the resolved path in the profile
-- Inject the ancestor block before the `__WORKDIR_BLOCK_START__` marker
-- Write the assembled profile to a temp file, exec `sandbox-exec -p "$(cat $tmpfile)" "$@"`
-- Clean up temp files via `trap`
-
-Do NOT use `awk -v` with multi-line strings (it breaks). Use temp files and `sed` for injection.
-
-#### 4c. Shell aliases
-
-Append to the detected shell's config file. Create a function for each detected agent, and match the shell syntax to the detected shell. If you show both variants, label them explicitly:
-
-```bash
-# Sandbox shortcuts
-sandbox-claude() { ~/.config/sandbox-exec/run-sandboxed.sh claude "$@" }
-sandbox-codex()  { ~/.config/sandbox-exec/run-sandboxed.sh codex "$@" }
-```
-
-```fish
-# Sandbox shortcuts
-function sandbox-claude
-    ~/.config/sandbox-exec/run-sandboxed.sh claude $argv
-end
-
-function sandbox-codex
-    ~/.config/sandbox-exec/run-sandboxed.sh codex $argv
-end
-```
-
-Use `sandbox-<agent>` as the default naming convention, but if the user requests a custom prefix (e.g., `safe-`, `custom-`), use that instead.
-
-#### 4d. Explanation table
-
-Print a short markdown table summarizing each access grant, its mode (RO/RW/Denied), and which Agent Safehouse profile it came from.
-
-#### 4e. Verification checklist
-
-```
-1. Reload the shell config you edited (`source ~/.zshrc`, `source ~/.bashrc`, or `source ~/.config/fish/config.fish`)
-2. cd <project-dir> && sandbox-claude
-3. Verify: agent can read/write project files
-4. Verify: agent cannot read ~/Desktop, ~/Documents, ~/Downloads
-5. Verify: agent can run git, node/pnpm/bun (whichever detected)
-```
-
-Note: `sandbox-exec` returns exit code 65 for SBPL syntax errors and 71 for "Operation not permitted" (which means the profile parsed correctly but the calling process is already sandboxed or SIP-restricted — not a profile bug).
-
-## Key patterns to follow (from Agent Safehouse)
-
-- `(deny default)` must be the first operative rule (after version and defines).
-- `(home-subpath "/.npm")` NOT `(subpath "/Users/alice/.npm")` — always use the helper macros for home-relative paths.
-- Broad allow → narrow deny for defense-in-depth (e.g., allow `/tmp` then deny launchd Listeners inside it).
-- `10-system-runtime.sb` is large and non-obvious — include it fully rather than trying to minimise it. It is already minimal.
-- Container sockets (Docker, OrbStack, Podman, Colima, Rancher) are denied by default via `container-runtime-default-deny.sb`. Only re-open them if the user explicitly asks for Docker access.
-- Git integration (`50-integrations-core/git.sb`) grants read-only access to `~/.gitconfig*`, `~/.gitignore*`, `~/.ssh/config`, `~/.ssh/known_hosts` — but never SSH private keys.
-- Agent profiles in `60-agents/*.sb` use `home-prefix` for binary paths (e.g., `(home-prefix "/.local/bin/claude")`) to cover versioned symlinks, and `home-subpath` for state directories.
+Use the Safehouse references above to justify the structure, but output a self-contained result I can save directly.

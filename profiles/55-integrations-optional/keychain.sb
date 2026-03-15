@@ -4,7 +4,7 @@
 ;; Source: 55-integrations-optional/keychain.sb
 ;; ---------------------------------------------------------------------------
 
-;; Auto-injected when a selected app/agent profile declares $$require=55-integrations-optional/keychain.sb$$.
+;; Auto-injected when a selected app/agent profile declares Keychain as a dependency.
 
 (allow file-read* file-write*
     (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.

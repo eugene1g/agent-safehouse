@@ -2,6 +2,7 @@
 ;; Agent: GitHub Copilot CLI
 ;; GitHub Copilot CLI default state/config directory and auth integration.
 ;; Source: 60-agents/copilot-cli.sb
+;; $$command=copilot,copilot-cli$$
 ;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 

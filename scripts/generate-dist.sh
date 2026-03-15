@@ -3,27 +3,31 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+PROFILES_DIR="${ROOT_DIR}/profiles"
 
 output_dir="${ROOT_DIR}/dist"
 output_path="${output_dir}/safehouse.sh"
-policy_output_dir="${output_dir}/profiles"
-default_policy_path="${policy_output_dir}/safehouse.generated.sb"
-apps_policy_path="${policy_output_dir}/safehouse-for-apps.generated.sb"
-launcher_path="${output_dir}/Claude.app.sandboxed.command"
-launcher_offline_path="${output_dir}/Claude.app.sandboxed-offline.command"
 output_path_explicit=0
 output_dir_explicit=0
 
-GENERATOR="${ROOT_DIR}/bin/safehouse.sh"
 project_version_file="${ROOT_DIR}/VERSION"
 project_version_placeholder="__SAFEHOUSE_PROJECT_VERSION__"
-template_root=""
-template_home=""
-template_workdir=""
-static_home_placeholder="/__SAFEHOUSE_TEMPLATE_HOME__"
-static_workdir_placeholder="/__SAFEHOUSE_TEMPLATE_WORKDIR__"
+source_manifest_file="${ROOT_DIR}/bin/lib/bootstrap/source-manifest.sh"
 
 profile_files=()
+lib_source_files=()
+embedded_optional_integration_features=()
+embedded_supported_enable_features=""
+embedded_supported_enable_synthetic_features=(
+  all-agents
+  all-apps
+  wide-read
+)
+embedded_hidden_optional_integration_feature="keychain"
+generator_metadata_helpers_loaded=0
+dist_preassembled_fixed_before_home_keys=()
+dist_preassembled_fixed_after_home_keys=()
+dist_preassembled_core_integration_keys=()
 
 usage() {
   cat <<USAGE
@@ -31,19 +35,15 @@ Usage:
   $(basename "$0") [--output PATH] [--output-dir PATH]
 
 Description:
-  Generate all committed dist artifacts:
+  Generate the committed dist executable:
     - safehouse.sh (single-file executable with embedded profiles/runtime)
-    - Claude.app.sandboxed.command (single-file launcher for Claude Desktop)
-    - Claude.app.sandboxed-offline.command (single-file offline launcher for Claude Desktop)
-    - profiles/safehouse.generated.sb (default static policy)
-    - profiles/safehouse-for-apps.generated.sb (--enable=macos-gui,electron,all-agents,all-apps)
 
 Options:
   --output PATH
       Dist executable output file path (default: ${output_path})
 
   --output-dir PATH
-      Directory for launcher and static policy outputs (default: ${output_dir})
+      Directory for dist executable output (default: ${output_dir})
 
   -h, --help
       Show this help
@@ -102,6 +102,192 @@ collect_profiles() {
     cd "$ROOT_DIR"
     find profiles -type f -name '*.sb' | LC_ALL=C sort
   )
+}
+
+collect_lib_sources() {
+  SAFEHOUSE_LIB_SOURCE_MANIFEST=()
+
+  if [[ ! -f "$source_manifest_file" ]]; then
+    echo "Missing source manifest: ${source_manifest_file}" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC1091
+  # shellcheck source=bin/lib/bootstrap/source-manifest.sh
+  source "$source_manifest_file"
+  if [[ "${#SAFEHOUSE_LIB_SOURCE_MANIFEST[@]}" -eq 0 ]]; then
+    echo "Source manifest did not declare any library files: ${source_manifest_file}" >&2
+    exit 1
+  fi
+
+  lib_source_files=("${SAFEHOUSE_LIB_SOURCE_MANIFEST[@]}")
+}
+
+load_generator_metadata_helpers() {
+  local rel_path
+  local metadata_loaded=0
+
+  if [[ "$generator_metadata_helpers_loaded" -eq 1 ]]; then
+    return 0
+  fi
+
+  if [[ "${#lib_source_files[@]}" -eq 0 ]]; then
+    collect_lib_sources
+  fi
+
+  for rel_path in "${lib_source_files[@]}"; do
+    # shellcheck disable=SC1090
+    source "${ROOT_DIR}/bin/lib/${rel_path}"
+    if [[ "$rel_path" == "policy/metadata.sh" ]]; then
+      metadata_loaded=1
+      break
+    fi
+  done
+
+  if [[ "$metadata_loaded" -ne 1 ]]; then
+    echo "Source manifest does not include policy/metadata.sh: ${source_manifest_file}" >&2
+    exit 1
+  fi
+
+  generator_metadata_helpers_loaded=1
+}
+
+validate_embedded_agent_command_alias_catalog() {
+  local profile_key command_alias
+  local idx
+  local -a seen_aliases=()
+  local -a seen_profile_keys=()
+  local -a profile_aliases=()
+
+  load_generator_metadata_helpers
+
+  for profile_key in "${profile_files[@]}"; do
+    [[ "$profile_key" == profiles/60-agents/*.sb ]] || continue
+
+    profile_aliases=()
+    while IFS= read -r command_alias || [[ -n "$command_alias" ]]; do
+      [[ -n "$command_alias" ]] || continue
+
+      if [[ "${#profile_aliases[@]}" -gt 0 ]]; then
+        if safehouse_array_contains_exact "$command_alias" "${profile_aliases[@]}"; then
+          safehouse_fail "Agent profile ${profile_key} declares duplicate \$\$command alias: ${command_alias}"
+          return 1
+        fi
+      fi
+      profile_aliases+=("$command_alias")
+
+      if [[ "${#seen_aliases[@]}" -gt 0 ]]; then
+        for idx in "${!seen_aliases[@]}"; do
+          if [[ "${seen_aliases[$idx]}" == "$command_alias" ]]; then
+            safehouse_fail "Command alias ${command_alias} is declared by multiple agent profiles: ${seen_profile_keys[$idx]}, ${profile_key}"
+            return 1
+          fi
+        done
+      fi
+
+      seen_aliases+=("$command_alias")
+      seen_profile_keys+=("$profile_key")
+    done < <(policy_metadata_emit_profile_command_alias_tokens "$profile_key")
+  done
+}
+
+optional_integration_feature_from_profile_path() {
+  local rel_path="$1"
+  local feature
+
+  case "$rel_path" in
+    profiles/55-integrations-optional/*.sb)
+      feature="${rel_path##*/}"
+      feature="${feature%.sb}"
+      printf '%s\n' "$feature"
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+build_embedded_supported_enable_features_csv() {
+  local feature
+  local supported_csv=""
+  local need_separator=0
+
+  for feature in "${embedded_optional_integration_features[@]}"; do
+    if [[ "$need_separator" -eq 1 ]]; then
+      supported_csv+=", "
+    fi
+    supported_csv+="$feature"
+    need_separator=1
+  done
+
+  for feature in "${embedded_supported_enable_synthetic_features[@]}"; do
+    if [[ "$need_separator" -eq 1 ]]; then
+      supported_csv+=", "
+    fi
+    supported_csv+="$feature"
+    need_separator=1
+  done
+
+  printf '%s\n' "$supported_csv"
+}
+
+collect_embedded_feature_catalog() {
+  local rel_path feature
+
+  embedded_optional_integration_features=()
+  embedded_supported_enable_features=""
+
+  for rel_path in "${profile_files[@]}"; do
+    feature="$(optional_integration_feature_from_profile_path "$rel_path")" || continue
+    if [[ "$feature" == "$embedded_hidden_optional_integration_feature" ]]; then
+      continue
+    fi
+    embedded_optional_integration_features+=("$feature")
+  done
+
+  if [[ "${#embedded_optional_integration_features[@]}" -eq 0 ]]; then
+    echo "No user-exposed optional integration profiles found under profiles/55-integrations-optional" >&2
+    exit 1
+  fi
+
+  embedded_supported_enable_features="$(build_embedded_supported_enable_features_csv)"
+}
+
+collect_dist_preassembled_render_chunks() {
+  local rel_path
+
+  dist_preassembled_fixed_before_home_keys=()
+  dist_preassembled_fixed_after_home_keys=()
+  dist_preassembled_core_integration_keys=()
+
+  for rel_path in "${profile_files[@]}"; do
+    case "$rel_path" in
+      "profiles/10-system-runtime.sb")
+        dist_preassembled_fixed_before_home_keys+=("$rel_path")
+        ;;
+      "profiles/20-network.sb"|profiles/30-toolchains/*.sb|profiles/40-shared/*.sb)
+        dist_preassembled_fixed_after_home_keys+=("$rel_path")
+        ;;
+      profiles/50-integrations-core/*.sb)
+        dist_preassembled_core_integration_keys+=("$rel_path")
+        ;;
+    esac
+  done
+
+  if [[ "${#dist_preassembled_fixed_before_home_keys[@]}" -eq 0 ]]; then
+    echo "Dist preassembled fixed-before-home chunk is empty." >&2
+    exit 1
+  fi
+
+  if [[ "${#dist_preassembled_fixed_after_home_keys[@]}" -eq 0 ]]; then
+    echo "Dist preassembled fixed-after-home chunk is empty." >&2
+    exit 1
+  fi
+
+  if [[ "${#dist_preassembled_core_integration_keys[@]}" -eq 0 ]]; then
+    echo "Dist preassembled core-integration chunk is empty." >&2
+    exit 1
+  fi
 }
 
 count_profiles_with_prefix() {
@@ -195,18 +381,13 @@ resolve_output_paths() {
 
   output_path="$(to_abs_path "$output_path")"
   output_dir="$(to_abs_path "$output_dir")"
-  policy_output_dir="${output_dir%/}/profiles"
-  launcher_path="${output_dir%/}/Claude.app.sandboxed.command"
-  launcher_offline_path="${output_dir%/}/Claude.app.sandboxed-offline.command"
-  default_policy_path="${policy_output_dir}/safehouse.generated.sb"
-  apps_policy_path="${policy_output_dir}/safehouse-for-apps.generated.sb"
-  template_root="${output_dir%/}/agent-safehouse-static-template"
-  template_home="${template_root}/home"
-  template_workdir="${template_root}/workspace"
 }
 
-cleanup_template_root() {
-  [[ -z "${template_root:-}" ]] || rm -rf "$template_root"
+cleanup_committed_obsolete_dist_artifacts() {
+  rm -f \
+    "${ROOT_DIR}/dist/Claude.app.sandboxed.command" \
+    "${ROOT_DIR}/dist/Claude.app.sandboxed-offline.command"
+  rm -rf "${ROOT_DIR}/dist/profiles"
 }
 
 format_epoch_utc() {
@@ -281,106 +462,6 @@ set -euo pipefail
 SCRIPT
 }
 
-validate_sb_string() {
-  local value="$1"
-  local label="${2:-SBPL string}"
-
-  if [[ "$value" =~ [[:cntrl:]] ]]; then
-    echo "Invalid ${label}: contains control characters and cannot be emitted into SBPL." >&2
-    return 1
-  fi
-}
-
-escape_for_static_sb_literal() {
-  local value="$1"
-
-  validate_sb_string "$value" "policy token" || exit 1
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  printf '%s' "$value"
-}
-
-rewrite_static_policy_home_dir_literal() {
-  local policy_path="$1"
-  local tmp_policy
-
-  tmp_policy="$(mktemp "${policy_path}.XXXXXX")"
-  awk -v static_home_placeholder="$static_home_placeholder" '
-    BEGIN { replaced = 0 }
-    /^\(define HOME_DIR "/ {
-      if (replaced == 0) {
-        print "(define HOME_DIR \"" static_home_placeholder "\")"
-        replaced = 1
-        next
-      }
-    }
-    { print }
-    END {
-      if (replaced == 0) {
-        exit 64
-      }
-    }
-  ' "$policy_path" >"$tmp_policy" || {
-    rm -f "$tmp_policy"
-    echo "Failed to rewrite HOME_DIR in generated static policy: ${policy_path}" >&2
-    exit 1
-  }
-
-  mv "$tmp_policy" "$policy_path"
-}
-
-emit_static_policy_path_ancestor_literals() {
-  local path="$1"
-  local label="$2"
-
-  local trimmed cur IFS part escaped_cur
-  local -a parts=()
-
-  {
-    echo ";; Generated ancestor directory literals for ${label}: ${path}"
-    echo ";;"
-    echo ";; Why file-read* (not file-read-metadata) with literal (not subpath):"
-    echo ";; Agents (notably Claude Code) call readdir() on every ancestor of the working"
-    echo ";; directory during startup. If only file-read-metadata (stat) is granted, the"
-    echo ";; agent cannot list directory contents, which causes it to blank PATH and break."
-    echo ";; Using 'literal' (not 'subpath') keeps this safe: it grants read access to the"
-    echo ";; directory entry itself (i.e. listing its immediate children), but does NOT"
-    echo ";; grant recursive read access to files or subdirectories under it."
-    echo "(allow file-read*"
-    echo "    (literal \"/\")"
-
-    trimmed="${path#/}"
-    if [[ -n "$trimmed" ]]; then
-      cur=""
-      IFS='/'
-      read -r -a parts <<< "$trimmed"
-      for part in "${parts[@]}"; do
-        [[ -z "$part" ]] && continue
-        cur+="/${part}"
-        escaped_cur="$(escape_for_static_sb_literal "$cur")"
-        echo "    (literal \"${escaped_cur}\")"
-      done
-    fi
-
-    echo ")"
-    echo ""
-  }
-}
-
-append_static_policy_workdir_grant() {
-  local policy_path="$1"
-  local escaped_workdir
-
-  escaped_workdir="$(escape_for_static_sb_literal "$static_workdir_placeholder")"
-
-  {
-    echo ";; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir."
-    emit_static_policy_path_ancestor_literals "$static_workdir_placeholder" "selected workdir"
-    echo "(allow file-read* file-write* (subpath \"${escaped_workdir}\"))"
-    echo ""
-  } >>"$policy_path"
-}
-
 emit_array_declaration() {
   local name="$1"
   shift
@@ -391,6 +472,59 @@ emit_array_declaration() {
     printf '  "%s"\n' "$item"
   done
   printf ')\n\n'
+}
+
+emit_profile_chunk_body() {
+  local rel_path
+
+  for rel_path in "$@"; do
+    cat "${ROOT_DIR}/${rel_path}"
+    if [[ -n "$(tail -c 1 "${ROOT_DIR}/${rel_path}" 2>/dev/null || true)" ]]; then
+      echo ""
+    fi
+    echo ""
+  done
+}
+
+emit_embedded_metadata_case_branch() {
+  local rel_path="$1"
+  local emitter_name="$2"
+  local values="" value
+
+  values="$("$emitter_name" "$rel_path")"
+
+  printf '    "%s")\n' "$rel_path"
+  if [[ -n "$values" ]]; then
+    printf "      printf '%%s\\\\n'"
+    while IFS= read -r value || [[ -n "$value" ]]; do
+      printf ' "%s"' "$(escape_for_shell_double_quotes "$value")"
+    done <<< "$values"
+    printf '\n'
+  else
+    printf '      :\n'
+  fi
+  printf '      ;;\n'
+}
+
+emit_profile_requirement_tokens_for_dist() {
+  local profile_key="$1"
+
+  load_generator_metadata_helpers
+  policy_metadata_emit_profile_requirement_tokens "$profile_key"
+}
+
+emit_profile_command_alias_tokens_for_dist() {
+  local profile_key="$1"
+
+  load_generator_metadata_helpers
+  policy_metadata_emit_profile_command_alias_tokens "$profile_key"
+}
+
+emit_profile_exec_env_defaults_for_dist() {
+  local profile_key="$1"
+
+  load_generator_metadata_helpers
+  policy_metadata_emit_profile_exec_env_defaults "$profile_key"
 }
 
 emit_embedded_profiles_function() {
@@ -423,109 +557,206 @@ SCRIPT
 SCRIPT
 }
 
+emit_embedded_profile_requirements_function() {
+  local rel_path
+
+  cat <<'SCRIPT'
+policy_dist_emit_embedded_profile_requirement_tokens() {
+  case "$1" in
+SCRIPT
+
+  for rel_path in "${profile_files[@]}"; do
+    emit_embedded_metadata_case_branch "$rel_path" "emit_profile_requirement_tokens_for_dist"
+  done
+
+  cat <<'SCRIPT'
+    *)
+      return 1
+      ;;
+  esac
+}
+
+SCRIPT
+}
+
+emit_embedded_profile_command_aliases_function() {
+  local rel_path
+
+  cat <<'SCRIPT'
+policy_dist_emit_embedded_profile_command_alias_tokens() {
+  case "$1" in
+SCRIPT
+
+  for rel_path in "${profile_files[@]}"; do
+    emit_embedded_metadata_case_branch "$rel_path" "emit_profile_command_alias_tokens_for_dist"
+  done
+
+  cat <<'SCRIPT'
+    *)
+      return 1
+      ;;
+  esac
+}
+
+SCRIPT
+}
+
+emit_embedded_profile_exec_env_defaults_function() {
+  local rel_path
+
+  cat <<'SCRIPT'
+policy_dist_emit_embedded_profile_exec_env_defaults() {
+  case "$1" in
+SCRIPT
+
+  for rel_path in "${profile_files[@]}"; do
+    emit_embedded_metadata_case_branch "$rel_path" "emit_profile_exec_env_defaults_for_dist"
+  done
+
+  cat <<'SCRIPT'
+    *)
+      return 1
+      ;;
+  esac
+}
+
+SCRIPT
+}
+
+emit_preassembled_profile_chunk_function() {
+  local function_name="$1"
+  local marker="$2"
+  shift 2
+
+  cat <<SCRIPT
+${function_name}() {
+  cat <<'${marker}' >&"\$policy_render_target_fd"
+SCRIPT
+
+  emit_profile_chunk_body "$@"
+
+  cat <<SCRIPT
+${marker}
+}
+
+SCRIPT
+}
+
 emit_safehouse_globals() {
-  local project_version="$1"
-  local escaped_project_version
+  cat <<'SCRIPT'
+set -euo pipefail
 
-  escaped_project_version="$(escape_for_shell_double_quotes "$project_version")"
-
-  awk -v embedded_version="$escaped_project_version" -v placeholder="$project_version_placeholder" '
-    NR <= 2 { next }
-    /^# shellcheck source=bin\/lib\/common.sh$/ { exit }
-    $0 == "safehouse_project_version_embedded=\"" placeholder "\"" {
-      print "safehouse_project_version_embedded=\"" embedded_version "\""
-      replaced = 1
-      next
-    }
-    { print }
-    END {
-      if (replaced != 1) {
-        exit 64
-      }
-    }
-  ' "${ROOT_DIR}/bin/safehouse.sh" || {
-    echo "Failed to embed project version into dist script globals." >&2
-    exit 1
-  }
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+safehouse_invocation_path="${BASH_SOURCE[0]}"
+SCRIPT
 
   echo ""
 }
 
 emit_inlined_runtime_sources() {
-  cat "${ROOT_DIR}/bin/lib/common.sh"
-  echo ""
-  cat "${ROOT_DIR}/bin/lib/policy/10-options.sh"
-  echo ""
-  cat "${ROOT_DIR}/bin/lib/policy/20-profile-selection.sh"
-  echo ""
-  cat "${ROOT_DIR}/bin/lib/policy/30-assembly.sh"
-  echo ""
-  cat "${ROOT_DIR}/bin/lib/policy/40-generate.sh"
-  echo ""
-  cat "${ROOT_DIR}/bin/lib/cli.sh"
-  echo ""
-  cat "${ROOT_DIR}/bin/lib/update.sh"
-  echo ""
+  local project_version="$1"
+  local escaped_project_version rel_path source_path
+
+  escaped_project_version="$(escape_for_shell_double_quotes "$project_version")"
+
+  for rel_path in "${lib_source_files[@]}"; do
+    source_path="${ROOT_DIR}/bin/lib/${rel_path}"
+
+    if [[ ! -f "$source_path" ]]; then
+      echo "Missing library source file from manifest: ${source_path}" >&2
+      exit 1
+    fi
+
+    if [[ "$rel_path" == "bootstrap/constants.sh" ]]; then
+      awk -v embedded_version="$escaped_project_version" -v placeholder="$project_version_placeholder" '
+        $0 == "safehouse_project_version_embedded=\"" placeholder "\"" {
+          print "safehouse_project_version_embedded=\"" embedded_version "\""
+          replaced = 1
+          next
+        }
+        { print }
+        END {
+          if (replaced != 1) {
+            exit 64
+          }
+        }
+      ' "$source_path" || {
+        echo "Failed to embed project version into dist bootstrap constants." >&2
+        exit 1
+      }
+    else
+      cat "$source_path"
+    fi
+    echo ""
+  done
 }
 
 emit_embedded_overrides() {
+  local escaped_supported_enable_features
+
+  emit_array_declaration "policy_embedded_optional_integration_features" "${embedded_optional_integration_features[@]}"
+  escaped_supported_enable_features="$(escape_for_shell_double_quotes "$embedded_supported_enable_features")"
+  printf 'policy_embedded_supported_enable_features="%s"\n\n' "$escaped_supported_enable_features"
+  emit_embedded_profile_requirements_function
+  emit_embedded_profile_command_aliases_function
+  emit_embedded_profile_exec_env_defaults_function
+  emit_preassembled_profile_chunk_function \
+    "policy_dist_append_preassembled_fixed_before_home" \
+    "__SAFEHOUSE_PREASSEMBLED_FIXED_BEFORE_HOME__" \
+    "${dist_preassembled_fixed_before_home_keys[@]}"
+  emit_preassembled_profile_chunk_function \
+    "policy_dist_append_preassembled_fixed_after_home" \
+    "__SAFEHOUSE_PREASSEMBLED_FIXED_AFTER_HOME__" \
+    "${dist_preassembled_fixed_after_home_keys[@]}"
+  emit_preassembled_profile_chunk_function \
+    "policy_dist_append_preassembled_core_integrations" \
+    "__SAFEHOUSE_PREASSEMBLED_CORE_INTEGRATIONS__" \
+    "${dist_preassembled_core_integration_keys[@]}"
+
   cat <<'SCRIPT'
-profile_key_from_source() {
+policy_source_normalize_profile_key() {
   local source="$1"
 
   if [[ "$source" == profiles/* ]]; then
     printf '%s\n' "$source"
-    return
+    return 0
   fi
 
   if [[ -n "${PROFILES_DIR:-}" && "$source" == "${PROFILES_DIR}/"* ]]; then
     printf 'profiles/%s\n' "${source#"${PROFILES_DIR}/"}"
-    return
+    return 0
   fi
 
   printf '%s\n' "$source"
 }
 
-emit_profile_lines() {
-  local profile_path="$1"
-  local profile_key
-
-  profile_key="$(profile_key_from_source "$profile_path")"
-
-  if embedded_profile_body "$profile_key" >/dev/null 2>&1; then
-    embedded_profile_body "$profile_key"
-    return 0
-  fi
-
-  [[ -f "$profile_path" ]] || return 1
-  cat "$profile_path"
-}
-
-collect_sorted_profile_paths_in_dir() {
-  local base_dir="$1"
-  local profile_prefix=""
+policy_source_collect_sorted_profile_keys_in_dir() {
+  local target_array_name="$1"
+  local base_dir="$2"
+  local profile_key_prefix=""
   local key
 
-  sorted_profile_paths_buffer=()
+  safehouse_array_clear "$target_array_name"
 
   case "$base_dir" in
     "${PROFILES_DIR}/30-toolchains"|"profiles/30-toolchains")
-      profile_prefix="profiles/30-toolchains/"
+      profile_key_prefix="profiles/30-toolchains/"
       ;;
     "${PROFILES_DIR}/40-shared"|"profiles/40-shared")
-      profile_prefix="profiles/40-shared/"
+      profile_key_prefix="profiles/40-shared/"
       ;;
     "${PROFILES_DIR}/50-integrations-core"|"profiles/50-integrations-core")
-      profile_prefix="profiles/50-integrations-core/"
+      profile_key_prefix="profiles/50-integrations-core/"
       ;;
     "${PROFILES_DIR}/55-integrations-optional"|"profiles/55-integrations-optional")
-      profile_prefix="profiles/55-integrations-optional/"
+      profile_key_prefix="profiles/55-integrations-optional/"
       ;;
     "${PROFILES_DIR}/60-agents"|"profiles/60-agents")
-      profile_prefix="profiles/60-agents/"
+      profile_key_prefix="profiles/60-agents/"
       ;;
     "${PROFILES_DIR}/65-apps"|"profiles/65-apps")
-      profile_prefix="profiles/65-apps/"
+      profile_key_prefix="profiles/65-apps/"
       ;;
     *)
       return 0
@@ -533,120 +764,122 @@ collect_sorted_profile_paths_in_dir() {
   esac
 
   for key in "${PROFILE_KEYS[@]}"; do
-    [[ "$key" == "${profile_prefix}"* ]] || continue
-    sorted_profile_paths_buffer+=("$key")
+    [[ "$key" == "${profile_key_prefix}"* ]] || continue
+    safehouse_array_append "$target_array_name" "$key"
   done
 }
 
-resolve_agent_app_profile_paths() {
-  if [[ "$agent_app_profile_paths_resolved" -eq 1 ]]; then
-    return 0
+policy_source_read_profile_content() {
+  local profile_key="$1"
+  local normalized_key profile_path
+
+  normalized_key="$(policy_source_normalize_profile_key "$profile_key")"
+  if [[ "$normalized_key" == profiles/* ]]; then
+    if embedded_profile_body "$normalized_key"; then
+      return 0
+    fi
   fi
 
-  collect_sorted_profile_paths_in_dir "${PROFILES_DIR}/60-agents"
-  agent_profile_paths=("${sorted_profile_paths_buffer[@]-}")
-  collect_sorted_profile_paths_in_dir "${PROFILES_DIR}/65-apps"
-  app_profile_paths=("${sorted_profile_paths_buffer[@]-}")
-  agent_app_profile_paths_resolved=1
-}
-
-resolve_optional_integration_profile_paths() {
-  if [[ "$optional_integration_profile_paths_resolved" -eq 1 ]]; then
-    return 0
+  profile_path="$profile_key"
+  if [[ "$normalized_key" == "$profile_key" && "$profile_key" == profiles/* ]]; then
+    profile_path="${ROOT_DIR}/${profile_key}"
   fi
 
-  collect_sorted_profile_paths_in_dir "${PROFILES_DIR}/55-integrations-optional"
-  optional_integration_profile_paths=("${sorted_profile_paths_buffer[@]-}")
-  optional_integration_profile_paths_resolved=1
+  [[ -f "$profile_path" ]] || return 1
+  cat "$profile_path"
 }
 
-append_profile_requirement_tokens_to_cache() {
-  local profile_path="$1"
-  local target="$2"
-  local profile_content=""
+policy_dist_emit_profile_requirement_tokens_from_content() {
+  local profile_key="$1"
   local line raw_requirements
 
-  profile_content="$(emit_profile_lines "$profile_path" 2>/dev/null || true)"
-  [[ -n "$profile_content" ]] || return 0
-
   while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" == *'$$require='*'$$'* ]] || continue
-    raw_requirements="${line#*\$\$require=}"
-    raw_requirements="${raw_requirements%%\$\$*}"
-    raw_requirements="$(trim_whitespace "$raw_requirements")"
+    raw_requirements="$(policy_metadata_extract_requirement_csv_from_line "$line")"
     [[ -n "$raw_requirements" ]] || continue
-    append_requirement_tokens_from_csv "$raw_requirements" "$target"
-  done <<< "$profile_content"
+    policy_metadata_emit_requirement_tokens_from_csv "$raw_requirements"
+  done < <(policy_source_read_profile_content "$profile_key")
 }
 
-append_profile() {
-  local target="$1"
-  local source="$2"
-  local key content
-
-  key="$(profile_key_from_source "$source")"
-  if content="$(embedded_profile_body "$key" 2>/dev/null)"; then
-    append_policy_chunk "$content"
-    append_policy_chunk ""
-    return
-  fi
-
-  # Fallback: read from disk (needed for --append-profile with external files).
-  if [[ -f "$source" ]]; then
-    content="$(<"$source")"
-    append_policy_chunk "$content"
-    append_policy_chunk ""
-    return
-  fi
-
-  echo "Missing profile module: ${source}" >&2
-  exit 1
-}
-
-append_resolved_base_profile() {
-  local target="$1"
-  local source="$2"
-  local escaped_home key resolved_base
-  local first_line rest
-
-  escaped_home="$(escape_for_sb "$home_dir")"
-  key="$(profile_key_from_source "$source")"
-  if ! resolved_base="$(embedded_profile_body "$key" | replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home")"; then
-    echo "Failed to resolve HOME_DIR placeholder in base profile: ${source}" >&2
-    echo "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" >&2
-    exit 1
-  fi
-
-  first_line="${resolved_base%%$'\n'*}"
-  if [[ "$resolved_base" == *$'\n'* ]]; then
-    rest="${resolved_base#*$'\n'}"
-  else
-    rest=""
-  fi
-
-  append_policy_chunk "$first_line"
-  append_policy_chunk ""
-  emit_policy_origin_preamble "$target"
-  append_policy_chunk "$rest"
-  append_policy_chunk ""
-}
-
-append_profile_runtime_env_defaults_from_file() {
-  local profile_path="$1"
-  local profile_content=""
-  local line metadata_entry
-
-  profile_content="$(emit_profile_lines "$profile_path" 2>/dev/null || true)"
-  [[ -n "$profile_content" ]] || return 0
+policy_dist_emit_profile_command_alias_tokens_from_content() {
+  local profile_key="$1"
+  local line raw_command_aliases
+  local found_metadata=0
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" == *'$$exec-env-default='*'$$'* ]] || continue
-    metadata_entry="${line#*\$\$exec-env-default=}"
-    metadata_entry="${metadata_entry%%\$\$*}"
-    metadata_entry="$(trim_whitespace "$metadata_entry")"
-    [[ -n "$metadata_entry" ]] || continue
-    append_profile_runtime_env_default "$metadata_entry" "$profile_path"
-  done <<< "$profile_content"
+    raw_command_aliases="$(policy_metadata_extract_command_alias_csv_from_line "$line")"
+    [[ -n "$raw_command_aliases" ]] || continue
+    found_metadata=1
+    policy_metadata_emit_command_alias_tokens_from_csv "$raw_command_aliases"
+  done < <(policy_source_read_profile_content "$profile_key")
+
+  if [[ "$found_metadata" -eq 0 ]]; then
+    policy_metadata_default_command_alias_from_profile_key "$profile_key"
+  fi
+}
+
+policy_dist_emit_profile_exec_env_defaults_from_content() {
+  local profile_key="$1"
+  local line raw_entry normalized_entry
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    raw_entry="$(policy_metadata_extract_exec_env_default_entry_from_line "$line")"
+    [[ -n "$raw_entry" ]] || continue
+    normalized_entry="$(policy_metadata_normalize_exec_env_default_entry "$raw_entry" "$profile_key")" || return 1
+    printf '%s\n' "$normalized_entry"
+  done < <(policy_source_read_profile_content "$profile_key")
+}
+
+policy_metadata_emit_profile_requirement_tokens() {
+  local profile_key="$1"
+  local normalized_key
+
+  normalized_key="$(policy_source_normalize_profile_key "$profile_key")"
+  if policy_dist_emit_embedded_profile_requirement_tokens "$normalized_key"; then
+    return 0
+  fi
+
+  policy_dist_emit_profile_requirement_tokens_from_content "$profile_key"
+}
+
+policy_metadata_emit_profile_command_alias_tokens() {
+  local profile_key="$1"
+  local normalized_key
+
+  normalized_key="$(policy_source_normalize_profile_key "$profile_key")"
+  if policy_dist_emit_embedded_profile_command_alias_tokens "$normalized_key"; then
+    return 0
+  fi
+
+  policy_dist_emit_profile_command_alias_tokens_from_content "$profile_key"
+}
+
+policy_metadata_emit_profile_exec_env_defaults() {
+  local profile_key="$1"
+  local normalized_key
+
+  normalized_key="$(policy_source_normalize_profile_key "$profile_key")"
+  if policy_dist_emit_embedded_profile_exec_env_defaults "$normalized_key"; then
+    return 0
+  fi
+
+  policy_dist_emit_profile_exec_env_defaults_from_content "$profile_key"
+}
+
+policy_selection_validate_agent_command_alias_catalog() {
+  return 0
+}
+
+policy_render_emit_fixed_sections() {
+  policy_render_append_resolved_base_profile "profiles/00-base.sb" || return 1
+  policy_dist_append_preassembled_fixed_before_home || return 1
+  policy_render_emit_home_ancestor_metadata_access || return 1
+  policy_dist_append_preassembled_fixed_after_home || return 1
+}
+
+policy_render_emit_integration_sections() {
+  policy_render_emit_integration_preamble
+  policy_dist_append_preassembled_core_integrations || return 1
+  policy_render_append_optional_profiles || return 1
 }
 
 SCRIPT
@@ -660,7 +893,7 @@ emit_dist_script_body() {
   emit_array_declaration "PROFILE_KEYS" "${profile_files[@]}"
   emit_embedded_profiles_function
   emit_safehouse_globals "$project_version"
-  emit_inlined_runtime_sources
+  emit_inlined_runtime_sources "$project_version"
   emit_embedded_overrides
 }
 
@@ -682,469 +915,12 @@ write_dist_script() {
 
   {
     emit_dist_script_body "$embedded_profiles_last_modified_utc" "$project_version"
-    echo 'main "$@"'
+    echo 'safehouse_main "$@"'
     emit_self_update_validation_marker
   } >"$tmp_output"
 
   chmod 0755 "$tmp_output"
   mv "$tmp_output" "$target_path"
-}
-
-write_claude_launcher() {
-  local target_path="$1"
-  local tmp_output
-
-  mkdir -p "$(dirname "$target_path")"
-  tmp_output="$(mktemp "${target_path}.XXXXXX")"
-
-  {
-    cat <<'SCRIPT'
-#!/usr/bin/env bash
-# ---------------------------------------------------------------------------
-# Agent Safehouse Claude Desktop Launcher (generated file)
-# Purpose: Launch Claude Desktop sandboxed to this file's directory.
-#          Fetch latest apps policy from GitHub at runtime.
-# Project: https://agent-safehouse.dev
-# Generated by: scripts/generate-dist.sh
-# ---------------------------------------------------------------------------
-set -euo pipefail
-
-claude_desktop_binary="/Applications/Claude.app/Contents/MacOS/Claude"
-default_policy_url="https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/profiles/safehouse-for-apps.generated.sb"
-project_url="https://agent-safehouse.dev"
-
-validate_sb_string() {
-  local value="$1"
-  local label="${2:-SBPL string}"
-
-  if [[ "$value" =~ [[:cntrl:]] ]]; then
-    echo "Invalid ${label}: contains control characters and cannot be emitted into SBPL." >&2
-    exit 1
-  fi
-}
-
-escape_for_sb() {
-  local value="$1"
-
-  validate_sb_string "$value" "policy token" || exit 1
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  printf '%s' "$value"
-}
-
-policy_checksum_256() {
-  local path="$1"
-
-  if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$path" | awk '{print $1}'
-    return 0
-  fi
-
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$path" | awk '{print $1}'
-    return 0
-  fi
-
-  if command -v openssl >/dev/null 2>&1; then
-    openssl dgst -sha256 "$path" | awk '{print $NF}'
-    return 0
-  fi
-
-  return 1
-}
-
-policy_checksum_matches() {
-  local policy_path="$1"
-  local expected="$2"
-  local actual
-
-  actual="$(policy_checksum_256 "$policy_path")" || return 1
-
-  [[ "$actual" == "$expected" ]]
-}
-
-replace_literal_stream() {
-  local from="$1"
-  local to="$2"
-
-  awk -v from="$from" -v to="$to" '
-    {
-      if (from == "") {
-        print $0
-        next
-      }
-
-      line = $0
-      out = ""
-      from_len = length(from)
-      while ((idx = index(line, from)) > 0) {
-        out = out substr(line, 1, idx - 1) to
-        line = substr(line, idx + from_len)
-      }
-
-      print out line
-    }
-  '
-}
-
-fetch_remote_policy() {
-  local url="$1"
-  local output_path="$2"
-
-  if command -v curl >/dev/null 2>&1; then
-    if curl -fsSL --connect-timeout 10 --retry 2 --retry-delay 1 "$url" -o "$output_path"; then
-      return 0
-    fi
-  fi
-
-  if command -v wget >/dev/null 2>&1; then
-    if wget -q -O "$output_path" "$url"; then
-      return 0
-    fi
-  fi
-
-  return 1
-}
-
-policy_template_looks_valid() {
-  local policy_candidate="$1"
-
-  [[ -f "$policy_candidate" ]] || return 1
-  grep -Fq "(version 1)" "$policy_candidate" || return 1
-  grep -Fq "(define HOME_DIR \"" "$policy_candidate" || return 1
-  grep -Fq "#safehouse-test-id:electron-integration#" "$policy_candidate" || return 1
-
-  return 0
-}
-
-emit_path_ancestor_literals() {
-  local path_value="$1"
-  local current="$path_value"
-  local escaped
-  local -a ancestors=()
-
-  while true; do
-    ancestors+=("$current")
-    [[ "$current" == "/" ]] && break
-    current="$(dirname "$current")"
-  done
-
-  local idx
-  for ((idx=${#ancestors[@]} - 1; idx>=0; idx--)); do
-    escaped="$(escape_for_sb "${ancestors[$idx]}")"
-    printf '    (literal "%s")\n' "$escaped"
-  done
-}
-
-main() {
-  local home_dir launcher_workdir escaped_home escaped_workdir policy_source_path policy_path
-  local remote_policy_url template_home_path policy_expected_sha256
-
-  if [[ ! -x "$claude_desktop_binary" ]]; then
-    echo "Claude Desktop binary not found at ${claude_desktop_binary}" >&2
-    exit 1
-  fi
-
-  if ! command -v sandbox-exec >/dev/null 2>&1; then
-    echo "sandbox-exec is required but was not found in PATH" >&2
-    exit 1
-  fi
-
-  home_dir="${HOME:-}"
-  if [[ -z "$home_dir" || ! -d "$home_dir" ]]; then
-    echo "HOME must be set to an existing directory" >&2
-    exit 1
-  fi
-
-  launcher_workdir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-  escaped_home="$(escape_for_sb "$home_dir")"
-  escaped_workdir="$(escape_for_sb "$launcher_workdir")"
-  policy_source_path="$(mktemp "/tmp/claude-safehouse-source-policy.XXXXXX")"
-  policy_path="$(mktemp "/tmp/claude-safehouse-policy.XXXXXX")"
-
-  cleanup_policy() {
-    rm -f "$policy_source_path" "$policy_path"
-  }
-  trap cleanup_policy EXIT
-
-  remote_policy_url="${SAFEHOUSE_CLAUDE_POLICY_URL:-$default_policy_url}"
-  validate_sb_string "$remote_policy_url" "policy URL" || exit 1
-  policy_expected_sha256="${SAFEHOUSE_CLAUDE_POLICY_SHA256:-}"
-  if [[ -n "$policy_expected_sha256" ]]; then
-    validate_sb_string "$policy_expected_sha256" "policy SHA-256" || exit 1
-  fi
-
-  if ! fetch_remote_policy "$remote_policy_url" "$policy_source_path"; then
-    echo "Failed to download sandbox policy from ${remote_policy_url}" >&2
-    echo "Install curl or wget, or set SAFEHOUSE_CLAUDE_POLICY_URL to a reachable policy URL." >&2
-    echo "Help: ${project_url}" >&2
-    exit 1
-  fi
-  if ! policy_template_looks_valid "$policy_source_path"; then
-    echo "Downloaded policy is invalid: ${remote_policy_url}" >&2
-    echo "Help: ${project_url}" >&2
-    exit 1
-  fi
-
-  if [[ -n "$policy_expected_sha256" ]]; then
-    if ! policy_checksum_matches "$policy_source_path" "$policy_expected_sha256"; then
-      echo "Downloaded policy SHA-256 does not match SAFEHOUSE_CLAUDE_POLICY_SHA256." >&2
-      echo "Expected: ${policy_expected_sha256}" >&2
-      echo "Could not verify: install one of shasum/sha256sum/openssl." >&2
-      exit 1
-    fi
-  fi
-
-  template_home_path="$(awk -F'"' '/^\(define HOME_DIR "/ { print $2; exit }' "$policy_source_path")"
-  if [[ -z "${template_home_path:-}" ]]; then
-    echo "Failed to parse HOME_DIR from launcher policy source (${remote_policy_url})" >&2
-    exit 1
-  fi
-
-  {
-    replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<POLICY
-
-;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}
-;; Why file-read* (not file-read-metadata) with literal (not subpath):
-;; Agents (notably Claude Code) call readdir() on every ancestor of the working
-;; directory to discover project structure. file-read-metadata on the leaf is not
-;; enough; each ancestor directory itself must be traversable. literal confines
-;; access to the directory entry only (no recursion), so this does not grant
-;; recursive read access to files or subdirectories under it.
-(allow file-read*
-$(emit_path_ancestor_literals "$launcher_workdir")
-)
-
-(allow file-read* file-write* (subpath "$escaped_workdir"))
-POLICY
-  } > "$policy_path"
-
-  cd "$launcher_workdir"
-  sandbox-exec -f "$policy_path" -- "$claude_desktop_binary" --no-sandbox "$@"
-}
-
-main "$@"
-SCRIPT
-  } >"$tmp_output"
-
-  chmod 0755 "$tmp_output"
-  mv "$tmp_output" "$target_path"
-}
-
-write_claude_offline_launcher() {
-  local target_path="$1"
-  local embedded_policy_source="$2"
-  local tmp_output
-
-  if [[ ! -f "$embedded_policy_source" ]]; then
-    echo "Embedded launcher policy source is missing: ${embedded_policy_source}" >&2
-    exit 1
-  fi
-
-  mkdir -p "$(dirname "$target_path")"
-  tmp_output="$(mktemp "${target_path}.XXXXXX")"
-
-  {
-    cat <<'SCRIPT'
-#!/usr/bin/env bash
-# ---------------------------------------------------------------------------
-# Agent Safehouse Claude Desktop Offline Launcher (generated file)
-# Purpose: Launch Claude Desktop sandboxed to this file's directory.
-#          Uses an embedded apps policy (no runtime download required).
-# Project: https://agent-safehouse.dev
-# Generated by: scripts/generate-dist.sh
-# ---------------------------------------------------------------------------
-set -euo pipefail
-
-claude_desktop_binary="/Applications/Claude.app/Contents/MacOS/Claude"
-project_url="https://agent-safehouse.dev"
-
-validate_sb_string() {
-  local value="$1"
-  local label="${2:-SBPL string}"
-
-  if [[ "$value" =~ [[:cntrl:]] ]]; then
-    echo "Invalid ${label}: contains control characters and cannot be emitted into SBPL." >&2
-    exit 1
-  fi
-}
-
-escape_for_sb() {
-  local value="$1"
-
-  validate_sb_string "$value" "policy token" || exit 1
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  printf '%s' "$value"
-}
-
-replace_literal_stream() {
-  local from="$1"
-  local to="$2"
-
-  awk -v from="$from" -v to="$to" '
-    {
-      if (from == "") {
-        print $0
-        next
-      }
-
-      line = $0
-      out = ""
-      from_len = length(from)
-      while ((idx = index(line, from)) > 0) {
-        out = out substr(line, 1, idx - 1) to
-        line = substr(line, idx + from_len)
-      }
-
-      print out line
-    }
-  '
-}
-
-policy_template_looks_valid() {
-  local policy_candidate="$1"
-
-  [[ -f "$policy_candidate" ]] || return 1
-  grep -Fq "(version 1)" "$policy_candidate" || return 1
-  grep -Fq "(define HOME_DIR \"" "$policy_candidate" || return 1
-  grep -Fq "#safehouse-test-id:electron-integration#" "$policy_candidate" || return 1
-
-  return 0
-}
-
-emit_embedded_policy_template() {
-  cat <<'SAFEHOUSE_EMBEDDED_APPS_POLICY'
-SCRIPT
-    cat "$embedded_policy_source"
-    if [[ -n "$(tail -c 1 "$embedded_policy_source" 2>/dev/null || true)" ]]; then
-      echo ""
-    fi
-    cat <<'SCRIPT'
-SAFEHOUSE_EMBEDDED_APPS_POLICY
-}
-
-emit_path_ancestor_literals() {
-  local path_value="$1"
-  local current="$path_value"
-  local escaped
-  local -a ancestors=()
-
-  while true; do
-    ancestors+=("$current")
-    [[ "$current" == "/" ]] && break
-    current="$(dirname "$current")"
-  done
-
-  local idx
-  for ((idx=${#ancestors[@]} - 1; idx>=0; idx--)); do
-    escaped="$(escape_for_sb "${ancestors[$idx]}")"
-    printf '    (literal "%s")\n' "$escaped"
-  done
-}
-
-main() {
-  local home_dir launcher_workdir escaped_home escaped_workdir policy_source_path policy_path
-  local template_home_path
-
-  if [[ ! -x "$claude_desktop_binary" ]]; then
-    echo "Claude Desktop binary not found at ${claude_desktop_binary}" >&2
-    exit 1
-  fi
-
-  if ! command -v sandbox-exec >/dev/null 2>&1; then
-    echo "sandbox-exec is required but was not found in PATH" >&2
-    exit 1
-  fi
-
-  home_dir="${HOME:-}"
-  if [[ -z "$home_dir" || ! -d "$home_dir" ]]; then
-    echo "HOME must be set to an existing directory" >&2
-    exit 1
-  fi
-
-  launcher_workdir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-  escaped_home="$(escape_for_sb "$home_dir")"
-  escaped_workdir="$(escape_for_sb "$launcher_workdir")"
-  policy_source_path="$(mktemp "/tmp/claude-safehouse-source-policy.XXXXXX")"
-  policy_path="$(mktemp "/tmp/claude-safehouse-policy.XXXXXX")"
-
-  cleanup_policy() {
-    rm -f "$policy_source_path" "$policy_path"
-  }
-  trap cleanup_policy EXIT
-
-  emit_embedded_policy_template > "$policy_source_path"
-  if ! policy_template_looks_valid "$policy_source_path"; then
-    echo "Embedded launcher policy template is invalid." >&2
-    echo "Download a fresh launcher from ${project_url}" >&2
-    echo "Help: ${project_url}" >&2
-    exit 1
-  fi
-
-  template_home_path="$(awk -F'"' '/^\(define HOME_DIR \"/ { print $2; exit }' "$policy_source_path")"
-  if [[ -z "${template_home_path:-}" ]]; then
-    echo "Failed to parse HOME_DIR from embedded launcher policy template" >&2
-    echo "Help: ${project_url}" >&2
-    exit 1
-  fi
-
-  {
-    replace_literal_stream "$template_home_path" "$escaped_home" < "$policy_source_path"
-    cat <<POLICY
-
-;; #safehouse-test-id:workdir-grant# Allow read/write access to the selected workdir.
-;; Generated ancestor directory literals for selected workdir: ${launcher_workdir}
-;; Why file-read* (not file-read-metadata) with literal (not subpath):
-;; Agents (notably Claude Code) call readdir() on every ancestor of the working
-;; directory to discover project structure. file-read-metadata on the leaf is not
-;; enough; each ancestor directory itself must be traversable. literal confines
-;; access to the directory entry only (no recursion), so this does not grant
-;; recursive read access to files or subdirectories under it.
-(allow file-read*
-$(emit_path_ancestor_literals "$launcher_workdir")
-)
-
-(allow file-read* file-write* (subpath "$escaped_workdir"))
-POLICY
-  } > "$policy_path"
-
-  cd "$launcher_workdir"
-  sandbox-exec -f "$policy_path" -- "$claude_desktop_binary" --no-sandbox "$@"
-}
-
-main "$@"
-SCRIPT
-  } >"$tmp_output"
-
-  chmod 0755 "$tmp_output"
-  mv "$tmp_output" "$target_path"
-}
-
-generate_static_policy_files() {
-  if [[ ! -x "$GENERATOR" ]]; then
-    echo "Policy generator is missing or not executable: ${GENERATOR}" >&2
-    exit 1
-  fi
-
-  rm -rf "$template_root"
-  mkdir -p "$output_dir" "$policy_output_dir" "$template_home" "$template_workdir"
-
-  (
-    cd "$template_workdir"
-    HOME="$template_home" "$GENERATOR" --enable=all-agents --workdir="" --output "$default_policy_path" >/dev/null
-    HOME="$template_home" "$GENERATOR" --enable=macos-gui,electron,all-agents,all-apps --workdir="" --output "$apps_policy_path" >/dev/null
-  )
-
-  rewrite_static_policy_home_dir_literal "$default_policy_path"
-  rewrite_static_policy_home_dir_literal "$apps_policy_path"
-
-  append_static_policy_workdir_grant "$default_policy_path"
-  append_static_policy_workdir_grant "$apps_policy_path"
-
-  chmod 0644 "$default_policy_path" "$apps_policy_path"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -1190,22 +966,18 @@ while [[ $# -gt 0 ]]; do
 done
 
 resolve_output_paths
-trap cleanup_template_root EXIT
 
 collect_profiles
+collect_lib_sources
 validate_profiles
+collect_embedded_feature_catalog
+collect_dist_preassembled_render_chunks
+validate_embedded_agent_command_alias_catalog
 
 project_version="$(read_project_version)"
 embedded_profiles_last_modified_utc="$(resolve_embedded_profiles_last_modified_utc)"
 
 write_dist_script "$output_path" "$embedded_profiles_last_modified_utc" "$project_version"
-write_claude_launcher "$launcher_path"
-
-generate_static_policy_files
-write_claude_offline_launcher "$launcher_offline_path" "$apps_policy_path"
+cleanup_committed_obsolete_dist_artifacts
 
 printf '%s\n' "$output_path"
-printf '%s\n' "$launcher_path"
-printf '%s\n' "$launcher_offline_path"
-printf '%s\n' "$default_policy_path"
-printf '%s\n' "$apps_policy_path"

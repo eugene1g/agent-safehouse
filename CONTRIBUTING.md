@@ -8,7 +8,9 @@ Agent Safehouse is a macOS sandbox toolkit for LLM coding agents built with Bash
 
 - `bin/` and `bin/lib/`: runtime CLI and policy assembly logic.
 - `profiles/`: authored policy modules (`.sb`), organized by numeric stage.
-- `tests/`: policy behavior tests and helpers.
+- `tests/policy/`: primary policy and runtime contract suite.
+- `tests/surface/`: CLI and packaged-artifact contract suite.
+- `tests/e2e/`: tmux-driven startup/readiness and prompt-roundtrip checks for agent TUIs.
 - `scripts/generate-dist.sh`: deterministic packaging pipeline.
 - `dist/`: generated distribution artifacts for consumers (not source of truth).
 
@@ -109,8 +111,11 @@ Starter snippets (copy/paste and adapt paths/names):
 ## Local Validation
 
 ```bash
-# Run policy tests (macOS only; must be outside an existing sandbox)
+# Run the default non-E2E suites (macOS only; must be outside an existing sandbox)
 ./tests/run.sh
+
+# Run only the tmux-driven E2E suite
+./tests/run.sh e2e
 
 # Regenerate deterministic dist artifacts (required after profile/runtime changes)
 ./scripts/generate-dist.sh
@@ -155,22 +160,24 @@ Use `/usr/bin/log` to watch denial events:
   - Run `./scripts/generate-dist.sh`.
   - Include regenerated `dist/` files in the same PR.
 - If you changed tests only:
-  - Run `./tests/run.sh`.
+  - Run `./tests/run.sh` and/or `./tests/run.sh e2e`, depending on the suite you touched.
 - If you changed docs only:
   - No dist regeneration needed.
 
 ## Adding Tests
 
-- Add behavior tests under `tests/sections/*.sh`.
-- Use existing helpers in `tests/lib/common.sh` (`assert_allowed`, `assert_denied`, `assert_policy_contains`, `assert_policy_order_literal`, etc.).
-- Register the section function with `register_section`.
-- Prefer precise tests for ordering and policy-shape regressions when changing assembly logic or module dependencies.
+- Add tests under `tests/policy/<topic>/*.bats`, `tests/surface/<topic>/*.bats`, or `tests/e2e/*.bats`.
+- Load the shared helper from nested policy/surface folders with `load ../../test_helper.bash`.
+- E2E files should `load ../test_helper.bash`, then `load tmux_utils.bash`, then `load agent_tui_harness.bash`.
+- Prefer Bats built-ins (`run`, `skip`) plus the small helper layer in `tests/test_helper.bash`.
+- Keep tests dist-first: validate the packaged entrypoint and generated policy/runtime contracts rather than sourced shell internals.
+- Prefer precise tests for security boundaries, dependency injection, and the few order-sensitive invariants that affect semantics.
 
 ## Pull Request Checklist
 
 - Explain what changed and why.
 - Describe security/least-privilege impact (especially for new allow rules).
-- Include test evidence (`./tests/run.sh`) or clearly state why tests were not runnable.
+- Include test evidence (`./tests/run.sh` and/or `./tests/run.sh e2e`) or clearly state why tests were not runnable.
 - Confirm whether `dist/` was regenerated and committed (when required).
 - If preparing a release, confirm `CHANGELOG.md` has a matching SemVer section for the tag.
 

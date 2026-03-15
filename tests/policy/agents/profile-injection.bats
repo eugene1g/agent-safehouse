@@ -1,0 +1,46 @@
+#!/usr/bin/env bats
+# bats file_tags=suite:policy
+#
+# Agent profile injection.
+# Verifies that agent commands auto-inject their required integration
+# profiles (keychain, browser-native-messaging) via $$require=$$ metadata.
+#
+load ../../test_helper.bash
+
+@test "[POLICY-ONLY] claude command auto-injects keychain profile" { # https://github.com/eugene1g/agent-safehouse/issues/5
+  local profile
+  profile="$(safehouse_profile -- claude)"
+
+  sft_assert_includes_source "$profile" "55-integrations-optional/keychain.sb"
+}
+
+@test "[POLICY-ONLY] copilot command auto-injects keychain profile" { # https://github.com/eugene1g/agent-safehouse/issues/5
+  local profile
+  profile="$(safehouse_profile -- copilot)"
+
+  sft_assert_includes_source "$profile" "55-integrations-optional/keychain.sb"
+}
+
+@test "[POLICY-ONLY] claude command auto-injects browser-native-messaging profile" { # https://github.com/eugene1g/agent-safehouse/issues/16
+  local profile
+  profile="$(safehouse_profile -- claude)"
+
+  sft_assert_includes_source "$profile" "55-integrations-optional/browser-native-messaging.sb"
+}
+
+@test "[POLICY-ONLY] kilo command auto-injects keychain profile" {
+  local profile
+  profile="$(safehouse_profile -- kilo)"
+
+  sft_assert_includes_source "$profile" "55-integrations-optional/keychain.sb"
+}
+
+@test "[POLICY-ONLY] selected agent commands include their own scoped agent profile source" {
+  local claude_profile copilot_profile
+
+  claude_profile="$(safehouse_profile -- claude)"
+  copilot_profile="$(safehouse_profile -- copilot)"
+
+  sft_assert_includes_source "$claude_profile" "60-agents/claude-code.sb"
+  sft_assert_includes_source "$copilot_profile" "60-agents/copilot-cli.sb"
+}

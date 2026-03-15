@@ -2,6 +2,7 @@
 ;; Agent: Kilo Code
 ;; Kilo Code CLI binary, state, and config paths.
 ;; Source: 60-agents/kilo-code.sb
+;; $$command=kilo,kilocode,kilo-code$$
 ;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
 

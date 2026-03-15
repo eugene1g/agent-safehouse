@@ -1,48 +1,35 @@
 # Distribution Artifacts
 
-## Static Baseline Policy Files
-
-Use committed static policies when you need policy files without wrapper runtime:
-
-- `dist/profiles/safehouse.generated.sb` (default baseline)
-- `dist/profiles/safehouse-for-apps.generated.sb` (includes app integrations)
-
-Committed generation modes:
-
-- `safehouse.generated.sb`: `--enable=all-agents`
-- `safehouse-for-apps.generated.sb`: `--enable=macos-gui,electron,all-agents,all-apps`
-
-Regenerate after profile/runtime changes:
-
-```bash
-./scripts/generate-dist.sh
-```
-
-Generated static artifacts use template placeholders:
-
-- `HOME`: `/__SAFEHOUSE_TEMPLATE_HOME__`
-- Workdir: `/__SAFEHOUSE_TEMPLATE_WORKDIR__`
-
-Before direct policy use, replace `HOME_DIR` and final workdir grant block for your environment.
-
 ## Single-File Distribution
 
-`./scripts/generate-dist.sh` also builds the standalone executable and launcher commands:
+`./scripts/generate-dist.sh` generates one committed consumer artifact:
 
 - `dist/safehouse.sh`
-- `dist/Claude.app.sandboxed.command`
-- `dist/Claude.app.sandboxed-offline.command`
-- `dist/profiles/safehouse.generated.sb`
-- `dist/profiles/safehouse-for-apps.generated.sb`
 
-`dist/safehouse.sh` has CLI parity with `bin/safehouse.sh`:
+`dist/safehouse.sh` is self-contained and embeds the runtime plus policy modules as plain text. It has CLI parity with `bin/safehouse.sh`:
 
 ```bash
 ./dist/safehouse.sh claude --dangerously-skip-permissions
 ./dist/safehouse.sh --stdout
 ```
 
-The dist binary is self-contained and embeds policy modules as plain text.
+Static `dist/profiles/*` files and app-specific launcher scripts are no longer generated.
+
+## Desktop Apps
+
+Known `.app` bundles are selected automatically when you launch their inner
+binary through Safehouse. Today that includes `Claude.app` and `Visual Studio Code.app`.
+Claude Desktop also auto-includes the shared `claude-code` profile and its
+transitive integrations.
+
+Examples:
+
+```bash
+./dist/safehouse.sh -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
+./dist/safehouse.sh -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
+```
+
+For Electron apps, keep `--no-sandbox` so the app does not attempt to initialize a nested sandbox inside Safehouse.
 
 ## GitHub Releases
 

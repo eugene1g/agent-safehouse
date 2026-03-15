@@ -17,7 +17,7 @@ These are baseline allowances intended to keep common workflows functional:
 - Core system/runtime paths required by shells, compilers, and package managers.
 - Toolchain profile access under `profiles/30-toolchains/`.
 - Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
-- Core integrations in `profiles/50-integrations-core/` (`git`, `scm-clis`).
+- Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`).
 - Agent-specific profile selection for the wrapped command.
 - Network access (open by default).
 - Sanitized runtime environment (not full shell env by default; preserves `SDKROOT` when set).
@@ -27,13 +27,20 @@ These are baseline allowances intended to keep common workflows functional:
 
 Enable only when required for the current task:
 
+- `agent-browser`: local browser automation CLI state plus Chromium headless access.
 - `clipboard`: clipboard read/write integration.
+- `cleanshot`: read access to CleanShot media captures.
 - `cloud-credentials`: cloud CLI credential stores.
+- `chromium-headless`: headless Chromium / Playwright shell access.
+- `chromium-full`: system Google Chrome and related full Chrome allowances.
 - `docker`: Docker socket and related access.
+- `1password`: 1Password CLI/app integration paths.
 - `kubectl`: kube config/cache + krew state.
 - `shell-init`: shell startup/config file reads.
 - `ssh`: extended SSH agent socket and system SSH config integration.
+- `spotlight`: Spotlight metadata queries via `mdfind` / `mdls`.
 - `browser-native-messaging`: browser host messaging integration.
+- `playwright-chrome`: Playwright Chrome-family channels plus injected `PLAYWRIGHT_MCP_SANDBOX=false`.
 - `process-control`: host process enumeration/signalling for local supervision tools.
 - `lldb`: LLDB/debugger toolchain access plus debugger-grade host process inspection.
 - `xcode`: full Xcode developer roots plus Xcode/CoreSimulator user state.
@@ -46,14 +53,16 @@ Enable only when required for the current task:
 ## Not Granted (or Explicitly Denied) by Default
 
 - SSH private keys under `~/.ssh`.
-- Browser profile/cookie/session data.
+- SSH agent sockets (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
+- Browser profile/cookie/session data, even when `browser-native-messaging` is enabled.
 - Shell startup files unless `shell-init` is enabled.
 - Clipboard access unless `clipboard` is enabled.
 - Host process enumeration/control unless `process-control` or `lldb` is enabled.
 - LLDB/debugger toolchain and task-port access unless `lldb` is enabled.
 - Full Xcode developer roots and Xcode/CoreSimulator state unless `xcode` is enabled.
 - Broad raw device access under `/dev`.
-- Setuid/setgid executable paths (`forbidden-exec-sugid`).
+
+`browser-native-messaging` is intentionally narrower: it grants NativeMessagingHosts registration paths and browser extension-manifest reads, not cookies, passwords, history, or bookmarks.
 
 ## Operational Defaults for Common Scenarios
 

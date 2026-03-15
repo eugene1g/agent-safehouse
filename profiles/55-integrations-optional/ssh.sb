@@ -34,8 +34,21 @@
     (home-literal "/.ssh/known_hosts.old")                          ;; Rotated during host key updates.
 )
 
-;; SSH agent socket access via launchd-managed SSH_AUTH_SOCK.
+;; Directory traversal so Tahoe-style ~/.ssh/agent sockets can resolve.
+(allow file-read-metadata
+    (home-literal "/.ssh/agent")
+)
+
+;; SSH agent socket access via launchd-managed SSH_AUTH_SOCK and Tahoe-style
+;; ~/.ssh/agent sockets.
 (allow file-read* file-write*
     (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")  ;; launchd-managed SSH_AUTH_SOCK path on macOS.
     (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")          ;; symlinked tmp variant of SSH_AUTH_SOCK path.
+    (home-subpath "/.ssh/agent")                                    ;; macOS 26 ssh-agent socket directory (e.g. ~/.ssh/agent/s.*).
+)
+
+(allow network-outbound
+    (remote unix-socket (path-regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
+    (remote unix-socket (path-regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.ssh/agent(/.*)?$")))
 )

@@ -5,10 +5,11 @@
 ;; internal sandboxing under Safehouse.
 ;; Source: 55-integrations-optional/playwright-chrome.sb
 ;; #safehouse-test-id:playwright-chrome-integration#
-;; $$require=55-integrations-optional/chromium-headless.sb,55-integrations-optional/chromium-full.sb$$
+;; $$require=55-integrations-optional/chromium-full.sb$$
 ;; $$exec-env-default=PLAYWRIGHT_MCP_SANDBOX=false$$
 ;; ---------------------------------------------------------------------------
 
 ;; This profile emits no direct SBPL rules. It exists to require the shared
-;; Chromium Full policy for Chrome-family channels and to inject
+;; Chromium Full policy for Chrome-family channels (which transitively pulls
+;; Chromium Headless) and to inject
 ;; PLAYWRIGHT_MCP_SANDBOX=false so Playwright removes Chrome's inner sandbox.

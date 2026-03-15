@@ -5,28 +5,36 @@ on:
     branches:
       - main
     paths:
+      - "VERSION"
       - "bin/**"
       - "profiles/**"
       - "scripts/**"
-      - "tests/**"
-      - "dist/profiles/safehouse.generated.sb"
-      - "dist/profiles/safehouse-for-apps.generated.sb"
+      - "docs/docs/**"
+      - "docs/public/**"
+      - "docs/.vitepress/config.ts"
+      - "tests/policy/**"
+      - "tests/surface/**"
+      - "tests/run.sh"
+      - "tests/setup_suite.bash"
+      - "tests/test_helper.bash"
       - "dist/safehouse.sh"
-      - "dist/Claude.app.sandboxed.command"
-      - "dist/Claude.app.sandboxed-offline.command"
       - ".github/workflows/tests-macos.yml"
       - ".github/workflows/regenerate-dist.yml"
   pull_request:
     paths:
+      - "VERSION"
       - "bin/**"
       - "profiles/**"
       - "scripts/**"
-      - "tests/**"
-      - "dist/profiles/safehouse.generated.sb"
-      - "dist/profiles/safehouse-for-apps.generated.sb"
+      - "docs/docs/**"
+      - "docs/public/**"
+      - "docs/.vitepress/config.ts"
+      - "tests/policy/**"
+      - "tests/surface/**"
+      - "tests/run.sh"
+      - "tests/setup_suite.bash"
+      - "tests/test_helper.bash"
       - "dist/safehouse.sh"
-      - "dist/Claude.app.sandboxed.command"
-      - "dist/Claude.app.sandboxed-offline.command"
       - ".github/workflows/tests-macos.yml"
       - ".github/workflows/regenerate-dist.yml"
   workflow_dispatch:
@@ -43,5 +51,16 @@ jobs:
       - name: Checkout branch
         uses: actions/checkout@v6
 
+      - name: Install test and browser dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew install bats-core parallel node
+          brew install --cask google-chrome
+          npm install --global --no-fund --no-audit agent-browser playwright
+          agent-browser install
+          playwright install chromium-headless-shell
+
       - name: Run test suite
-        run: ./tests/run.sh
+        run: |
+          ./tests/run.sh

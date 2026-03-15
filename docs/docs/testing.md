@@ -11,68 +11,72 @@
 ./tests/run.sh
 ```
 
-- Runs section-based tests under `tests/sections/`
-- Uses shared helpers in `tests/lib/`
-- Designed for macOS with `sandbox-exec`
+- `./tests/run.sh` is the primary entrypoint for the macOS Bats suite.
+- By default it runs the `policy` and `surface` suites.
+- Tests live under `tests/policy/`, `tests/surface/`, and `tests/e2e/`.
+- The suite is designed for macOS with `sandbox-exec`.
 
-## TUI E2E Simulation
-
-```bash
-./tests/e2e/run.sh
-```
-
-This runs a fake TUI agent under Safehouse via `tmux` across configured profiles and validates:
-
-- expected profile selection
-- in-workdir write succeeds
-- out-of-workdir write is denied
-- out-of-workdir read is denied
-- clean session exit
-
-Parallel execution:
+Run a specific suite:
 
 ```bash
-SAFEHOUSE_E2E_TUI_JOBS=4 ./tests/e2e/run.sh
+./tests/run.sh policy
+./tests/run.sh surface
+./tests/run.sh e2e
+./tests/run.sh all
 ```
 
-Timeout tuning:
+Single-file ad hoc runs should use Bats directly:
 
 ```bash
-SAFEHOUSE_E2E_TUI_TIMEOUT_SECS=30 SAFEHOUSE_E2E_TUI_SESSION_TIMEOUT_SECS=30 ./tests/e2e/run.sh
+bats tests/policy/integrations/docker.bats
+bats tests/e2e/codex.bats
 ```
 
-## Live Agent Checks
+Some standard-suite integration checks also depend on host browser tooling. When
+present, CI installs `agent-browser`, Playwright's `chromium-headless-shell`
+download, and Google Chrome for those checks. Missing local host dependencies
+skip cleanly.
+
+## E2E Checks
+
+These Bats tests drive real agent TUIs through `tmux` under Safehouse.
+Their contract is limited to startup/readiness and a basic prompt roundtrip, not full agent capability coverage.
+They currently cover:
+
+- `aider`
+- `amp`
+- `claude-code`
+- `cline`
+- `codex`
+- `gemini`
+- `goose`
+- `kilo-code`
+- `opencode`
+- `pi`
+
+CI runs this subset in the dedicated `E2E TUI Tests (macOS)` workflow.
+
+Install the same agent dependencies used by GitHub Actions:
 
 ```bash
-./tests/e2e/live/run.sh
+brew install bats-core parallel tmux node aider block-goose-cli
+$(brew --prefix node)/bin/npm install --global \
+  @anthropic-ai/claude-code \
+  @google/gemini-cli \
+  @kilocode/cli \
+  @mariozechner/pi-coding-agent \
+  @openai/codex \
+  @sourcegraph/amp \
+  cline \
+  opencode-ai
 ```
 
-For repo-local agent CLI installs:
+CI installs these packages directly in the workflow job.
 
-```bash
-./tests/e2e/agents/install.sh
-```
+Depending on the specific test file, you may also need provider keys such as:
 
-Allow setup/auth prerequisite skips:
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `GEMINI_API_KEY`
 
-```bash
-SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP=1 ./tests/e2e/live/run.sh
-```
-
-Parallel live execution:
-
-```bash
-SAFEHOUSE_E2E_LIVE_JOBS=3 SAFEHOUSE_E2E_LIVE_ALLOW_PREREQ_SKIP=1 ./tests/e2e/live/run.sh
-```
-
-Live timeout tuning:
-
-```bash
-SAFEHOUSE_E2E_LIVE_COMMAND_TIMEOUT_SECS=240 ./tests/e2e/live/run.sh
-```
-
-Run both simulation and live checks:
-
-```bash
-SAFEHOUSE_E2E_LIVE=1 ./tests/e2e/run.sh
-```
+Without the required binary or API key, the corresponding test skips cleanly.

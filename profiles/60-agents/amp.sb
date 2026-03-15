@@ -23,5 +23,10 @@
 )
 
 (allow file-read*
+    (literal "/home")                                                ;; Amp probes the /home compatibility root during startup on some hosts.
+    (literal "/System/Volumes/Data/home")                            ;; Data-backed target of /home on modern macOS path-resolution flows.
+)
+
+(allow file-read*
     (home-subpath "/.claude")  ;; Amp probes Claude config/auth files on startup in some environments.
 )

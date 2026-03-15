@@ -12,3 +12,7 @@ docs/.vitepress/dist/
 .env.*
 !.env.example
 telemetry-id
+/tests-tmux/agents/bin/
+/tests-e2e/agents/bin/
+/tests-tmux/agents/cursor-agent/home/
+/tests-tmux/agents/python/venv/

@@ -40,6 +40,8 @@ EOF2
 
 ## Shell Functions (Recommended)
 
+Prefer selective env passthrough by default. `safeenv` forwards the entire inherited host environment, including secrets such as `AWS_SECRET_ACCESS_KEY`, `GITHUB_TOKEN`, and provider API keys. Use `safekeys` for the common agent-key case and reserve `safeenv` for wrappers that genuinely need broad host env access.
+
 POSIX shells (`zsh` / `bash`):
 
 ```bash
@@ -48,12 +50,12 @@ SAFEHOUSE_APPEND_PROFILE="$HOME/.config/agent-safehouse/local-overrides.sb"
 
 safe() { safehouse --add-dirs-ro=~/mywork --append-profile="$SAFEHOUSE_APPEND_PROFILE" "$@"; }
 safeenv() { safe --env "$@"; }
-safekeys() { safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY "$@"; }
+safekeys() { safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY,GEMINI_API_KEY "$@"; }
 claude()   { safe claude --dangerously-skip-permissions "$@"; }
 codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
 amp()      { safe amp --dangerously-allow-all "$@"; }
-opencode() { OPENCODE_PERMISSION='{"*":"allow"}' safeenv opencode "$@"; }
-gemini()   { NO_BROWSER=true safeenv gemini --yolo "$@"; }
+opencode() { OPENCODE_PERMISSION='{"*":"allow"}' safekeys opencode "$@"; }
+gemini()   { NO_BROWSER=true safekeys gemini --yolo "$@"; }
 goose()    { safe goose "$@"; }
 kilo()     { safe kilo "$@"; }
 pi()       { safe pi "$@"; }
@@ -74,7 +76,7 @@ function safeenv
 end
 
 function safekeys
-    safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY $argv
+    safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY,GEMINI_API_KEY $argv
 end
 
 function claude
@@ -91,12 +93,12 @@ end
 
 function opencode
     set -lx OPENCODE_PERMISSION '{"*":"allow"}'
-    safeenv opencode $argv
+    safekeys opencode $argv
 end
 
 function gemini
     set -lx NO_BROWSER true
-    safeenv gemini --yolo $argv
+    safekeys gemini --yolo $argv
 end
 
 function goose
@@ -125,34 +127,22 @@ cd ~/projects/my-app
 safehouse claude --dangerously-skip-permissions
 ```
 
-## One-File Claude Desktop Launcher (No CLI Install)
+## Desktop Apps
 
-Safehouse ships self-contained launchers:
-
-- `dist/Claude.app.sandboxed.command` (downloads latest apps policy at runtime)
-- `dist/Claude.app.sandboxed-offline.command` (embedded policy; no runtime download)
+Download the standalone release asset:
 
 ```bash
-# Online launcher
-curl -fsSL __SAFEHOUSE_RELEASE_RAW_DIST_BASE_URL__/Claude.app.sandboxed.command \
-  -o ~/Downloads/Claude.app.sandboxed.command
-chmod +x ~/Downloads/Claude.app.sandboxed.command
-
-# Offline launcher
-curl -fsSL __SAFEHOUSE_RELEASE_RAW_DIST_BASE_URL__/Claude.app.sandboxed-offline.command \
-  -o ~/Downloads/Claude.app.sandboxed-offline.command
-chmod +x ~/Downloads/Claude.app.sandboxed-offline.command
+curl -fsSL https://github.com/eugene1g/agent-safehouse/releases/latest/download/safehouse.sh \
+  -o ~/Downloads/safehouse
+chmod +x ~/Downloads/safehouse
 ```
 
-Equivalent launch behavior:
+Known app bundles are matched to their app profile automatically, so Claude
+Desktop usually does not need extra `--enable` flags:
 
 ```bash
-safehouse --workdir="<folder-containing-Claude.app.sandboxed.command>" --enable=electron -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
+~/Downloads/safehouse -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
+~/Downloads/safehouse -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 ```
 
-If you use Claude Desktop "Allow bypass permissions mode", launching through the sandboxed command keeps tool execution constrained by the outer Safehouse policy.
-
-Launcher policy controls:
-
-- `SAFEHOUSE_CLAUDE_POLICY_URL`: override policy download source (online launcher)
-- `SAFEHOUSE_CLAUDE_POLICY_SHA256`: pin expected policy checksum
+If you use Claude Desktop "Allow bypass permissions mode", launching Claude Desktop through Safehouse is intended to keep tool execution constrained by the outer Safehouse policy.

@@ -36,8 +36,12 @@ jobs:
 
       - name: Run shellcheck
         run: |
+          shellcheck_bin_files=()
+          while IFS= read -r shell_file; do
+            shellcheck_bin_files+=("$shell_file")
+          done < <(find bin -type f -name '*.sh' | LC_ALL=C sort)
           shellcheck --external-sources \
-            bin/safehouse.sh \
+            "${shellcheck_bin_files[@]}" \
             scripts/generate-dist.sh
 
       - name: Run shfmt check (advisory)

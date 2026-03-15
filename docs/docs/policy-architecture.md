@@ -11,11 +11,11 @@ Policy assembly order:
 | `20-network.sb` | Network policy |
 | `30-toolchains/*.sb` | Apple Toolchain Core, Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent modules |
-| `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `scm-clis`) |
+| `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`) |
 | `55-integrations-optional/*.sb` | Opt-in integrations (`--enable=...`) |
 | `60-agents/*.sb` | Per-agent profile selection by command basename |
 | `65-apps/*.sb` | Per-app bundle selection (`Claude.app`, `Visual Studio Code.app`) |
-| Config/env/CLI grants | Trusted `.safehouse` config, env grants, CLI grants, selected workdir |
+| Config/env/CLI grants | Trusted `.safehouse` config, env grants, CLI grants, auto-detected app bundle read grant, selected workdir |
 | Appended profiles | User profile overlays via `--append-profile` (loaded last) |
 
 ## Ordering Rules Matter
@@ -44,4 +44,6 @@ Ancestor `literal` read grants are intentionally emitted for traversal compatibi
 
 - `__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__`
 
-Assembly logic in `/Users/eugene/server/agent-safehouse/bin/lib/policy.sh` replaces this with the actual absolute home path.
+Assembly logic in `/Users/eugene/server/agent-safehouse/bin/lib/policy/render.sh` replaces this with the actual absolute home path.
+
+See also: [Bin Architecture](/docs/bin-architecture)

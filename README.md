@@ -1,12 +1,12 @@
 # Agent Safehouse
 
 [![Tests (macOS)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/tests-macos.yml)
-[![E2E (TUI Agent via tmux)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml)
+[![E2E TUI Tests (macOS)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml/badge.svg)](https://github.com/eugene1g/agent-safehouse/actions/workflows/e2e-agent-tui-macos.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 Sandbox your LLM coding agents on macOS so they can only access the files and integrations they actually need.
 
-Agent Safehouse uses `sandbox-exec` with composable policy profiles and a deny-first model. It supports major coding agents and app-hosted agent workflows while keeping normal development usage practical.
+Agent Safehouse uses `sandbox-exec` with composable policy profiles and a deny-first model. It includes profiles for major coding agents and app-hosted agent workflows while keeping normal development usage practical.
 
 ## Install
 

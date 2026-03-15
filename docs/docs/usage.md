@@ -60,7 +60,7 @@ safehouse --enable=kubectl -- kubectl get pods -A
 # Shell startup file reads
 safehouse --enable=shell-init -- claude --dangerously-skip-permissions
 
-# Browser native messaging integration
+# Browser native messaging manifests + extension detection (not browsing data)
 safehouse --enable=browser-native-messaging -- codex
 
 # Host process enumeration/signalling for local debugging
@@ -96,24 +96,33 @@ safehouse --env=./agent.env -- codex --dangerously-bypass-approvals-and-sandbox
 
 # Combine file + named pass-through (named vars win)
 safehouse --env=./agent.env --env-pass=OPENAI_API_KEY -- codex --dangerously-bypass-approvals-and-sandbox
+
+# Inject a one-off child env value without inheriting the full host env
+safehouse -- MYVAR=123 printenv MYVAR
 ```
 
 ## Electron Apps
 
-Use `--enable=electron` and launch with `--no-sandbox`:
+Known app bundles are auto-detected from the command path. In practice, Claude
+Desktop and Visual Studio Code usually do not need `--enable=electron`.
+Claude Desktop also picks up its shared `claude-code` profile transitively.
+Launch with `--no-sandbox`:
 
 ```bash
-safehouse --enable=electron -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
-safehouse --enable=electron -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
+safehouse -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
+safehouse -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 ```
 
 For VS Code as a multi-agent host:
 
 ```bash
-safehouse --workdir=~/server --enable=electron,all-agents,wide-read -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
+safehouse --workdir=~/server --enable=all-agents,wide-read -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 ```
 
 Troubleshooting: `forbidden-sandbox-reinit` or `sandbox initialization failed: Operation not permitted` usually means nested sandbox re-init was attempted; launch with `--no-sandbox`.
+
+Use `--enable=electron` explicitly only for unknown/custom Electron apps or when
+you need Electron allowances without launching a concrete app binary.
 
 ## Chromium / Playwright
 

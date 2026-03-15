@@ -1,41 +1,4 @@
-import fs from 'node:fs'
 import { defineConfig } from 'vitepress'
-
-const VERSION_FILE = new URL('../../VERSION', import.meta.url)
-const RELEASE_RAW_DIST_BASE_URL_TOKEN = '__SAFEHOUSE_RELEASE_RAW_DIST_BASE_URL__'
-
-type MarkdownToken = {
-  content?: string
-  children?: MarkdownToken[]
-}
-
-function readSafehouseVersion(): string {
-  const version = fs.readFileSync(VERSION_FILE, 'utf8').trim()
-
-  if (!version) {
-    throw new Error(`VERSION file is empty: ${VERSION_FILE.pathname}`)
-  }
-
-  return version
-}
-
-const safehouseVersion = readSafehouseVersion()
-const safehouseReleaseRawDistBaseUrl = `https://raw.githubusercontent.com/eugene1g/agent-safehouse/v${safehouseVersion}/dist`
-
-function replaceLauncherUrlTokens(tokens: MarkdownToken[]): void {
-  for (const token of tokens) {
-    if (typeof token.content === 'string' && token.content.length > 0) {
-      token.content = token.content.replaceAll(
-        RELEASE_RAW_DIST_BASE_URL_TOKEN,
-        safehouseReleaseRawDistBaseUrl,
-      )
-    }
-
-    if (Array.isArray(token.children) && token.children.length > 0) {
-      replaceLauncherUrlTokens(token.children)
-    }
-  }
-}
 
 export default defineConfig({
   title: 'Agent Safehouse',
@@ -57,16 +20,10 @@ export default defineConfig({
   ],
 
   appearance: false,
-
   markdown: {
     theme: {
       light: 'one-light',
       dark: 'one-dark-pro',
-    },
-    config(md) {
-      md.core.ruler.push('safehouse-launcher-url-replacements', (state) => {
-        replaceLauncherUrlTokens(state.tokens as MarkdownToken[])
-      })
     },
   },
 
