@@ -62,6 +62,12 @@ configure_agent_tui() {
   # Kilo keeps the placeholder visible in tmux captures instead of echoing the
   # full typed prompt before submit, so the response token is the stable signal.
   AGENT_TUI_PROMPT_VISIBLE_MODE="none"
+  # The ready screen can appear before Kilo consistently accepts injected
+  # input on busy CI runners, so wait briefly and type more conservatively.
+  AGENT_TUI_PRE_PROMPT_DELAY_SECS=1
+  AGENT_TUI_PROMPT_SEND_MODE="slow"
+  AGENT_TUI_PROMPT_CHAR_DELAY_SECS=0.05
+  AGENT_TUI_SUBMIT_DELAY_SECS=1
 }
 
 handle_startup_gates() {

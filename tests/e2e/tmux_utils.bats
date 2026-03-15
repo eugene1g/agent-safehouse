@@ -62,3 +62,22 @@ load agent_tui_harness.bash
   sft_tmux_wait_until "Ready" 2 0.1
   sft_tmux_assert_roundtrip
 }
+
+@test "[E2E-TUI] pre-prompt delay and slow typing tolerate late input readiness" {
+  local fake_agent_code=""
+
+  sft_require_cmd_or_skip "python3"
+
+  fake_agent_code=$'import sys, termios, tty, time\nfd = sys.stdin.fileno()\nold = termios.tcgetattr(fd)\nbuf = []\nready_at = time.time() + 0.5\nprint("Ready", flush=True)\nprint("  Type your message or @path/to/file", flush=True)\ntry:\n    tty.setcbreak(fd)\n    while True:\n        ch = sys.stdin.read(1)\n        if not ch:\n            break\n        if time.time() < ready_at:\n            continue\n        if ch in "\\r\\n":\n            print("* " + "".join(buf), flush=True)\n            print("London", flush=True)\n            break\n        buf.append(ch)\n        print("* " + "".join(buf), flush=True)\n        sys.stdout.flush()\nfinally:\n    termios.tcsetattr(fd, termios.TCSADRAIN, old)\n'
+
+  AGENT_TUI_PRE_PROMPT_DELAY_SECS=0.6
+  AGENT_TUI_PROMPT_SEND_MODE="slow"
+  AGENT_TUI_PROMPT_CHAR_DELAY_SECS=0
+  AGENT_TUI_PROMPT_VISIBLE_MODE="regex"
+  AGENT_TUI_PROMPT_VISIBLE_REGEX='What is the capital of England\?? Reply with only the city name\.'
+  AGENT_TUI_SUBMIT_DELAY_SECS=0
+
+  sft_tmux_start_session python3 -u -c "${fake_agent_code}"
+  sft_tmux_wait_until "Ready" 2 0.1
+  sft_tmux_assert_roundtrip
+}

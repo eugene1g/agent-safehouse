@@ -4,6 +4,7 @@
 #   sft_tmux_start_session command [args...]
 #   sft_tmux_capture
 #   sft_tmux_send_text text
+#   sft_tmux_send_text_slow text [char_delay_secs]
 #   sft_tmux_send_keys key [key ...]
 #   sft_tmux_wait_until text [timeout_secs] [poll_secs]
 #   sft_tmux_wait_until_regex pattern [timeout_secs] [poll_secs]
@@ -217,6 +218,28 @@ sft_tmux_send_text() {
   }
 
   tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" -l -- "${input_text}"
+}
+
+sft_tmux_send_text_slow() {
+  local input_text="${1:-}"
+  local char_delay_secs="${2:-0.03}"
+  local idx=0
+  local char=""
+
+  sft_tmux_require_current_session || return 1
+  [[ -n "${input_text}" ]] || {
+    printf 'usage: sft_tmux_send_text_slow input_text [char_delay_secs]\n' >&2
+    return 1
+  }
+
+  while (( idx < ${#input_text} )); do
+    char="${input_text:idx:1}"
+    tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" -l -- "${char}"
+    idx=$((idx + 1))
+    if [[ "${char_delay_secs}" != "0" && "${char_delay_secs}" != "0.0" ]]; then
+      sleep "${char_delay_secs}"
+    fi
+  done
 }
 
 sft_tmux_send_keys() {
