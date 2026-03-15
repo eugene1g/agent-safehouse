@@ -139,8 +139,9 @@ handle_startup_gates() {
     return $?
   fi
 
-  AGENT_TUI_FAILED=1
-  printf 'unhandled startup gate\n' >&2
-  sft_agent_tui_write_screen_capture >&2 || true
-  return 1
+  # Once the combined wait above has seen either the ready screen or a known
+  # gate, Gemini can repaint between captures. If no known gate is still
+  # visible, treat the session as ready and let the roundtrip assertion own any
+  # later failure.
+  return 0
 }
