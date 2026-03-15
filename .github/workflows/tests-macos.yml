@@ -57,6 +57,15 @@ jobs:
         run: |
           brew install bats-core parallel node
           brew install --cask google-chrome temurin
+          shopt -s nullglob
+          temurin_homes=(/Library/Java/JavaVirtualMachines/temurin*.jdk/Contents/Home)
+          shopt -u nullglob
+          if [[ "${#temurin_homes[@]}" -eq 0 ]]; then
+            echo "temurin install did not create a JDK under /Library/Java/JavaVirtualMachines" >&2
+            exit 1
+          fi
+          printf 'JAVA_HOME=%s\n' "${temurin_homes[0]}" >> "${GITHUB_ENV}"
+          printf '%s\n' "${temurin_homes[0]}/bin" >> "${GITHUB_PATH}"
           npm install --global --no-fund --no-audit agent-browser playwright
           agent-browser install
           playwright install chromium-headless-shell

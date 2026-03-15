@@ -79,7 +79,7 @@ configure_agent_tui() {
 
 handle_startup_gates() {
   local pass="${1:-1}"
-  local input_ready_pattern='Type your message or'
+  local input_ready_pattern='Type your message|@path/to/file|YOLO ctrl\+y'
   local trust_gate_pattern='Do you trust the files in this folder'
   local permission_gate_pattern='Get started|How would you like to authenticate for this project\?|Existing API key detected|Use Gemini API Key|Use Enter to select'
   local restart_gate_pattern='Gemini CLI is restarting to apply the trust changes'

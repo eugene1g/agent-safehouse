@@ -43,6 +43,10 @@ login_agent() {
 }
 
 configure_agent_tui() {
+  if (( AGENT_TUI_STARTUP_WAIT_SECS < 60 )); then
+    AGENT_TUI_STARTUP_WAIT_SECS=60
+  fi
+
   return 0
 }
 

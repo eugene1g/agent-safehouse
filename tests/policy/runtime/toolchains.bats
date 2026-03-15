@@ -30,7 +30,10 @@ load ../../test_helper.bash
 
   local src java_bin javac_bin java_home
   src="$(sft_workspace_path "Hello.java")" || return 1
-  java_home="$(/usr/libexec/java_home 2>/dev/null || true)"
+  java_home="${JAVA_HOME:-}"
+  if [[ -z "${java_home}" ]]; then
+    java_home="$(/usr/libexec/java_home 2>/dev/null || true)"
+  fi
   if [[ -n "${java_home}" ]] && [[ -x "${java_home}/bin/java" ]] && [[ -x "${java_home}/bin/javac" ]]; then
     java_bin="${java_home}/bin/java"
     javac_bin="${java_home}/bin/javac"
