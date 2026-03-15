@@ -59,7 +59,7 @@ Policy scope options:
       Note: electron implies macos-gui
       Note: chromium-full implies chromium-headless
       Note: playwright-chrome implies chromium-full and chromium-headless
-      Note: agent-browser implies chromium-headless
+      Note: agent-browser implies chromium-full and chromium-headless
       Note: shell-init enables shell startup file reads
       Note: process-control enables host process enumeration/signalling
       Note: lldb enables LLDB toolchain + task-port access and implies process-control

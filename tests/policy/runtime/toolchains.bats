@@ -32,6 +32,9 @@ load ../../test_helper.bash
   src="$(sft_workspace_path "Hello.java")" || return 1
   printf 'public class Hello { public static void main(String[] a) { System.out.println("sandboxed-java"); } }\n' > "$src"
 
+  java -version >/dev/null 2>&1 || skip "java runtime precheck failed outside sandbox"
+  javac -version >/dev/null 2>&1 || skip "javac precheck failed outside sandbox"
+
   safehouse_ok -- /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && javac Hello.java && java Hello"
 }
 

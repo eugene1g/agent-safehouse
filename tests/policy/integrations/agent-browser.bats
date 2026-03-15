@@ -8,6 +8,7 @@ load ../../test_helper.bash
   profile="$(safehouse_profile --enable=agent-browser)"
 
   sft_assert_includes_source "$profile" "55-integrations-optional/agent-browser.sb"
+  sft_assert_includes_source "$profile" "55-integrations-optional/chromium-full.sb"
   sft_assert_includes_source "$profile" "55-integrations-optional/chromium-headless.sb"
   sft_assert_omits_source "$profile" "55-integrations-optional/electron.sb"
   sft_assert_omits_source "$profile" "55-integrations-optional/macos-gui.sb"

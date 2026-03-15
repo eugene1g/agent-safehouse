@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
-PROFILES_DIR="${ROOT_DIR}/profiles"
 
 output_dir="${ROOT_DIR}/dist"
 output_path="${output_dir}/safehouse.sh"
@@ -58,7 +57,7 @@ read_project_version() {
     exit 1
   fi
 
-  IFS= read -r version < "$project_version_file" || true
+  IFS= read -r version <"$project_version_file" || true
   version="${version%%$'\r'}"
   if [[ -z "$version" ]]; then
     echo "VERSION file is empty: ${project_version_file}" >&2
@@ -265,7 +264,7 @@ collect_dist_preassembled_render_chunks() {
       "profiles/10-system-runtime.sb")
         dist_preassembled_fixed_before_home_keys+=("$rel_path")
         ;;
-      "profiles/20-network.sb"|profiles/30-toolchains/*.sb|profiles/40-shared/*.sb)
+      "profiles/20-network.sb" | profiles/30-toolchains/*.sb | profiles/40-shared/*.sb)
         dist_preassembled_fixed_after_home_keys+=("$rel_path")
         ;;
       profiles/50-integrations-core/*.sb)
@@ -420,7 +419,7 @@ latest_embedded_profile_epoch_from_fs() {
     profile_path="${ROOT_DIR}/${rel_path}"
     epoch="$(file_mtime_epoch "$profile_path")" || continue
 
-    if [[ "$epoch" =~ ^[0-9]+$ ]] && (( epoch > latest_epoch )); then
+    if [[ "$epoch" =~ ^[0-9]+$ ]] && ((epoch > latest_epoch)); then
       latest_epoch="$epoch"
     fi
   done
@@ -434,11 +433,11 @@ resolve_embedded_profiles_last_modified_utc() {
   # Prefer git commit metadata for deterministic output across machines/CI.
   epoch="$(git -C "$ROOT_DIR" log -1 --format=%ct -- "${profile_files[@]}" 2>/dev/null || true)"
 
-  if [[ ! "$epoch" =~ ^[0-9]+$ ]] || (( epoch <= 0 )); then
+  if [[ ! "$epoch" =~ ^[0-9]+$ ]] || ((epoch <= 0)); then
     epoch="$(latest_embedded_profile_epoch_from_fs)"
   fi
 
-  if [[ ! "$epoch" =~ ^[0-9]+$ ]] || (( epoch <= 0 )); then
+  if [[ ! "$epoch" =~ ^[0-9]+$ ]] || ((epoch <= 0)); then
     printf 'unknown\n'
     return
   fi
@@ -498,7 +497,7 @@ emit_embedded_metadata_case_branch() {
     printf "      printf '%%s\\\\n'"
     while IFS= read -r value || [[ -n "$value" ]]; do
       printf ' "%s"' "$(escape_for_shell_double_quotes "$value")"
-    done <<< "$values"
+    done <<<"$values"
     printf '\n'
   else
     printf '      :\n'

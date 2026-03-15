@@ -27,7 +27,7 @@ These are baseline allowances intended to keep common workflows functional:
 
 Enable only when required for the current task:
 
-- `agent-browser`: local browser automation CLI state plus Chromium headless access.
+- `agent-browser`: local browser automation CLI state plus Chrome-family launch access.
 - `clipboard`: clipboard read/write integration.
 - `cleanshot`: read access to CleanShot media captures.
 - `cloud-credentials`: cloud CLI credential stores.
