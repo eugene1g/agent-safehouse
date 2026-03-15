@@ -81,6 +81,11 @@ configure_agent_tui() {
   # submit even when the input buffer is ready, so rely on the roundtrip token
   # instead of a pre-submit prompt echo.
   AGENT_TUI_PROMPT_VISIBLE_MODE="none"
+  # The ready screen can appear before Gemini consistently accepts injected
+  # input on busy CI runners, so wait briefly and type more conservatively.
+  AGENT_TUI_PRE_PROMPT_DELAY_SECS=1
+  AGENT_TUI_PROMPT_SEND_MODE="slow"
+  AGENT_TUI_PROMPT_CHAR_DELAY_SECS=0.05
   # Give Gemini's hidden input buffer extra time to absorb the injected text
   # before Enter on busy CI runners.
   AGENT_TUI_SUBMIT_DELAY_SECS=1

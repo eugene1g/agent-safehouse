@@ -34,10 +34,13 @@ sft_agent_tui_setup_test_env() {
   AGENT_TUI_RESPONSE_TIMEOUT_SECS="${SAFEHOUSE_AGENT_TUI_RESPONSE_TIMEOUT_SECS:-20}"
   AGENT_TUI_PROMPT_VISIBLE_TIMEOUT_SECS="${SAFEHOUSE_AGENT_TUI_PROMPT_VISIBLE_TIMEOUT_SECS:-5}"
   AGENT_TUI_POLL_INTERVAL_SECS="${SAFEHOUSE_AGENT_TUI_POLL_INTERVAL_SECS:-0.2}"
+  AGENT_TUI_PRE_PROMPT_DELAY_SECS="${SAFEHOUSE_AGENT_TUI_PRE_PROMPT_DELAY_SECS:-0}"
   AGENT_TUI_SUBMIT_DELAY_SECS="${SAFEHOUSE_AGENT_TUI_SUBMIT_DELAY_SECS:-0.3}"
   AGENT_TUI_KEEP_SESSION="${SAFEHOUSE_AGENT_TUI_KEEP_SESSION:-0}"
   AGENT_TUI_KEEP_SESSION_ON_FAIL="${SAFEHOUSE_AGENT_TUI_KEEP_SESSION_ON_FAIL:-0}"
   AGENT_TUI_PRE_PROMPT_KEYS=()
+  AGENT_TUI_PROMPT_SEND_MODE="${SAFEHOUSE_AGENT_TUI_PROMPT_SEND_MODE:-bulk}"
+  AGENT_TUI_PROMPT_CHAR_DELAY_SECS="${SAFEHOUSE_AGENT_TUI_PROMPT_CHAR_DELAY_SECS:-0.03}"
   AGENT_TUI_SUBMIT_KEYS=(Enter)
   AGENT_TUI_PROMPT_TEXT="What is the capital of England? Reply with only the city name."
   AGENT_TUI_PROMPT_VISIBLE_MODE="literal"
@@ -497,6 +500,23 @@ sft_agent_tui_wait_for_prompt_visible() {
   esac
 }
 
+sft_agent_tui_send_prompt_text() {
+  local send_mode="${AGENT_TUI_PROMPT_SEND_MODE:-bulk}"
+
+  case "${send_mode}" in
+    ""|bulk)
+      sft_tmux_send_text "${AGENT_TUI_PROMPT_TEXT}"
+      ;;
+    slow)
+      sft_tmux_send_text_slow "${AGENT_TUI_PROMPT_TEXT}" "${AGENT_TUI_PROMPT_CHAR_DELAY_SECS:-0.03}"
+      ;;
+    *)
+      printf 'unsupported AGENT_TUI_PROMPT_SEND_MODE: %s\n' "${send_mode}" >&2
+      return 1
+      ;;
+  esac
+}
+
 sft_tmux_assert_roundtrip() {
   local key_name=""
 
@@ -508,7 +528,10 @@ sft_tmux_assert_roundtrip() {
     }
   done
 
-  sft_tmux_send_text "${AGENT_TUI_PROMPT_TEXT}" || {
+  if [[ "${AGENT_TUI_PRE_PROMPT_DELAY_SECS:-0}" != "0" && "${AGENT_TUI_PRE_PROMPT_DELAY_SECS:-0}" != "0.0" ]]; then
+    sleep "${AGENT_TUI_PRE_PROMPT_DELAY_SECS}"
+  fi
+  sft_agent_tui_send_prompt_text || {
       AGENT_TUI_FAILED=1
       return 1
     }
