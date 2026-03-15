@@ -28,10 +28,16 @@ load ../../test_helper.bash
   sft_require_cmd_or_skip java
   sft_require_cmd_or_skip javac
 
-  local src java_bin javac_bin
+  local src java_bin javac_bin java_home
   src="$(sft_workspace_path "Hello.java")" || return 1
-  java_bin="$(command -v java)" || skip "java is not installed"
-  javac_bin="$(command -v javac)" || skip "javac is not installed"
+  java_home="$(/usr/libexec/java_home 2>/dev/null || true)"
+  if [[ -n "${java_home}" ]] && [[ -x "${java_home}/bin/java" ]] && [[ -x "${java_home}/bin/javac" ]]; then
+    java_bin="${java_home}/bin/java"
+    javac_bin="${java_home}/bin/javac"
+  else
+    java_bin="$(sft_command_path_or_skip java)" || return 1
+    javac_bin="$(sft_command_path_or_skip javac)" || return 1
+  fi
   printf 'public class Hello { public static void main(String[] a) { System.out.println("sandboxed-java"); } }\n' > "$src"
 
   run /bin/sh -c 'cd "$1" && "$2" Hello.java && "$3" Hello' _ "$SAFEHOUSE_WORKSPACE" "$javac_bin" "$java_bin"
