@@ -35,6 +35,16 @@ sft_tmux_shell_join() {
   done
 }
 
+sft_tmux_capture_normal() {
+  sft_tmux_require_current_session || return 1
+  tmux capture-pane -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true
+}
+
+sft_tmux_capture_alternate() {
+  sft_tmux_require_current_session || return 1
+  tmux capture-pane -a -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true
+}
+
 sft_tmux_capture_score() {
   local capture_output="${1:-}"
 
@@ -51,6 +61,88 @@ sft_tmux_has_visible_content() {
 
   [[ -n "${capture_output}" ]] || return 1
   [[ -n "$(printf '%s' "${capture_output}" | tr -d '[:space:]')" ]]
+}
+
+sft_tmux_select_capture() {
+  local normal_output="${1:-}"
+  local alt_output="${2:-}"
+  local normal_score=0
+  local alt_score=0
+
+  normal_score="$(sft_tmux_capture_score "${normal_output}")"
+  alt_score="$(sft_tmux_capture_score "${alt_output}")"
+
+  if (( alt_score > normal_score )); then
+    printf '%s\n' "${alt_output}"
+  elif sft_tmux_has_visible_content "${normal_output}"; then
+    printf '%s\n' "${normal_output}"
+  else
+    printf '%s\n' "${alt_output}"
+  fi
+}
+
+sft_tmux_output_matches_grep() {
+  local capture_output="${1:-}"
+
+  shift
+  [[ -n "${capture_output}" ]] || return 1
+  printf '%s\n' "${capture_output}" | grep "$@"
+}
+
+sft_tmux_outputs_match_grep() {
+  local normal_output="${1:-}"
+  local alt_output="${2:-}"
+
+  shift 2
+  sft_tmux_output_matches_grep "${normal_output}" "$@" && return 0
+  [[ "${alt_output}" != "${normal_output}" ]] || return 1
+  sft_tmux_output_matches_grep "${alt_output}" "$@"
+}
+
+sft_tmux_output_matches_compact_text() {
+  local capture_output="${1:-}"
+  local compact_needle="${2:-}"
+  local compact_output=""
+
+  [[ -n "${capture_output}" ]] || return 1
+  compact_output="$(printf '%s' "${capture_output}" | tr -d '[:space:]')"
+  [[ "${compact_output}" == *"${compact_needle}"* ]]
+}
+
+sft_tmux_outputs_match_compact_text() {
+  local normal_output="${1:-}"
+  local alt_output="${2:-}"
+  local compact_needle="${3:-}"
+
+  sft_tmux_output_matches_compact_text "${normal_output}" "${compact_needle}" && return 0
+  [[ "${alt_output}" != "${normal_output}" ]] || return 1
+  sft_tmux_output_matches_compact_text "${alt_output}" "${compact_needle}"
+}
+
+sft_tmux_log_last_output() {
+  local normal_output="${1:-}"
+  local alt_output="${2:-}"
+  local best_output=""
+
+  if [[ "${alt_output}" == "${normal_output}" ]]; then
+    printf '%s\n' 'last tmux output:' >&2
+    printf '%s\n' "${normal_output}" >&2
+    return 0
+  fi
+
+  best_output="$(sft_tmux_select_capture "${normal_output}" "${alt_output}")"
+  printf '%s\n' 'last tmux output (best capture):' >&2
+  printf '%s\n' "${best_output}" >&2
+
+  if sft_tmux_has_visible_content "${normal_output}"; then
+    printf '%s\n' 'last tmux normal output:' >&2
+    printf '%s\n' "${normal_output}" >&2
+  fi
+
+  if sft_tmux_has_visible_content "${alt_output}"; then
+    printf '%s\n' 'last tmux alternate output:' >&2
+    printf '%s\n' "${alt_output}" >&2
+  fi
 }
 
 sft_tmux_require_current_session() {
@@ -107,24 +199,12 @@ sft_tmux_start_session() {
 sft_tmux_capture() {
   local normal_output=""
   local alt_output=""
-  local normal_score=0
-  local alt_score=0
 
   sft_tmux_require_current_session || return 1
 
-  normal_output="$(tmux capture-pane -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true)"
-  alt_output="$(tmux capture-pane -a -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true)"
-
-  normal_score="$(sft_tmux_capture_score "${normal_output}")"
-  alt_score="$(sft_tmux_capture_score "${alt_output}")"
-
-  if (( alt_score > normal_score )); then
-    printf '%s\n' "${alt_output}"
-  elif sft_tmux_has_visible_content "${normal_output}"; then
-    printf '%s\n' "${normal_output}"
-  else
-    printf '%s\n' "${alt_output}"
-  fi
+  normal_output="$(sft_tmux_capture_normal 2>/dev/null || true)"
+  alt_output="$(sft_tmux_capture_alternate 2>/dev/null || true)"
+  sft_tmux_select_capture "${normal_output}" "${alt_output}"
 }
 
 sft_tmux_send_text() {
@@ -163,7 +243,8 @@ _sft_tmux_wait_until_grep() {
   local poll_secs="${2:-0.2}"
   local timeout_label="${3:-match}"
   local deadline=0
-  local output=""
+  local normal_output=""
+  local alt_output=""
   local -a grep_args=()
 
   shift 3
@@ -173,23 +254,22 @@ _sft_tmux_wait_until_grep() {
   deadline="$(( $(date +%s) + timeout_secs ))"
 
   while true; do
-    output="$(sft_tmux_capture 2>/dev/null || true)"
+    normal_output="$(sft_tmux_capture_normal 2>/dev/null || true)"
+    alt_output="$(sft_tmux_capture_alternate 2>/dev/null || true)"
 
-    if printf '%s\n' "${output}" | grep "${grep_args[@]}"; then
+    if sft_tmux_outputs_match_grep "${normal_output}" "${alt_output}" "${grep_args[@]}"; then
       return 0
     fi
 
     if sft_tmux_current_pane_dead; then
       printf 'tmux pane exited while waiting for %s in %s\n' "${timeout_label}" "${SFT_TMUX_CURRENT_SESSION}" >&2
-      printf '%s\n' 'last tmux output:' >&2
-      printf '%s\n' "${output}" >&2
+      sft_tmux_log_last_output "${normal_output}" "${alt_output}"
       return 1
     fi
 
     if (( $(date +%s) >= deadline )); then
       printf 'timed out after %ss waiting for %s in %s\n' "${timeout_secs}" "${timeout_label}" "${SFT_TMUX_CURRENT_SESSION}" >&2
-      printf '%s\n' 'last tmux output:' >&2
-      printf '%s\n' "${output}" >&2
+      sft_tmux_log_last_output "${normal_output}" "${alt_output}"
       return 1
     fi
 
@@ -229,8 +309,8 @@ sft_tmux_wait_until_compact_text() {
   local poll_secs="${3:-0.2}"
   local compact_needle=""
   local deadline=0
-  local output=""
-  local compact_output=""
+  local normal_output=""
+  local alt_output=""
 
   [[ -n "${needle}" ]] || {
     printf 'usage: sft_tmux_wait_until_compact_text text [timeout_secs] [poll_secs]\n' >&2
@@ -242,24 +322,22 @@ sft_tmux_wait_until_compact_text() {
   deadline="$(( $(date +%s) + timeout_secs ))"
 
   while true; do
-    output="$(sft_tmux_capture 2>/dev/null || true)"
-    compact_output="$(printf '%s' "${output}" | tr -d '[:space:]')"
+    normal_output="$(sft_tmux_capture_normal 2>/dev/null || true)"
+    alt_output="$(sft_tmux_capture_alternate 2>/dev/null || true)"
 
-    if [[ "${compact_output}" == *"${compact_needle}"* ]]; then
+    if sft_tmux_outputs_match_compact_text "${normal_output}" "${alt_output}" "${compact_needle}"; then
       return 0
     fi
 
     if sft_tmux_current_pane_dead; then
       printf 'tmux pane exited while waiting for compact text in %s\n' "${SFT_TMUX_CURRENT_SESSION}" >&2
-      printf '%s\n' 'last tmux output:' >&2
-      printf '%s\n' "${output}" >&2
+      sft_tmux_log_last_output "${normal_output}" "${alt_output}"
       return 1
     fi
 
     if (( $(date +%s) >= deadline )); then
       printf 'timed out after %ss waiting for compact text in %s\n' "${timeout_secs}" "${SFT_TMUX_CURRENT_SESSION}" >&2
-      printf '%s\n' 'last tmux output:' >&2
-      printf '%s\n' "${output}" >&2
+      sft_tmux_log_last_output "${normal_output}" "${alt_output}"
       return 1
     fi
 
@@ -269,15 +347,17 @@ sft_tmux_wait_until_compact_text() {
 
 sft_tmux_matches_regex() {
   local pattern="${1:-}"
-  local output=""
+  local normal_output=""
+  local alt_output=""
 
   [[ -n "${pattern}" ]] || {
     printf 'usage: sft_tmux_matches_regex pattern\n' >&2
     return 1
   }
 
-  output="$(sft_tmux_capture 2>/dev/null || true)"
-  printf '%s\n' "${output}" | grep -Eq -- "${pattern}"
+  normal_output="$(sft_tmux_capture_normal 2>/dev/null || true)"
+  alt_output="$(sft_tmux_capture_alternate 2>/dev/null || true)"
+  sft_tmux_outputs_match_grep "${normal_output}" "${alt_output}" -Eq -- "${pattern}"
 }
 
 sft_tmux_type_and_wait_visible() {

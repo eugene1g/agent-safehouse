@@ -71,6 +71,12 @@ login_agent() {
 
 configure_agent_tui() {
   AGENT_TUI_STARTUP_WAIT_SECS=30
+  if (( AGENT_TUI_PROMPT_VISIBLE_TIMEOUT_SECS < 12 )); then
+    AGENT_TUI_PROMPT_VISIBLE_TIMEOUT_SECS=12
+  fi
+  if (( AGENT_TUI_RESPONSE_TIMEOUT_SECS < 30 )); then
+    AGENT_TUI_RESPONSE_TIMEOUT_SECS=30
+  fi
   # Gemini currently normalizes the echoed prompt by dropping the question
   # mark, so use an explicit visibility regex instead of exact literal echo.
   AGENT_TUI_PROMPT_VISIBLE_MODE="regex"

@@ -168,6 +168,20 @@ sft_default_jobs() {
 
   if [[ -n "${SAFEHOUSE_BATS_JOBS:-}" ]]; then
     jobs="${SAFEHOUSE_BATS_JOBS}"
+  elif sft_suite_includes_e2e; then
+    if [[ -n "${SAFEHOUSE_BATS_E2E_JOBS:-}" ]]; then
+      jobs="${SAFEHOUSE_BATS_E2E_JOBS}"
+    else
+      cpu_count="$(sft_cpu_count)"
+      # Live agent TUIs contend on startup latency and remote APIs, so keep the
+      # default e2e fanout close to the available CPUs instead of oversubscribing.
+      jobs="${cpu_count}"
+      max_jobs="${SAFEHOUSE_BATS_E2E_MAX_JOBS:-4}"
+
+      if [[ "$max_jobs" =~ ^[0-9]+$ ]] && [[ "$max_jobs" -ge 1 ]] && [[ "$jobs" -gt "$max_jobs" ]]; then
+        jobs="$max_jobs"
+      fi
+    fi
   else
     cpu_count="$(sft_cpu_count)"
     # The suite is dominated by sandboxed subprocess and filesystem work, so modest oversubscription improves wall time.
