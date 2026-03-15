@@ -28,16 +28,18 @@ load ../../test_helper.bash
   sft_require_cmd_or_skip java
   sft_require_cmd_or_skip javac
 
-  local src
+  local src java_bin javac_bin
   src="$(sft_workspace_path "Hello.java")" || return 1
+  java_bin="$(command -v java)" || skip "java is not installed"
+  javac_bin="$(command -v javac)" || skip "javac is not installed"
   printf 'public class Hello { public static void main(String[] a) { System.out.println("sandboxed-java"); } }\n' > "$src"
 
-  run /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && javac Hello.java && java Hello"
+  run /bin/sh -c 'cd "$1" && "$2" Hello.java && "$3" Hello' _ "$SAFEHOUSE_WORKSPACE" "$javac_bin" "$java_bin"
   if [[ "$status" -ne 0 ]] || [[ "$output" != *"sandboxed-java"* ]]; then
     skip "java toolchain precheck failed outside sandbox"
   fi
 
-  safehouse_ok -- /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && javac Hello.java && java Hello"
+  safehouse_ok -- /bin/sh -c 'cd "$1" && "$2" Hello.java && "$3" Hello' _ "$SAFEHOUSE_WORKSPACE" "$javac_bin" "$java_bin"
 }
 
 @test "[EXECUTION] make builds a target inside the sandbox" { # https://github.com/eugene1g/agent-safehouse/issues/18

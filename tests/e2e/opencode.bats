@@ -19,9 +19,9 @@ load agent_tui_harness.bash
   configure_agent_tui
 
   ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
-  HOME="${agent_home}" \
   sft_tmux_start \
     safehouse --env-pass=ANTHROPIC_API_KEY -- \
+    "HOME=${agent_home}" \
     opencode --model="${model}"
   handle_startup_gates 1
   sft_tmux_assert_roundtrip
