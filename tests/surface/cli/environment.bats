@@ -103,3 +103,28 @@ EOF
   PLAYWRIGHT_MCP_SANDBOX="true" \
     safehouse_ok --enable=playwright-chrome -- /bin/sh -c '[ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "true" ]'
 }
+
+@test "[EXECUTION] default sanitized mode sets APP_SANDBOX_CONTAINER_ID=agent-safehouse" {
+  safehouse_ok -- /bin/sh -c '[ "${APP_SANDBOX_CONTAINER_ID:-}" = "agent-safehouse" ]'
+}
+
+@test "[EXECUTION] --env preserves caller-provided APP_SANDBOX_CONTAINER_ID" {
+  APP_SANDBOX_CONTAINER_ID="caller-container" \
+    safehouse_ok --env -- /bin/sh -c '[ "${APP_SANDBOX_CONTAINER_ID:-}" = "caller-container" ]'
+}
+
+@test "[EXECUTION] --env=FILE preserves file-provided APP_SANDBOX_CONTAINER_ID" {
+  local env_file
+  env_file="$(sft_workspace_path "safehouse.env")"
+
+  cat > "$env_file" <<'EOF'
+APP_SANDBOX_CONTAINER_ID=file-container
+EOF
+
+  safehouse_ok --env="$env_file" -- /bin/sh -c '[ "${APP_SANDBOX_CONTAINER_ID:-}" = "file-container" ]'
+}
+
+@test "[EXECUTION] --env-pass=APP_SANDBOX_CONTAINER_ID preserves host value" {
+  APP_SANDBOX_CONTAINER_ID="host-container" \
+    safehouse_ok --env-pass=APP_SANDBOX_CONTAINER_ID -- /bin/sh -c '[ "${APP_SANDBOX_CONTAINER_ID:-}" = "host-container" ]'
+}
