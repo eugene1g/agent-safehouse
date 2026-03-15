@@ -45,8 +45,8 @@ Common examples:
   sandbox-exec -f "\$($(basename "$0"))" -- /usr/bin/true
 
   # Run a command under Safehouse policy
-  $(basename "$0") -- claude --dangerously-skip-permissions
-  $(basename "$0") --enable=docker -- docker ps
+  $(basename "$0") claude --dangerously-skip-permissions
+  $(basename "$0") --enable=docker docker ps
 
   # Pass one-off child env vars to the wrapped command
   $(basename "$0") -- MYVAR=123 printenv MYVAR

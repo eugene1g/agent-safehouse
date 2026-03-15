@@ -478,6 +478,11 @@ cli_parse_consume_command_token() {
   return 0
 }
 
+cli_parse_consume_literal_command_arg() {
+  cli_parse_consumed_args=1
+  cli_command_args+=("$1")
+}
+
 cli_parse() {
   local command_started=0
   local update_subcommand_allowed=1
@@ -504,10 +509,7 @@ cli_parse() {
     fi
 
     if [[ "$command_started" -eq 1 ]]; then
-      cli_parse_consume_command_token "$1" "${@:2}" || return 1
-      if [[ "$cli_parse_consumed_args" -lt 0 ]]; then
-        break
-      fi
+      cli_parse_consume_literal_command_arg "$1"
       shift "$cli_parse_consumed_args"
       continue
     fi
