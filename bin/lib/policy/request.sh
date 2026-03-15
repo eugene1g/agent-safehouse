@@ -20,6 +20,9 @@ policy_req_add_dirs_rw_raw_inputs=()
 policy_req_append_profile_paths=()
 policy_req_effective_workdir=""
 policy_req_effective_workdir_source=""
+policy_req_effective_workdir_git_root=""
+policy_req_git_worktree_common_dir=""
+policy_req_git_linked_worktree_paths=()
 policy_req_trust_workdir_config=0
 policy_req_trust_workdir_config_source="default"
 policy_req_workdir_config_path=""
@@ -154,6 +157,9 @@ policy_request_reset() {
   policy_req_append_profile_paths=()
   policy_req_effective_workdir=""
   policy_req_effective_workdir_source=""
+  policy_req_effective_workdir_git_root=""
+  policy_req_git_worktree_common_dir=""
+  policy_req_git_linked_worktree_paths=()
   policy_req_trust_workdir_config=0
   policy_req_trust_workdir_config_source="default"
   policy_req_workdir_config_path=""
@@ -316,6 +322,54 @@ policy_request_resolve_effective_workdir() {
   fi
 }
 
+policy_request_resolve_effective_workdir_git_root() {
+  local git_root=""
+
+  policy_req_effective_workdir_git_root=""
+
+  if [[ -z "$policy_req_effective_workdir" ]]; then
+    return 0
+  fi
+
+  if [[ "$policy_req_effective_workdir_source" == "auto-git-root" ]]; then
+    policy_req_effective_workdir_git_root="$policy_req_effective_workdir"
+    return 0
+  fi
+
+  git_root="$(safehouse_find_git_root "$policy_req_effective_workdir" || true)"
+  if [[ -n "$git_root" && "$git_root" == "$policy_req_effective_workdir" ]]; then
+    policy_req_effective_workdir_git_root="$git_root"
+  fi
+}
+
+policy_request_resolve_git_worktree_common_dir_access() {
+  policy_req_git_worktree_common_dir=""
+
+  if [[ -z "$policy_req_effective_workdir_git_root" ]]; then
+    return 0
+  fi
+
+  policy_req_git_worktree_common_dir="$(safehouse_find_git_worktree_common_dir "$policy_req_effective_workdir_git_root" || true)"
+}
+
+policy_request_resolve_git_linked_worktree_access() {
+  local worktree_path=""
+
+  policy_req_git_linked_worktree_paths=()
+
+  if [[ -z "$policy_req_effective_workdir_git_root" ]]; then
+    return 0
+  fi
+
+  while IFS= read -r worktree_path || [[ -n "$worktree_path" ]]; do
+    [[ -n "$worktree_path" ]] || continue
+    if [[ "$worktree_path" == "$policy_req_effective_workdir" ]]; then
+      continue
+    fi
+    safehouse_array_append_unique policy_req_git_linked_worktree_paths "$worktree_path"
+  done < <(safehouse_emit_git_worktree_paths "$policy_req_effective_workdir_git_root")
+}
+
 policy_request_resolve_append_profile_paths() {
   local raw_profile_path expanded_profile_path normalized_profile_path
 
@@ -436,6 +490,9 @@ policy_request_build() {
   safehouse_array_copy cli_add_dirs_rw_inputs cli_policy_add_dirs_rw_values
   policy_request_resolve_trust_workdir_config || return 1
   policy_request_resolve_effective_workdir || return 1
+  policy_request_resolve_effective_workdir_git_root || return 1
+  policy_request_resolve_git_worktree_common_dir_access || return 1
+  policy_request_resolve_git_linked_worktree_access || return 1
   policy_request_resolve_append_profile_paths || return 1
   policy_request_load_effective_workdir_config config_add_dirs_ro_inputs config_add_dirs_rw_inputs || return 1
   policy_request_merge_add_dir_inputs \

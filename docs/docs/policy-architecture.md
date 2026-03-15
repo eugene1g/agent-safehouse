@@ -11,11 +11,11 @@ Policy assembly order:
 | `20-network.sb` | Network policy |
 | `30-toolchains/*.sb` | Apple Toolchain Core, Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent modules |
-| `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`) |
+| `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`) |
 | `55-integrations-optional/*.sb` | Opt-in integrations (`--enable=...`) |
 | `60-agents/*.sb` | Per-agent profile selection by command basename |
 | `65-apps/*.sb` | Per-app bundle selection (`Claude.app`, `Visual Studio Code.app`) |
-| Config/env/CLI grants | Trusted `.safehouse` config, env grants, CLI grants, auto-detected app bundle read grant, selected workdir |
+| Config/env/CLI grants | Trusted `.safehouse` config, env grants, CLI grants, auto-detected app bundle read grant, selected workdir, launch-time active-worktree common-dir grant, and launch-time sibling worktree read grants |
 | Appended profiles | User profile overlays via `--append-profile` (loaded last) |
 
 ## Ordering Rules Matter
@@ -26,6 +26,8 @@ Important implications:
 
 - Broad late grants (for example `--add-dirs` or `--enable=wide-read`) can reopen earlier read denies.
 - Appended profiles (`--append-profile`) are the correct final override layer for must-not-read path denials.
+- Active linked-worktree common-dir detection happens at launch.
+- Sibling worktree read grants are a launch-time snapshot. New worktrees created after the process starts are not added to the active policy.
 
 ## Path Matchers
 

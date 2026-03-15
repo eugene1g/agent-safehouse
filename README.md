@@ -96,4 +96,6 @@ Example machine-local policy file:
 
 Use `--add-dirs-ro` or `--add-dirs` for normal shared-folder access, and keep `--append-profile` for machine-local policy exceptions or final deny/allow overrides. That pattern is useful when the repo is shared but each developer machine has different local mount points.
 
+Git worktrees are auto-detected at launch: the selected worktree gets the shared Git metadata access it needs when its common dir lives outside the selected workdir, and the other existing linked worktrees for that repo become readable by default for cross-tree inspection. That snapshot does not update for already-running processes, so if you create worktrees under a stable parent such as `~/worktrees`, prefer adding that root explicitly with `--add-dirs-ro`.
+
 All detailed documentation (setup, usage, options, architecture, testing, debugging, and investigations) lives in the VitePress docs site.

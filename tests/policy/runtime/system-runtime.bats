@@ -23,6 +23,8 @@ load ../../test_helper.bash
   sft_assert_includes_source "$profile" "50-integrations-core/launch-services.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/scm-clis.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/ssh-agent-default-deny.sb"
+  sft_assert_includes_source "$profile" "50-integrations-core/worktree-common-dir.sb"
+  sft_assert_includes_source "$profile" "50-integrations-core/worktrees.sb"
 }
 
 @test "[EXECUTION] default sandbox can read standard runtime paths and devices" {

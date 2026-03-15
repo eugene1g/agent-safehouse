@@ -26,6 +26,9 @@ safehouse --workdir=/tmp/scratch -- claude --dangerously-skip-permissions
 
 # Disable automatic workdir grants; use only explicit grants
 safehouse --workdir= --add-dirs-ro=/repos/shared-lib --add-dirs=/tmp/scratch -- aider
+
+# Pre-grant a stable worktree root for future cross-worktree read context without restarting
+safehouse --add-dirs-ro=~/worktrees -- claude --dangerously-skip-permissions
 ```
 
 ## Config via Environment Variables
@@ -74,6 +77,7 @@ safehouse --enable=xcode -- xcodebuild -scheme MyApp build
 
 # Broad read-only visibility across /
 safehouse --enable=wide-read -- claude --dangerously-skip-permissions
+
 ```
 
 Common Apple shimmed tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are covered by the default `apple-toolchain-core` toolchain profile.
@@ -81,6 +85,20 @@ Common Apple shimmed tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bi
 `--enable=lldb` opens the sandbox side for LLDB/debugger workflows, but macOS can still deny attach to protected or non-debuggable targets.
 
 `--enable=xcode` is for Xcode builds, simulator/device tooling, and per-user Xcode state. It does not grant debugger task-port access; keep `--enable=lldb` separate for real debugger sessions.
+
+## Git Worktrees
+
+When the selected workdir resolves to a Git worktree root, Safehouse automatically grants read/write access to the shared Git common dir when that metadata lives outside the selected workdir.
+
+Safehouse also snapshots the current worktree set and grants read-only access to the other existing worktree paths for that repo.
+
+This is decided when Safehouse starts the wrapped process. If you create new worktrees later, the already-running sandbox does not gain access to those new paths automatically.
+
+If your worktrees are always created under a stable folder such as `~/worktrees/project-name`, grant that parent up front. Use `--add-dirs-ro` for the same cross-worktree read behavior without restarting, or `--add-dirs` if you intentionally want write access too:
+
+```bash
+safehouse --add-dirs-ro=~/worktrees/project-name -- codex --dangerously-bypass-approvals-and-sandbox
+```
 
 ## Environment Modes
 

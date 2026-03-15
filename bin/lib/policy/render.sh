@@ -33,6 +33,16 @@ policy_render_append_profile() {
   local profile_key="$1"
   local content
 
+  if [[ "$profile_key" == "profiles/50-integrations-core/worktree-common-dir.sb" ]]; then
+    policy_render_append_resolved_worktree_common_dir_profile "$profile_key" || return 1
+    return 0
+  fi
+
+  if [[ "$profile_key" == "profiles/50-integrations-core/worktrees.sb" ]]; then
+    policy_render_append_resolved_worktrees_profile "$profile_key" || return 1
+    return 0
+  fi
+
   content="$(policy_source_read_profile_content "$profile_key")" || return 1
   printf '%s\n\n' "$content" >&"$policy_render_target_fd"
 }
@@ -163,7 +173,7 @@ policy_render_append_optional_profiles() {
   done
 }
 
-policy_render_emit_path_ancestor_literals() {
+policy_render_build_path_ancestor_literals_block() {
   local path="$1"
   local label="$2"
   local chunk trimmed_path current_path path_part escaped_current_path
@@ -195,7 +205,11 @@ policy_render_emit_path_ancestor_literals() {
   fi
 
   chunk+=$'\n)\n'
-  printf '%s' "$chunk" >&"$policy_render_target_fd"
+  printf '%s' "$chunk"
+}
+
+policy_render_emit_path_ancestor_literals() {
+  policy_render_build_path_ancestor_literals_block "$1" "$2" >&"$policy_render_target_fd"
 }
 
 policy_render_emit_path_ancestor_metadata_literals() {
@@ -281,6 +295,93 @@ policy_render_emit_wide_read_access() {
   policy_render_write_line ";; Use --append-profile deny rules if you must keep specific paths unreadable."
   policy_render_write_line "(allow file-read* (subpath \"/\"))"
   policy_render_write_blank
+}
+
+policy_render_build_git_worktree_common_dir_rule_block() {
+  local path="$1"
+  local escaped_path
+
+  if [[ -z "$path" ]]; then
+    return 0
+  fi
+
+  printf '%s\n' ";; #safehouse-test-id:git-worktree-common-dir-grant# Allow linked git worktrees to read/write shared repository metadata."
+  printf '%s\n' ";; Git stores refs/index/worktree bookkeeping under the common dir owned by the main checkout."
+  policy_render_build_path_ancestor_literals_block "$path" "git worktree common dir" || return 1
+  escaped_path="$(safehouse_escape_for_sb "$path")" || return 1
+  printf '(allow file-read* file-write* (subpath "%s"))\n\n' "$escaped_path"
+}
+
+policy_render_build_git_linked_worktree_rule_block() {
+  local path="$1"
+  local escaped_path
+
+  if [[ -z "$path" ]]; then
+    return 0
+  fi
+
+  printf '%s\n' ";; #safehouse-test-id:git-linked-worktree-grant# Allow read access to linked git worktrees discovered at Safehouse launch."
+  printf '%s\n' ";; Keep sibling worktrees read-only by default; the selected workdir retains its own read/write grant."
+  printf '%s\n' ";; New worktrees created after launch are not added to this running policy."
+  policy_render_build_path_ancestor_literals_block "$path" "linked git worktree" || return 1
+  escaped_path="$(safehouse_escape_for_sb "$path")" || return 1
+  printf '(allow file-read* (subpath "%s"))\n\n' "$escaped_path"
+}
+
+policy_render_build_git_worktree_common_dir_runtime_rules_block() {
+  if [[ -n "${policy_req_git_worktree_common_dir:-}" ]]; then
+    policy_render_build_git_worktree_common_dir_rule_block "$policy_req_git_worktree_common_dir" || return 1
+    return 0
+  fi
+
+  printf '%s\n' ";; No external shared git common dir detected for this selected workdir."
+}
+
+policy_render_build_git_linked_worktree_runtime_rules_block() {
+  local worktree_path
+
+  if [[ "${#policy_req_git_linked_worktree_paths[@]}" -gt 0 ]]; then
+    for worktree_path in "${policy_req_git_linked_worktree_paths[@]}"; do
+      policy_render_build_git_linked_worktree_rule_block "$worktree_path" || return 1
+    done
+    return 0
+  fi
+
+  printf '%s\n' ";; No linked git worktree snapshot detected for this selected workdir."
+}
+
+policy_render_append_resolved_worktree_common_dir_profile() {
+  local profile_key="$1"
+  local content common_dir_status runtime_rules
+
+  content="$(policy_source_read_profile_content "$profile_key")" || return 1
+  if [[ -n "${policy_req_git_worktree_common_dir:-}" ]]; then
+    common_dir_status="${policy_req_git_worktree_common_dir}"
+  else
+    common_dir_status="(none)"
+  fi
+  runtime_rules="$(policy_render_build_git_worktree_common_dir_runtime_rules_block)" || return 1
+
+  content="$(printf '%s' "$content" | safehouse_replace_literal_stream_required "$WORKTREES_COMMON_DIR_STATUS_TEMPLATE_TOKEN" "$common_dir_status")" || return 1
+  printf '%s\n\n' "$content" >&"$policy_render_target_fd"
+  printf '%s\n\n' "$runtime_rules" >&"$policy_render_target_fd"
+}
+
+policy_render_append_resolved_worktrees_profile() {
+  local profile_key="$1"
+  local content linked_paths_status runtime_rules
+
+  content="$(policy_source_read_profile_content "$profile_key")" || return 1
+  if [[ "${#policy_req_git_linked_worktree_paths[@]}" -gt 0 ]]; then
+    linked_paths_status="$(safehouse_join_by_space "${policy_req_git_linked_worktree_paths[@]}")"
+  else
+    linked_paths_status="$(safehouse_join_by_space)"
+  fi
+  runtime_rules="$(policy_render_build_git_linked_worktree_runtime_rules_block)" || return 1
+
+  content="$(printf '%s' "$content" | safehouse_replace_literal_stream_required "$WORKTREES_LINKED_PATHS_STATUS_TEMPLATE_TOKEN" "$linked_paths_status")" || return 1
+  printf '%s\n\n' "$content" >&"$policy_render_target_fd"
+  printf '%s\n\n' "$runtime_rules" >&"$policy_render_target_fd"
 }
 
 policy_render_emit_workdir_access() {

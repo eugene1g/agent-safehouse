@@ -1,0 +1,26 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Git Worktree Common Dir
+;; Minimal support for running inside a linked Git worktree.
+;; Source: 50-integrations-core/worktree-common-dir.sb
+;; ---------------------------------------------------------------------------
+
+;; Why this exists:
+;; A linked Git worktree can keep refs, the index, and worktree bookkeeping
+;; under a shared git common dir outside the selected workdir. Without access
+;; to that shared metadata, normal git commands from the active worktree fail
+;; even though the checkout itself is already writable.
+;;
+;; Limitations:
+;; - Detection happens once when Safehouse launches the wrapped process.
+;; - This only grants the active worktree's shared git common dir when the
+;;   selected workdir itself resolves to a Git worktree root.
+;; - Sibling worktree files are handled separately by the default `worktrees`
+;;   integration and remain read-only.
+;;
+;; Runtime snapshot (this placeholder comment line is replaced at launch):
+;;   shared git common dir: __SAFEHOUSE_REPLACE_ME_WITH_GIT_WORKTREE_COMMON_DIR_STATUS__
+;;
+;; Example generated rules (illustrative only; actual paths depend on launch):
+;;   (allow file-read* file-write* (subpath "/Users/alice/src/project/.git"))
+;;
+;; Runtime-generated rules are emitted immediately below this profile section.

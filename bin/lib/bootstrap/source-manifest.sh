@@ -9,6 +9,7 @@ SAFEHOUSE_LIB_SOURCE_MANIFEST=(
   "support/strings.sh"
   "support/env.sh"
   "support/paths.sh"
+  "support/git-discovery.sh"
   "support/sb.sh"
 
   # Policy pipeline

@@ -57,7 +57,7 @@ Policy concatenation order in `bin/safehouse.sh`/`bin/lib/*.sh`:
 3. `profiles/20-network.sb`
 4. `profiles/30-toolchains/*.sb`
 5. `profiles/40-shared/*.sb`
-6. `profiles/50-integrations-core/*.sb` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny` always on)
+6. `profiles/50-integrations-core/*.sb` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktrees` always on)
 7. `profiles/55-integrations-optional/*.sb` (`--enable`, with `electron` implying `macos-gui`; keychain injected selectively)
 8. `profiles/60-agents/*.sb`
 9. `profiles/65-apps/*.sb`
