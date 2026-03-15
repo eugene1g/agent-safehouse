@@ -16,17 +16,25 @@ load ../../test_helper.bash
 }
 
 @test "[EXECUTION] enable=agent-browser can open example.com and read the page title" {
-  local precheck_session sandbox_session
+  local precheck_session sandbox_session socket_dir
 
   sft_require_cmd_or_skip agent-browser
 
   precheck_session="safehouse-agent-browser-precheck-${BATS_TEST_NUMBER}-$$"
   sandbox_session="safehouse-agent-browser-sandbox-${BATS_TEST_NUMBER}-$$"
+  socket_dir="$(sft_workspace_path ".agent-browser-sockets-${BATS_TEST_NUMBER}")" || return 1
+  mkdir -p "$socket_dir"
 
-  run agent_browser_get_example_title "$precheck_session" "$SAFEHOUSE_HOST_HOME"
+  run agent_browser_get_example_title "$precheck_session" "$SAFEHOUSE_HOST_HOME" "$socket_dir"
   [ "$status" -eq 0 ] || skip "agent-browser precheck failed outside sandbox"
 
-  HOME="$SAFEHOUSE_HOST_HOME" run safehouse_ok --enable=agent-browser -- /bin/sh -c '
+  run safehouse_ok_env \
+    "HOME=$SAFEHOUSE_HOST_HOME" \
+    "AGENT_BROWSER_SOCKET_DIR=$socket_dir" \
+    "AGENT_BROWSER_DEFAULT_TIMEOUT=10000" \
+    -- \
+    --enable=agent-browser \
+    -- /bin/sh -c '
     session_name="$1"
     cleanup() {
       agent-browser --session "$session_name" close >/dev/null 2>&1 || true
@@ -34,7 +42,7 @@ load ../../test_helper.bash
     trap cleanup EXIT
 
     agent-browser --session "$session_name" open https://example.com >/dev/null &&
-      agent-browser --session "$session_name" wait --load networkidle >/dev/null &&
+      agent-browser --session "$session_name" wait 500 >/dev/null &&
       agent-browser --session "$session_name" get title
   ' _ "$sandbox_session"
   [ "$status" -eq 0 ]
@@ -42,9 +50,12 @@ load ../../test_helper.bash
 }
 
 agent_browser_get_example_title() {
-  local session_name="$1" home_dir="${2:-$HOME}"
+  local session_name="$1" home_dir="${2:-$HOME}" socket_dir="${3:-}"
 
-  HOME="$home_dir" /bin/sh -c '
+  HOME="$home_dir" \
+    AGENT_BROWSER_SOCKET_DIR="$socket_dir" \
+    AGENT_BROWSER_DEFAULT_TIMEOUT=10000 \
+    /bin/sh -c '
     session_name="$1"
     cleanup() {
       agent-browser --session "$session_name" close >/dev/null 2>&1 || true
@@ -52,7 +63,7 @@ agent_browser_get_example_title() {
     trap cleanup EXIT
 
     agent-browser --session "$session_name" open https://example.com >/dev/null &&
-      agent-browser --session "$session_name" wait --load networkidle >/dev/null &&
+      agent-browser --session "$session_name" wait 500 >/dev/null &&
       agent-browser --session "$session_name" get title
   ' _ "$session_name"
 }

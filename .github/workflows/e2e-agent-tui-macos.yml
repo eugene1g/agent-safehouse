@@ -60,7 +60,6 @@ jobs:
             @mariozechner/pi-coding-agent \
             @openai/codex \
             @sourcegraph/amp \
-            cline \
             opencode-ai
 
       - name: Run agent TUI tests

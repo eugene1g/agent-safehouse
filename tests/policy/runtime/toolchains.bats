@@ -28,12 +28,12 @@ load ../../test_helper.bash
   sft_require_cmd_or_skip java
   sft_require_cmd_or_skip javac
 
-  local src out
+  local src
   src="$(sft_workspace_path "Hello.java")" || return 1
   printf 'public class Hello { public static void main(String[] a) { System.out.println("sandboxed-java"); } }\n' > "$src"
 
-  java -version >/dev/null 2>&1 || skip "java runtime precheck failed outside sandbox"
-  javac -version >/dev/null 2>&1 || skip "javac precheck failed outside sandbox"
+  run /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && javac Hello.java && java Hello"
+  [ "$status" -eq 0 ] || skip "java toolchain precheck failed outside sandbox"
 
   safehouse_ok -- /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && javac Hello.java && java Hello"
 }
