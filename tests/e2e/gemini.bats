@@ -74,13 +74,16 @@ configure_agent_tui() {
   if (( AGENT_TUI_PROMPT_VISIBLE_TIMEOUT_SECS < 12 )); then
     AGENT_TUI_PROMPT_VISIBLE_TIMEOUT_SECS=12
   fi
-  if (( AGENT_TUI_RESPONSE_TIMEOUT_SECS < 30 )); then
-    AGENT_TUI_RESPONSE_TIMEOUT_SECS=30
+  if (( AGENT_TUI_RESPONSE_TIMEOUT_SECS < 60 )); then
+    AGENT_TUI_RESPONSE_TIMEOUT_SECS=60
   fi
   # Gemini's Ink UI can keep the placeholder visible in tmux captures until
   # submit even when the input buffer is ready, so rely on the roundtrip token
   # instead of a pre-submit prompt echo.
   AGENT_TUI_PROMPT_VISIBLE_MODE="none"
+  # Give Gemini's hidden input buffer extra time to absorb the injected text
+  # before Enter on busy CI runners.
+  AGENT_TUI_SUBMIT_DELAY_SECS=1
 }
 
 handle_startup_gates() {
