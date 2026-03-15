@@ -3,12 +3,25 @@
 
 policy_explain_print_summary() {
   local workdir_status config_status keychain_status exec_env_status env_pass_names_status profile_env_defaults_status
+  local git_worktree_common_dir_status git_worktree_paths_status
   local idx profile reason
 
   if [[ -n "$policy_req_effective_workdir" ]]; then
     workdir_status="${policy_req_effective_workdir}"
   else
     workdir_status="(disabled)"
+  fi
+
+  if [[ -n "${policy_req_git_worktree_common_dir:-}" ]]; then
+    git_worktree_common_dir_status="${policy_req_git_worktree_common_dir}"
+  else
+    git_worktree_common_dir_status="(none)"
+  fi
+
+  if [[ "${#policy_req_git_linked_worktree_paths[@]}" -gt 0 ]]; then
+    git_worktree_paths_status="$(safehouse_join_by_space "${policy_req_git_linked_worktree_paths[@]}")"
+  else
+    git_worktree_paths_status="$(safehouse_join_by_space)"
   fi
 
   if [[ "$policy_plan_keychain_included" -eq 1 ]]; then
@@ -71,6 +84,8 @@ policy_explain_print_summary() {
     echo "  effective workdir: ${workdir_status} (source: ${policy_req_effective_workdir_source:-unknown})"
     echo "  workdir config trust: $([[ "$policy_req_trust_workdir_config" -eq 1 ]] && echo "enabled" || echo "disabled") (source: ${policy_req_trust_workdir_config_source})"
     echo "  workdir config: ${config_status}"
+    echo "  git worktree common dir grant: ${git_worktree_common_dir_status}"
+    echo "  git linked worktree read grants: ${git_worktree_paths_status}"
     if [[ "${#policy_plan_readonly_paths[@]}" -gt 0 ]]; then
       echo "  add-dirs-ro (normalized): $(safehouse_join_by_space "${policy_plan_readonly_paths[@]}")"
     else

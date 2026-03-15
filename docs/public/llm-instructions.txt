@@ -85,6 +85,8 @@ If you generate a wrapper script, make it behave like this:
 - resolve effective workdir as: explicit flag, then `git rev-parse --show-toplevel`, then `pwd -P`
 - generate the ancestor `literal` rules for that workdir at launch time
 - generate the workdir read/write rules at launch time
+- if the selected workdir is a git worktree root, snapshot the existing linked worktree paths at launch time and emit read-only grants for those sibling worktrees directly into the generated policy
+- if the selected workdir is a linked git worktree root, grant its shared git common dir read/write access when that metadata lives outside the selected workdir
 - write a temporary policy file, then run `sandbox-exec` with that file
 - clean up temporary files with `trap`
 

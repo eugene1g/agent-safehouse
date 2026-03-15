@@ -67,6 +67,13 @@ Safehouse resolves the effective workdir in this order:
 3. Git root above the invocation directory (if present)
 4. Otherwise the invocation directory
 
+When the effective workdir is a Git worktree root:
+
+- If the current worktree uses a shared Git common dir outside the selected workdir, that common dir gets automatic read/write access.
+- Safehouse snapshots the current worktree set at launch time and grants read-only access to the other existing linked worktree paths.
+- That worktree snapshot is fixed for the lifetime of the running sandboxed process. New worktrees created after launch are not added automatically.
+- If your worktrees live under a stable parent directory and you want future worktrees available without restarting the agent, grant that parent explicitly with `--add-dirs-ro=/path/to/worktrees-root` for the same read behavior, or `--add-dirs=/path/to/worktrees-root` if you intentionally want write access too.
+
 Path grant merge order:
 
 1. Trusted `<workdir>/.safehouse` (when trust is enabled)

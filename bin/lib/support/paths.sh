@@ -48,20 +48,3 @@ safehouse_normalize_abs_path() {
 
   printf '%s/%s\n' "$parent_resolved" "$base"
 }
-
-safehouse_find_git_root() {
-  local cwd="$1"
-  local git_root=""
-
-  if ! command -v git >/dev/null 2>&1; then
-    return 1
-  fi
-
-  git_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
-  if [[ -n "$git_root" && -d "$git_root" ]]; then
-    printf '%s\n' "$git_root"
-    return 0
-  fi
-
-  return 1
-}

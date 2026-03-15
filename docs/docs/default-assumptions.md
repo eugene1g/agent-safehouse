@@ -14,10 +14,12 @@ This page documents the baseline assumptions Safehouse makes so default behavior
 These are baseline allowances intended to keep common workflows functional:
 
 - Selected workdir read/write (git root above CWD, otherwise CWD).
+- Existing linked Git worktrees for the selected repo root are granted read-only visibility when they exist at launch time.
+- Shared Git common-dir metadata for linked worktrees is granted read/write when it lives outside the selected workdir.
 - Core system/runtime paths required by shells, compilers, and package managers.
 - Toolchain profile access under `profiles/30-toolchains/`.
 - Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
-- Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`).
+- Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
 - Agent-specific profile selection for the wrapped command.
 - Network access (open by default).
 - Sanitized runtime environment (not full shell env by default; preserves `SDKROOT` when set).
@@ -67,6 +69,7 @@ Enable only when required for the current task:
 ## Operational Defaults for Common Scenarios
 
 - **Daily coding agent use**: no optional integrations; rely on workdir + minimal explicit grants.
+- **Multi-worktree repo use**: existing worktrees are readable by default at launch; add `--add-dirs-ro` for a stable worktree parent if you need future worktrees for read context without restarting, or `--add-dirs` if you intentionally want broader write access.
 - **Cross-repo read context**: add `--add-dirs-ro` for specific sibling paths or files.
 - **Cloud task burst**: enable `cloud-credentials` only for that run/session.
 - **Docker/k8s workflow**: enable `docker` and/or `kubectl` only while needed.

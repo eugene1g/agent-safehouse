@@ -1,0 +1,26 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Worktrees
+;; Launch-time snapshot of sibling Git worktree paths for cross-worktree read access.
+;; Source: 50-integrations-core/worktrees.sb
+;; ---------------------------------------------------------------------------
+
+;; Why this exists:
+;; Multi-worktree flows often involve inspecting diffs, review branches, or
+;; alternative implementations across sibling worktrees in the same repository.
+;; Safehouse grants that visibility by default so agents can compare work
+;; across existing worktrees without manual path flags.
+;;
+;; Limitations:
+;; - The snapshot is computed once when Safehouse launches the wrapped process.
+;; - New worktrees created after launch are NOT added to the running sandbox.
+;; - Sibling worktrees stay read-only by default; use --add-dirs when you
+;;   intentionally want broader write access to a stable worktree parent.
+;;
+;; Runtime snapshot (this placeholder comment line is replaced at launch):
+;;   linked worktree read paths: __SAFEHOUSE_REPLACE_ME_WITH_GIT_LINKED_WORKTREE_PATHS_STATUS__
+;;
+;; Example generated rules (illustrative only; actual paths depend on launch):
+;;   (allow file-read* (subpath "/Users/alice/src/project-review"))
+;;   (allow file-read* (subpath "/Users/alice/src/project-fixup"))
+;;
+;; Runtime-generated rules are emitted immediately below this profile section.

@@ -267,6 +267,9 @@ collect_dist_preassembled_render_chunks() {
       "profiles/20-network.sb" | profiles/30-toolchains/*.sb | profiles/40-shared/*.sb)
         dist_preassembled_fixed_after_home_keys+=("$rel_path")
         ;;
+      profiles/50-integrations-core/worktree-common-dir.sb | profiles/50-integrations-core/worktrees.sb)
+        :
+        ;;
       profiles/50-integrations-core/*.sb)
         dist_preassembled_core_integration_keys+=("$rel_path")
         ;;
@@ -878,6 +881,8 @@ policy_render_emit_fixed_sections() {
 policy_render_emit_integration_sections() {
   policy_render_emit_integration_preamble
   policy_dist_append_preassembled_core_integrations || return 1
+  policy_render_append_profile "profiles/50-integrations-core/worktree-common-dir.sb" || return 1
+  policy_render_append_profile "profiles/50-integrations-core/worktrees.sb" || return 1
   policy_render_append_optional_profiles || return 1
 }
 

@@ -38,3 +38,30 @@ load ../../test_helper.bash
   sft_assert_file_contains "$pass_log" "execution environment: sanitized allowlist + named host vars (SAFEHOUSE_TEST_EXPLAIN)"
   sft_assert_file_contains "$profile_log" "profile env defaults: PLAYWRIGHT_MCP_SANDBOX=false"
 }
+
+@test "--explain reports default git worktree common-dir and sibling read grants" {
+  local explain_log repo_root worktree_parent linked_worktree sibling_worktree git_common_dir
+
+  sft_require_cmd_or_skip git
+
+  explain_log="$(sft_workspace_path "explain-worktree.log")"
+  repo_root="$(sft_external_dir "explain-git-worktree")" || return 1
+  worktree_parent="$(dirname "$repo_root")"
+  linked_worktree="${worktree_parent}/feature-worktree"
+  sibling_worktree="${worktree_parent}/review-worktree"
+
+  git -C "$repo_root" init -q || return 1
+  printf '%s\n' "tracked" > "${repo_root}/tracked.txt"
+  git -C "$repo_root" add tracked.txt || return 1
+  git -C "$repo_root" -c user.name=test -c user.email=test@example.com commit -q -m init || return 1
+  git -C "$repo_root" branch feature || return 1
+  git -C "$repo_root" branch review || return 1
+  git -C "$repo_root" worktree add -q "$linked_worktree" feature || return 1
+  git -C "$repo_root" worktree add -q "$sibling_worktree" review || return 1
+  git_common_dir="$(git -C "$linked_worktree" rev-parse --path-format=absolute --git-common-dir)"
+
+  safehouse_ok_in_dir "$linked_worktree" --explain --stdout >/dev/null 2>"$explain_log"
+
+  sft_assert_file_contains "$explain_log" "git worktree common dir grant: ${git_common_dir}"
+  sft_assert_file_contains "$explain_log" "git linked worktree read grants: ${repo_root} ${sibling_worktree}"
+}
