@@ -472,6 +472,11 @@ sft_agent_tui_wait_for_prompt_visible() {
   local visible_text="${AGENT_TUI_PROMPT_VISIBLE_TEXT:-${AGENT_TUI_PROMPT_TEXT}}"
 
   case "${visible_mode}" in
+    none)
+      # Some TUIs keep rendering the placeholder until submit, so prompt echo
+      # visibility is not a reliable signal that input landed.
+      return 0
+      ;;
     ""|literal)
       sft_tmux_wait_until "${visible_text}" "${timeout_secs}" "${poll_secs}"
       ;;

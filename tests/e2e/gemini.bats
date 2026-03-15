@@ -77,10 +77,10 @@ configure_agent_tui() {
   if (( AGENT_TUI_RESPONSE_TIMEOUT_SECS < 30 )); then
     AGENT_TUI_RESPONSE_TIMEOUT_SECS=30
   fi
-  # Gemini currently normalizes the echoed prompt by dropping the question
-  # mark, so use an explicit visibility regex instead of exact literal echo.
-  AGENT_TUI_PROMPT_VISIBLE_MODE="regex"
-  AGENT_TUI_PROMPT_VISIBLE_REGEX='What is the capital of England\?? Reply with only the city name\.'
+  # Gemini's Ink UI can keep the placeholder visible in tmux captures until
+  # submit even when the input buffer is ready, so rely on the roundtrip token
+  # instead of a pre-submit prompt echo.
+  AGENT_TUI_PROMPT_VISIBLE_MODE="none"
 }
 
 handle_startup_gates() {

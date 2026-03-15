@@ -47,3 +47,18 @@ load agent_tui_harness.bash
   sft_tmux_wait_until "Ready" 2 0.1
   sft_tmux_assert_roundtrip
 }
+
+@test "[E2E-TUI] prompt visibility can be skipped for submit-only UIs" {
+  local fake_agent_code=""
+
+  sft_require_cmd_or_skip "python3"
+
+  fake_agent_code=$'import sys, termios, tty\nfd = sys.stdin.fileno()\nold = termios.tcgetattr(fd)\nbuf = []\nprint("Ready", flush=True)\nprint("  Type your message or @path/to/file", flush=True)\ntry:\n    tty.setcbreak(fd)\n    while True:\n        ch = sys.stdin.read(1)\n        if not ch:\n            break\n        if ch in "\\r\\n":\n            print("London", flush=True)\n            break\n        buf.append(ch)\n        print("  Type your message or @path/to/file", flush=True)\n        sys.stdout.flush()\nfinally:\n    termios.tcsetattr(fd, termios.TCSADRAIN, old)\n'
+
+  AGENT_TUI_PROMPT_VISIBLE_MODE="none"
+  AGENT_TUI_SUBMIT_DELAY_SECS=0
+
+  sft_tmux_start_session python3 -u -c "${fake_agent_code}"
+  sft_tmux_wait_until "Ready" 2 0.1
+  sft_tmux_assert_roundtrip
+}
