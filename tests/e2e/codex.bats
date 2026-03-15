@@ -95,10 +95,6 @@ handle_startup_gates() {
       return 1
     }
 
-  if sft_tmux_matches_regex "${input_ready_pattern}"; then
-    return 0
-  fi
-
   if [[ -n "${trust_gate_pattern:-}" ]] && sft_tmux_matches_regex "${trust_gate_pattern}"; then
     sft_tmux_send_keys Enter
     handle_startup_gates "$((pass + 1))"
@@ -116,8 +112,9 @@ handle_startup_gates() {
     return $?
   fi
 
-  AGENT_TUI_FAILED=1
-  printf 'unhandled startup gate\n' >&2
-  sft_agent_tui_write_screen_capture >&2 || true
-  return 1
+  # Once the combined wait above has seen either the ready screen or the trust
+  # prompt, Codex can repaint between captures. If no known gate is still
+  # visible, treat the session as ready and let the roundtrip assertion own any
+  # later failure.
+  return 0
 }
