@@ -9,7 +9,7 @@
     (home-prefix "/.gitignore")    ;; User global gitignore variants (.gitignore, .gitignore_global, etc.).
     (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
     (home-literal "/.gitattributes")  ;; Global gitattributes file.
-    (home-literal "/.ssh")         ;; Directory traversal for default SSH metadata grants used by git-over-ssh.
-    (home-literal "/.ssh/config")  ;; SSH host aliases/IdentityFile selection used by git remotes.
-    (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by SSH git transports.
+    (home-literal "/.ssh")         ;; Directory traversal for baseline SSH metadata paths used by git and ssh utilities.
+    (home-literal "/.ssh/config")  ;; SSH host aliases/IdentityFile selection consulted when ssh integration is enabled.
+    (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by ssh tooling and git-over-ssh.
 )

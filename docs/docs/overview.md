@@ -29,13 +29,15 @@ Each policy rule should answer one question:
 - Agent/app-specific config grants scoped to the wrapped command.
 - Keychain/security integration when selected profiles declare keychain dependency metadata.
 - Core SCM integration profiles and related defaults for tools such as `git`, `gh`, and `glab`.
-- Sanitized runtime environment by default, with explicit opt-in controls for env pass-through and `SDKROOT` preserved when set.
-- Network access by default for registries, APIs, remotes, and MCP servers.
+- Sanitized runtime environment by default, with explicit opt-in controls for env pass-through, `SDKROOT` preserved when set, and `SSH_AUTH_SOCK` omitted unless `--enable=ssh` is selected.
+- General network access by default for registries, APIs, remotes, and MCP servers, except outbound TCP 22.
 - Temporary directories and runtime IPC services required by common CLI workflows.
 
 ## What Is Denied By Default
 
 - SSH private keys under `~/.ssh`.
+- `/usr/bin/ssh` execution and outbound TCP 22 unless `--enable=ssh` is used.
+- SSH agent socket access, including agent-backed git-over-SSH, unless `--enable=ssh` is used.
 - Shell startup files unless `--enable=shell-init` is used.
 - Sensitive browser profile data such as cookies, login data, history, and bookmarks.
 - Clipboard access unless `--enable=clipboard` is used.

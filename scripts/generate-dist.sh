@@ -884,6 +884,7 @@ policy_render_emit_integration_sections() {
   policy_render_append_profile "profiles/50-integrations-core/worktree-common-dir.sb" || return 1
   policy_render_append_profile "profiles/50-integrations-core/worktrees.sb" || return 1
   policy_render_append_optional_profiles || return 1
+  policy_render_emit_current_ssh_auth_sock_rules || return 1
 }
 
 SCRIPT

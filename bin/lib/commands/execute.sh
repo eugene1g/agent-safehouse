@@ -36,8 +36,9 @@ cmd_execute_apply_named_env_pass_overrides() {
 }
 
 cmd_execute_apply_safehouse_env_defaults() {
+  runtime_build_safehouse_default_exec_environment || return 1
   runtime_merge_exec_environment_defaults_if_missing runtime_execution_environment \
-    "APP_SANDBOX_CONTAINER_ID=agent-safehouse"
+    "${runtime_safehouse_default_exec_environment[@]}"
 }
 
 cmd_execute_build_environment() {

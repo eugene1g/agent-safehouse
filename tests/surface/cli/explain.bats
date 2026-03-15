@@ -39,6 +39,17 @@ load ../../test_helper.bash
   sft_assert_file_contains "$profile_log" "profile env defaults: PLAYWRIGHT_MCP_SANDBOX=false"
 }
 
+@test "--explain reports SSH_AUTH_SOCK handling" {
+  local explain_log
+
+  explain_log="$(sft_workspace_path "explain-ssh-auth-sock.log")"
+
+  SSH_AUTH_SOCK="/tmp/explain-ssh-auth.sock" \
+    safehouse_ok --enable=ssh --explain --stdout >/dev/null 2>"$explain_log"
+
+  sft_assert_file_contains "$explain_log" "SSH_AUTH_SOCK handling: auto-passed via --enable=ssh (/tmp/explain-ssh-auth.sock)"
+}
+
 @test "--explain reports default git worktree common-dir and sibling read grants" {
   local explain_log repo_root worktree_parent linked_worktree sibling_worktree git_common_dir
 

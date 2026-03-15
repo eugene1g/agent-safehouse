@@ -173,6 +173,61 @@ policy_render_append_optional_profiles() {
   done
 }
 
+policy_render_ssh_integration_selected() {
+  safehouse_array_contains_exact_by_name policy_plan_optional_profile_keys "profiles/55-integrations-optional/ssh.sb"
+}
+
+policy_render_resolve_current_ssh_auth_sock() {
+  local ssh_auth_sock="${SSH_AUTH_SOCK:-}"
+
+  [[ -n "$ssh_auth_sock" ]] || return 0
+  safehouse_validate_sb_string "$ssh_auth_sock" "SSH_AUTH_SOCK" || return 1
+
+  if [[ "$ssh_auth_sock" != /* ]]; then
+    return 0
+  fi
+
+  printf '%s\n' "$ssh_auth_sock"
+}
+
+policy_render_emit_current_ssh_auth_sock_deny() {
+  local ssh_auth_sock="$1"
+  local escaped_sock
+
+  escaped_sock="$(safehouse_escape_for_sb "$ssh_auth_sock")" || return 1
+
+  policy_render_write_line ";; #safehouse-test-id:current-ssh-auth-sock# Dynamic default-deny for the caller SSH_AUTH_SOCK path."
+  policy_render_write_line ";; Keep custom SSH agent socket locations opt-in just like the static launchd/Tahoe patterns."
+  policy_render_write_line "(deny file-read* file-write* (literal \"${escaped_sock}\"))"
+  policy_render_write_line "(deny network-outbound (remote unix-socket (path-literal \"${escaped_sock}\")))"
+  policy_render_write_blank
+}
+
+policy_render_emit_current_ssh_auth_sock_allow() {
+  local ssh_auth_sock="$1"
+  local escaped_sock
+
+  escaped_sock="$(safehouse_escape_for_sb "$ssh_auth_sock")" || return 1
+
+  policy_render_write_line ";; Re-open the caller SSH_AUTH_SOCK path when --enable=ssh is selected."
+  policy_render_emit_path_ancestor_literals "$ssh_auth_sock" "current SSH_AUTH_SOCK" || return 1
+  policy_render_write_line "(allow file-read* file-write* (literal \"${escaped_sock}\"))"
+  policy_render_write_line "(allow network-outbound (remote unix-socket (path-literal \"${escaped_sock}\")))"
+  policy_render_write_blank
+}
+
+policy_render_emit_current_ssh_auth_sock_rules() {
+  local ssh_auth_sock
+
+  ssh_auth_sock="$(policy_render_resolve_current_ssh_auth_sock)" || return 1
+  [[ -n "$ssh_auth_sock" ]] || return 0
+
+  policy_render_emit_current_ssh_auth_sock_deny "$ssh_auth_sock" || return 1
+  if policy_render_ssh_integration_selected; then
+    policy_render_emit_current_ssh_auth_sock_allow "$ssh_auth_sock" || return 1
+  fi
+}
+
 policy_render_build_path_ancestor_literals_block() {
   local path="$1"
   local label="$2"
@@ -479,6 +534,7 @@ policy_render_emit_integration_sections() {
   policy_render_emit_integration_preamble
   policy_render_append_unscoped_module_dir "profiles/50-integrations-core" || return 1
   policy_render_append_optional_profiles || return 1
+  policy_render_emit_current_ssh_auth_sock_rules || return 1
 }
 
 policy_render_emit_scoped_sections() {

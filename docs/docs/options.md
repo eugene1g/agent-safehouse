@@ -84,6 +84,8 @@ Path grant merge order:
 
 Prefer sanitized mode plus `--env-pass` or `SAFEHOUSE_ENV_PASS` when only a few host variables are needed. For one-off child env values, put `NAME=VALUE` immediately after `--`, for example `safehouse -- MYVAR=123 printenv MYVAR`. `--env` disables that boundary and forwards the entire inherited host environment, including cloud credentials, API keys, and other secrets.
 
+`SSH_AUTH_SOCK` is not part of the default sanitized allowlist. Use `--enable=ssh` to auto-pass the current caller value, re-enable `/usr/bin/ssh`, and reopen outbound TCP 22 for SSH workflows. Use explicit env controls only when you need to inspect the variable without granting socket access.
+
 - `SAFEHOUSE_ADD_DIRS_RO`: colon-separated read-only path grants
 - `SAFEHOUSE_ADD_DIRS`: colon-separated read/write path grants
 - `SAFEHOUSE_WORKDIR`: workdir override (`SAFEHOUSE_WORKDIR=` disables automatic grants)
