@@ -59,6 +59,9 @@ configure_agent_tui() {
   AGENT_TUI_STARTUP_WAIT_SECS=60
   AGENT_TUI_RESPONSE_TIMEOUT_SECS=120
   AGENT_TUI_PROMPT_VISIBLE_TIMEOUT_SECS=8
+  # Kilo keeps the placeholder visible in tmux captures instead of echoing the
+  # full typed prompt before submit, so the response token is the stable signal.
+  AGENT_TUI_PROMPT_VISIBLE_MODE="none"
 }
 
 handle_startup_gates() {
