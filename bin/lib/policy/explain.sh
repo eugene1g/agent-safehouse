@@ -3,6 +3,7 @@
 
 policy_explain_print_summary() {
   local workdir_status config_status keychain_status exec_env_status env_pass_names_status profile_env_defaults_status
+  local ssh_auth_sock_status
   local git_worktree_common_dir_status git_worktree_paths_status
   local idx profile reason
 
@@ -40,6 +41,28 @@ policy_explain_print_summary() {
     profile_env_defaults_status="$(safehouse_join_by_space "${policy_plan_profile_runtime_env_defaults[@]}")"
   else
     profile_env_defaults_status="$(safehouse_join_by_space)"
+  fi
+
+  if [[ "${cli_runtime_env_mode:-sanitized}" == "passthrough" ]]; then
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+      ssh_auth_sock_status="passed through via --env (${SSH_AUTH_SOCK})"
+    else
+      ssh_auth_sock_status="caller env unset"
+    fi
+  elif [[ "${#cli_runtime_env_pass_names[@]}" -gt 0 ]] && safehouse_array_contains_exact "SSH_AUTH_SOCK" "${cli_runtime_env_pass_names[@]}"; then
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+      ssh_auth_sock_status="passed via --env-pass (${SSH_AUTH_SOCK})"
+    else
+      ssh_auth_sock_status="requested via --env-pass but caller env unset"
+    fi
+  elif safehouse_array_contains_exact_by_name policy_plan_optional_profile_keys "profiles/55-integrations-optional/ssh.sb"; then
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+      ssh_auth_sock_status="auto-passed via --enable=ssh (${SSH_AUTH_SOCK})"
+    else
+      ssh_auth_sock_status="caller env unset"
+    fi
+  else
+    ssh_auth_sock_status="not passed by default"
   fi
 
   case "${cli_runtime_env_mode:-sanitized}" in
@@ -113,6 +136,7 @@ policy_explain_print_summary() {
     fi
     echo "  keychain integration: ${keychain_status}"
     echo "  execution environment: ${exec_env_status}"
+    echo "  SSH_AUTH_SOCK handling: ${ssh_auth_sock_status}"
     echo "  profile env defaults: ${profile_env_defaults_status}"
     if [[ -n "${policy_req_invoked_command_path:-}" ]]; then
       echo "  invoked command: ${policy_req_invoked_command_path}"

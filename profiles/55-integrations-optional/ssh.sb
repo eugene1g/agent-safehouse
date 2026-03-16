@@ -1,10 +1,21 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: SSH
-;; SSH agent sockets, system config, key deny rules, and safe config access.
+;; SSH client exec, TCP 22, agent sockets, system config, and safe config access.
 ;; Source: 55-integrations-optional/ssh.sb
 ;; ---------------------------------------------------------------------------
 
-;; Consolidates agent socket access, system config reads, key deny rules, and safe config allowances.
+;; Consolidates ssh client execution, port 22 access, agent socket access,
+;; system config reads, key deny rules, and safe config allowances.
+
+;; Re-open the default /usr/bin/ssh client path when explicitly enabled.
+(allow process-exec
+    (literal "/usr/bin/ssh")
+)
+
+;; Re-open conventional SSH transport on TCP 22 when explicitly enabled.
+(allow network-outbound
+    (remote tcp "*:22")
+)
 
 ;; Defense-in-depth: block private key reads/writes by default.
 (deny file-read* file-write*
@@ -40,7 +51,8 @@
 )
 
 ;; SSH agent socket access via launchd-managed SSH_AUTH_SOCK and Tahoe-style
-;; ~/.ssh/agent sockets.
+;; ~/.ssh/agent sockets. Custom current SSH_AUTH_SOCK paths are re-opened
+;; dynamically at render time when --enable=ssh is selected.
 (allow file-read* file-write*
     (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")  ;; launchd-managed SSH_AUTH_SOCK path on macOS.
     (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")          ;; symlinked tmp variant of SSH_AUTH_SOCK path.

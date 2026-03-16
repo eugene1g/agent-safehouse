@@ -1,10 +1,21 @@
 ;; ---------------------------------------------------------------------------
 ;; Integration: SSH Agent Default Deny
-;; Default-deny SSH agent unix sockets; ssh integration can re-open later.
+;; Default-deny SSH agent unix sockets, ssh client exec, and TCP 22; ssh
+;; integration can re-open later.
 ;; Source: 50-integrations-core/ssh-agent-default-deny.sb
 ;; ---------------------------------------------------------------------------
 
-;; #safehouse-test-id:ssh-agent-socket-deny# Keep SSH agent credential use opt-in.
+;; #safehouse-test-id:ssh-agent-socket-deny# Keep SSH transport and credential use opt-in.
+;; Defense-in-depth: require --enable=ssh before launching /usr/bin/ssh.
+(deny process-exec
+    (literal "/usr/bin/ssh")
+)
+
+;; Defense-in-depth: require --enable=ssh before opening conventional SSH port 22.
+(deny network-outbound
+    (remote tcp "*:22")
+)
+
 ;; SSH clients use connect() on unix domain sockets, which sandbox-exec classifies
 ;; as network-outbound rather than file-read/write. Without this deny block,
 ;; open network policy in 20-network.sb allows agent-backed authentication even
@@ -13,4 +24,7 @@
     (remote unix-socket (path-regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
     (remote unix-socket (path-regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
     (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.ssh/agent(/.*)?$")))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.1password(/.*)?$")))
+    (remote unix-socket (path-regex #"^/Users/Shared/\.1password(/.*)?$"))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t/agent\\.sock$")))
 )

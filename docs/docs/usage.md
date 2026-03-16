@@ -60,6 +60,10 @@ safehouse --enable=docker -- docker ps
 # kubectl config/cache + krew paths
 safehouse --enable=kubectl -- kubectl get pods -A
 
+# SSH client access and git-over-SSH
+safehouse --enable=ssh -- git fetch
+safehouse --enable=ssh -- ssh git@github.com
+
 # Shell startup file reads
 safehouse --enable=shell-init -- claude --dangerously-skip-permissions
 
@@ -132,6 +136,8 @@ safehouse --env=./agent.env --env-pass=OPENAI_API_KEY -- codex --dangerously-byp
 # Inject a one-off child env value without inheriting the full host env
 safehouse -- MYVAR=123 printenv MYVAR
 ```
+
+`SSH_AUTH_SOCK` is intentionally omitted from sanitized mode. `--enable=ssh` auto-passes the current caller value, re-opens the matching socket path, re-enables `/usr/bin/ssh`, and re-allows outbound TCP 22 so SSH workflows can authenticate when needed.
 
 ## Electron Apps
 

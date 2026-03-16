@@ -871,9 +871,9 @@ __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_container_runtime_default_den
     (home-prefix "/.gitignore")    ;; User global gitignore variants (.gitignore, .gitignore_global, etc.).
     (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
     (home-literal "/.gitattributes")  ;; Global gitattributes file.
-    (home-literal "/.ssh")         ;; Directory traversal for default SSH metadata grants used by git-over-ssh.
-    (home-literal "/.ssh/config")  ;; SSH host aliases/IdentityFile selection used by git remotes.
-    (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by SSH git transports.
+    (home-literal "/.ssh")         ;; Directory traversal for baseline SSH metadata paths used by git and ssh utilities.
+    (home-literal "/.ssh/config")  ;; SSH host aliases/IdentityFile selection consulted when ssh integration is enabled.
+    (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by ssh tooling and git-over-ssh.
 )
 __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_git_sb__
       ;;
@@ -943,11 +943,22 @@ __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_scm_clis_sb__
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_ssh_agent_default_deny_sb__'
 ;; ---------------------------------------------------------------------------
 ;; Integration: SSH Agent Default Deny
-;; Default-deny SSH agent unix sockets; ssh integration can re-open later.
+;; Default-deny SSH agent unix sockets, ssh client exec, and TCP 22; ssh
+;; integration can re-open later.
 ;; Source: 50-integrations-core/ssh-agent-default-deny.sb
 ;; ---------------------------------------------------------------------------
 
-;; #safehouse-test-id:ssh-agent-socket-deny# Keep SSH agent credential use opt-in.
+;; #safehouse-test-id:ssh-agent-socket-deny# Keep SSH transport and credential use opt-in.
+;; Defense-in-depth: require --enable=ssh before launching /usr/bin/ssh.
+(deny process-exec
+    (literal "/usr/bin/ssh")
+)
+
+;; Defense-in-depth: require --enable=ssh before opening conventional SSH port 22.
+(deny network-outbound
+    (remote tcp "*:22")
+)
+
 ;; SSH clients use connect() on unix domain sockets, which sandbox-exec classifies
 ;; as network-outbound rather than file-read/write. Without this deny block,
 ;; open network policy in 20-network.sb allows agent-backed authentication even
@@ -956,6 +967,9 @@ __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_scm_clis_sb__
     (remote unix-socket (path-regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
     (remote unix-socket (path-regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
     (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.ssh/agent(/.*)?$")))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.1password(/.*)?$")))
+    (remote unix-socket (path-regex #"^/Users/Shared/\.1password(/.*)?$"))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t/agent\\.sock$")))
 )
 __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_ssh_agent_default_deny_sb__
       ;;
@@ -1023,7 +1037,7 @@ __SAFEHOUSE_EMBEDDED_profiles_50_integrations_core_worktrees_sb__
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_1password_sb__'
 ;; ---------------------------------------------------------------------------
 ;; Integration: 1Password
-;; 1Password desktop app and CLI agent socket access.
+;; 1Password desktop app and CLI integration.
 ;; Source: 55-integrations-optional/1password.sb
 ;; ---------------------------------------------------------------------------
 
@@ -1848,11 +1862,22 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_spotlight_sb__
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_ssh_sb__'
 ;; ---------------------------------------------------------------------------
 ;; Integration: SSH
-;; SSH agent sockets, system config, key deny rules, and safe config access.
+;; SSH client exec, TCP 22, agent sockets, system config, and safe config access.
 ;; Source: 55-integrations-optional/ssh.sb
 ;; ---------------------------------------------------------------------------
 
-;; Consolidates agent socket access, system config reads, key deny rules, and safe config allowances.
+;; Consolidates ssh client execution, port 22 access, agent socket access,
+;; system config reads, key deny rules, and safe config allowances.
+
+;; Re-open the default /usr/bin/ssh client path when explicitly enabled.
+(allow process-exec
+    (literal "/usr/bin/ssh")
+)
+
+;; Re-open conventional SSH transport on TCP 22 when explicitly enabled.
+(allow network-outbound
+    (remote tcp "*:22")
+)
 
 ;; Defense-in-depth: block private key reads/writes by default.
 (deny file-read* file-write*
@@ -1888,7 +1913,8 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_spotlight_sb__
 )
 
 ;; SSH agent socket access via launchd-managed SSH_AUTH_SOCK and Tahoe-style
-;; ~/.ssh/agent sockets.
+;; ~/.ssh/agent sockets. Custom current SSH_AUTH_SOCK paths are re-opened
+;; dynamically at render time when --enable=ssh is selected.
 (allow file-read* file-write*
     (regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$")  ;; launchd-managed SSH_AUTH_SOCK path on macOS.
     (regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$")          ;; symlinked tmp variant of SSH_AUTH_SOCK path.
@@ -4959,6 +4985,61 @@ policy_render_append_optional_profiles() {
   done
 }
 
+policy_render_ssh_integration_selected() {
+  safehouse_array_contains_exact_by_name policy_plan_optional_profile_keys "profiles/55-integrations-optional/ssh.sb"
+}
+
+policy_render_resolve_current_ssh_auth_sock() {
+  local ssh_auth_sock="${SSH_AUTH_SOCK:-}"
+
+  [[ -n "$ssh_auth_sock" ]] || return 0
+  safehouse_validate_sb_string "$ssh_auth_sock" "SSH_AUTH_SOCK" || return 1
+
+  if [[ "$ssh_auth_sock" != /* ]]; then
+    return 0
+  fi
+
+  printf '%s\n' "$ssh_auth_sock"
+}
+
+policy_render_emit_current_ssh_auth_sock_deny() {
+  local ssh_auth_sock="$1"
+  local escaped_sock
+
+  escaped_sock="$(safehouse_escape_for_sb "$ssh_auth_sock")" || return 1
+
+  policy_render_write_line ";; #safehouse-test-id:current-ssh-auth-sock# Dynamic default-deny for the caller SSH_AUTH_SOCK path."
+  policy_render_write_line ";; Keep custom SSH agent socket locations opt-in just like the static launchd/Tahoe patterns."
+  policy_render_write_line "(deny file-read* file-write* (literal \"${escaped_sock}\"))"
+  policy_render_write_line "(deny network-outbound (remote unix-socket (path-literal \"${escaped_sock}\")))"
+  policy_render_write_blank
+}
+
+policy_render_emit_current_ssh_auth_sock_allow() {
+  local ssh_auth_sock="$1"
+  local escaped_sock
+
+  escaped_sock="$(safehouse_escape_for_sb "$ssh_auth_sock")" || return 1
+
+  policy_render_write_line ";; Re-open the caller SSH_AUTH_SOCK path when --enable=ssh is selected."
+  policy_render_emit_path_ancestor_literals "$ssh_auth_sock" "current SSH_AUTH_SOCK" || return 1
+  policy_render_write_line "(allow file-read* file-write* (literal \"${escaped_sock}\"))"
+  policy_render_write_line "(allow network-outbound (remote unix-socket (path-literal \"${escaped_sock}\")))"
+  policy_render_write_blank
+}
+
+policy_render_emit_current_ssh_auth_sock_rules() {
+  local ssh_auth_sock
+
+  ssh_auth_sock="$(policy_render_resolve_current_ssh_auth_sock)" || return 1
+  [[ -n "$ssh_auth_sock" ]] || return 0
+
+  policy_render_emit_current_ssh_auth_sock_deny "$ssh_auth_sock" || return 1
+  if policy_render_ssh_integration_selected; then
+    policy_render_emit_current_ssh_auth_sock_allow "$ssh_auth_sock" || return 1
+  fi
+}
+
 policy_render_build_path_ancestor_literals_block() {
   local path="$1"
   local label="$2"
@@ -5265,6 +5346,7 @@ policy_render_emit_integration_sections() {
   policy_render_emit_integration_preamble
   policy_render_append_unscoped_module_dir "profiles/50-integrations-core" || return 1
   policy_render_append_optional_profiles || return 1
+  policy_render_emit_current_ssh_auth_sock_rules || return 1
 }
 
 policy_render_emit_scoped_sections() {
@@ -5340,6 +5422,7 @@ policy_render_to_stdout() {
 
 policy_explain_print_summary() {
   local workdir_status config_status keychain_status exec_env_status env_pass_names_status profile_env_defaults_status
+  local ssh_auth_sock_status
   local git_worktree_common_dir_status git_worktree_paths_status
   local idx profile reason
 
@@ -5377,6 +5460,28 @@ policy_explain_print_summary() {
     profile_env_defaults_status="$(safehouse_join_by_space "${policy_plan_profile_runtime_env_defaults[@]}")"
   else
     profile_env_defaults_status="$(safehouse_join_by_space)"
+  fi
+
+  if [[ "${cli_runtime_env_mode:-sanitized}" == "passthrough" ]]; then
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+      ssh_auth_sock_status="passed through via --env (${SSH_AUTH_SOCK})"
+    else
+      ssh_auth_sock_status="caller env unset"
+    fi
+  elif [[ "${#cli_runtime_env_pass_names[@]}" -gt 0 ]] && safehouse_array_contains_exact "SSH_AUTH_SOCK" "${cli_runtime_env_pass_names[@]}"; then
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+      ssh_auth_sock_status="passed via --env-pass (${SSH_AUTH_SOCK})"
+    else
+      ssh_auth_sock_status="requested via --env-pass but caller env unset"
+    fi
+  elif safehouse_array_contains_exact_by_name policy_plan_optional_profile_keys "profiles/55-integrations-optional/ssh.sb"; then
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+      ssh_auth_sock_status="auto-passed via --enable=ssh (${SSH_AUTH_SOCK})"
+    else
+      ssh_auth_sock_status="caller env unset"
+    fi
+  else
+    ssh_auth_sock_status="not passed by default"
   fi
 
   case "${cli_runtime_env_mode:-sanitized}" in
@@ -5450,6 +5555,7 @@ policy_explain_print_summary() {
     fi
     echo "  keychain integration: ${keychain_status}"
     echo "  execution environment: ${exec_env_status}"
+    echo "  SSH_AUTH_SOCK handling: ${ssh_auth_sock_status}"
     echo "  profile env defaults: ${profile_env_defaults_status}"
     if [[ -n "${policy_req_invoked_command_path:-}" ]]; then
       echo "  invoked command: ${policy_req_invoked_command_path}"
@@ -5529,7 +5635,6 @@ runtime_default_sanitized_exec_passthrough_vars=(
   NODE_EXTRA_CA_CERTS
   NO_BROWSER
   PLAYWRIGHT_MCP_SANDBOX
-  SSH_AUTH_SOCK
   SDKROOT
 )
 
@@ -5539,6 +5644,7 @@ runtime_env_file_exec_environment=()
 runtime_merged_exec_environment=()
 runtime_env_pass_merged_exec_environment=()
 runtime_profile_default_merged_exec_environment=()
+runtime_safehouse_default_exec_environment=()
 
 runtime_preflight() {
   local os_name
@@ -5763,6 +5869,20 @@ runtime_merge_exec_environment_with_profile_defaults() {
   safehouse_array_copy runtime_profile_default_merged_exec_environment "$source_array_name"
   if [[ "${#policy_plan_profile_runtime_env_defaults[@]}" -gt 0 ]]; then
     runtime_merge_exec_environment_defaults_if_missing runtime_profile_default_merged_exec_environment "${policy_plan_profile_runtime_env_defaults[@]}"
+  fi
+}
+
+runtime_ssh_integration_selected() {
+  safehouse_array_contains_exact_by_name policy_plan_optional_profile_keys "profiles/55-integrations-optional/ssh.sb"
+}
+
+runtime_build_safehouse_default_exec_environment() {
+  runtime_safehouse_default_exec_environment=(
+    "APP_SANDBOX_CONTAINER_ID=agent-safehouse"
+  )
+
+  if runtime_ssh_integration_selected && [[ "${SSH_AUTH_SOCK+x}" == "x" ]] && [[ -n "${SSH_AUTH_SOCK}" ]]; then
+    runtime_safehouse_default_exec_environment+=("SSH_AUTH_SOCK=${SSH_AUTH_SOCK}")
   fi
 }
 
@@ -6159,8 +6279,9 @@ cmd_execute_apply_named_env_pass_overrides() {
 }
 
 cmd_execute_apply_safehouse_env_defaults() {
+  runtime_build_safehouse_default_exec_environment || return 1
   runtime_merge_exec_environment_defaults_if_missing runtime_execution_environment \
-    "APP_SANDBOX_CONTAINER_ID=agent-safehouse"
+    "${runtime_safehouse_default_exec_environment[@]}"
 }
 
 cmd_execute_build_environment() {
@@ -8254,9 +8375,9 @@ policy_dist_append_preassembled_core_integrations() {
     (home-prefix "/.gitignore")    ;; User global gitignore variants (.gitignore, .gitignore_global, etc.).
     (home-subpath "/.config/git")  ;; XDG-style git config directory (config, ignore, attributes).
     (home-literal "/.gitattributes")  ;; Global gitattributes file.
-    (home-literal "/.ssh")         ;; Directory traversal for default SSH metadata grants used by git-over-ssh.
-    (home-literal "/.ssh/config")  ;; SSH host aliases/IdentityFile selection used by git remotes.
-    (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by SSH git transports.
+    (home-literal "/.ssh")         ;; Directory traversal for baseline SSH metadata paths used by git and ssh utilities.
+    (home-literal "/.ssh/config")  ;; SSH host aliases/IdentityFile selection consulted when ssh integration is enabled.
+    (home-literal "/.ssh/known_hosts")  ;; Host key verification cache used by ssh tooling and git-over-ssh.
 )
 
 ;; ---------------------------------------------------------------------------
@@ -8317,11 +8438,22 @@ policy_dist_append_preassembled_core_integrations() {
 
 ;; ---------------------------------------------------------------------------
 ;; Integration: SSH Agent Default Deny
-;; Default-deny SSH agent unix sockets; ssh integration can re-open later.
+;; Default-deny SSH agent unix sockets, ssh client exec, and TCP 22; ssh
+;; integration can re-open later.
 ;; Source: 50-integrations-core/ssh-agent-default-deny.sb
 ;; ---------------------------------------------------------------------------
 
-;; #safehouse-test-id:ssh-agent-socket-deny# Keep SSH agent credential use opt-in.
+;; #safehouse-test-id:ssh-agent-socket-deny# Keep SSH transport and credential use opt-in.
+;; Defense-in-depth: require --enable=ssh before launching /usr/bin/ssh.
+(deny process-exec
+    (literal "/usr/bin/ssh")
+)
+
+;; Defense-in-depth: require --enable=ssh before opening conventional SSH port 22.
+(deny network-outbound
+    (remote tcp "*:22")
+)
+
 ;; SSH clients use connect() on unix domain sockets, which sandbox-exec classifies
 ;; as network-outbound rather than file-read/write. Without this deny block,
 ;; open network policy in 20-network.sb allows agent-backed authentication even
@@ -8330,6 +8462,9 @@ policy_dist_append_preassembled_core_integrations() {
     (remote unix-socket (path-regex #"^/private/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
     (remote unix-socket (path-regex #"^/tmp/com\.apple\.launchd\.[^/]+/Listeners$"))
     (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.ssh/agent(/.*)?$")))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.1password(/.*)?$")))
+    (remote unix-socket (path-regex #"^/Users/Shared/\.1password(/.*)?$"))
+    (remote unix-socket (path-regex (string-append "^" HOME_DIR "/Library/Group Containers/[A-Za-z0-9]+\\.com\\.1password/t/agent\\.sock$")))
 )
 
 __SAFEHOUSE_PREASSEMBLED_CORE_INTEGRATIONS__
@@ -8502,6 +8637,7 @@ policy_render_emit_integration_sections() {
   policy_render_append_profile "profiles/50-integrations-core/worktree-common-dir.sb" || return 1
   policy_render_append_profile "profiles/50-integrations-core/worktrees.sb" || return 1
   policy_render_append_optional_profiles || return 1
+  policy_render_emit_current_ssh_auth_sock_rules || return 1
 }
 
 safehouse_main "$@"

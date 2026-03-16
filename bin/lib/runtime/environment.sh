@@ -42,7 +42,6 @@ runtime_default_sanitized_exec_passthrough_vars=(
   NODE_EXTRA_CA_CERTS
   NO_BROWSER
   PLAYWRIGHT_MCP_SANDBOX
-  SSH_AUTH_SOCK
   SDKROOT
 )
 
@@ -52,6 +51,7 @@ runtime_env_file_exec_environment=()
 runtime_merged_exec_environment=()
 runtime_env_pass_merged_exec_environment=()
 runtime_profile_default_merged_exec_environment=()
+runtime_safehouse_default_exec_environment=()
 
 runtime_preflight() {
   local os_name
@@ -276,5 +276,19 @@ runtime_merge_exec_environment_with_profile_defaults() {
   safehouse_array_copy runtime_profile_default_merged_exec_environment "$source_array_name"
   if [[ "${#policy_plan_profile_runtime_env_defaults[@]}" -gt 0 ]]; then
     runtime_merge_exec_environment_defaults_if_missing runtime_profile_default_merged_exec_environment "${policy_plan_profile_runtime_env_defaults[@]}"
+  fi
+}
+
+runtime_ssh_integration_selected() {
+  safehouse_array_contains_exact_by_name policy_plan_optional_profile_keys "profiles/55-integrations-optional/ssh.sb"
+}
+
+runtime_build_safehouse_default_exec_environment() {
+  runtime_safehouse_default_exec_environment=(
+    "APP_SANDBOX_CONTAINER_ID=agent-safehouse"
+  )
+
+  if runtime_ssh_integration_selected && [[ "${SSH_AUTH_SOCK+x}" == "x" ]] && [[ -n "${SSH_AUTH_SOCK}" ]]; then
+    runtime_safehouse_default_exec_environment+=("SSH_AUTH_SOCK=${SSH_AUTH_SOCK}")
   fi
 }

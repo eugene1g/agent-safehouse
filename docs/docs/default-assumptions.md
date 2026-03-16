@@ -23,9 +23,8 @@ These are baseline allowances intended to keep common workflows functional:
 - Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
 - Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
 - Agent-specific profile selection for the wrapped command.
-- Network access (open by default).
-- Sanitized runtime environment (not full shell env by default; preserves `SDKROOT` when set).
-- SSH metadata read support (`~/.ssh/config`, `~/.ssh/known_hosts`) for git-over-ssh workflows.
+- General network access (open by default except outbound TCP 22).
+- Sanitized runtime environment (not full shell env by default; preserves `SDKROOT` when set and omits `SSH_AUTH_SOCK` unless `ssh` is enabled).
 
 ## Opt-In (Disabled by Default)
 
@@ -38,10 +37,10 @@ Enable only when required for the current task:
 - `chromium-headless`: headless Chromium / Playwright shell access.
 - `chromium-full`: system Google Chrome and related full Chrome allowances.
 - `docker`: Docker socket and related access.
-- `1password`: 1Password CLI/app integration paths.
+- `1password`: 1Password CLI/app integration paths (not SSH agent credential use).
 - `kubectl`: kube config/cache + krew state.
 - `shell-init`: shell startup/config file reads.
-- `ssh`: extended SSH agent socket and system SSH config integration.
+- `ssh`: `/usr/bin/ssh` execution, outbound TCP 22, SSH agent socket access, agent-backed git-over-SSH, and extended system SSH config integration.
 - `spotlight`: Spotlight metadata queries via `mdfind` / `mdls`.
 - `browser-native-messaging`: browser host messaging integration.
 - `playwright-chrome`: Playwright Chrome-family channels plus injected `PLAYWRIGHT_MCP_SANDBOX=false`.
@@ -58,7 +57,8 @@ Enable only when required for the current task:
 
 - Broad recursive reads of `$HOME`, directory listing of `$HOME` itself, and arbitrary file reads under `$HOME` unless a narrower explicit rule grants that path.
 - SSH private keys under `~/.ssh`.
-- SSH agent sockets (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
+- `/usr/bin/ssh` execution and outbound TCP 22 unless `ssh` is enabled.
+- SSH agent sockets (`SSH_AUTH_SOCK`, including launchd listeners, custom socket paths, `~/.ssh/agent/*`, and 1Password-managed sockets) unless `ssh` is enabled.
 - Browser profile/cookie/session data, even when `browser-native-messaging` is enabled.
 - Shell startup files unless `shell-init` is enabled.
 - Clipboard access unless `clipboard` is enabled.
@@ -76,6 +76,7 @@ Enable only when required for the current task:
 - **Cross-repo read context**: add `--add-dirs-ro` for specific sibling paths or files.
 - **Cloud task burst**: enable `cloud-credentials` only for that run/session.
 - **Docker/k8s workflow**: enable `docker` and/or `kubectl` only while needed.
+- **Git-over-SSH or direct `ssh`**: add `--enable=ssh` for `git fetch/pull/push` and `/usr/bin/ssh`, including cases where auth depends on `SSH_AUTH_SOCK`.
 - **Native builds via Apple shims**: common `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` flows work by default via the Apple toolchain core profile.
 - **Full Xcode builds / simulator flows**: add `--enable=xcode`; reserve `--enable=lldb` for debugger sessions.
 - **Local process triage**: prefer `process-control`; reserve `lldb` for real debugger sessions.

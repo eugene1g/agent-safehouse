@@ -14,6 +14,11 @@ load ../../test_helper.bash
   '
 }
 
+@test "[EXECUTION] default sanitized mode does not pass SSH_AUTH_SOCK" {
+  SSH_AUTH_SOCK="/tmp/safehouse-ssh-auth.sock" \
+    safehouse_ok -- /bin/sh -c '[ -z "${SSH_AUTH_SOCK+x}" ]'
+}
+
 @test "[EXECUTION] default sanitized mode preserves allowlisted SDK and proxy/browser vars" {
   SAFEHOUSE_TEST_SECRET="safehouse-secret" \
   SDKROOT="/tmp/safehouse-sdkroot" \
@@ -24,6 +29,11 @@ load ../../test_helper.bash
     [ "${HTTP_PROXY:-}" = "http://proxy.example:8080" ] &&
     [ "${NO_BROWSER:-}" = "true" ]
   '
+}
+
+@test "[EXECUTION] --enable=ssh auto-passes the caller SSH_AUTH_SOCK" {
+  SSH_AUTH_SOCK="/tmp/safehouse-ssh-auth.sock" \
+    safehouse_ok --enable=ssh -- /bin/sh -c '[ "${SSH_AUTH_SOCK:-}" = "/tmp/safehouse-ssh-auth.sock" ]'
 }
 
 @test "[EXECUTION] --env passes through the caller environment" {
