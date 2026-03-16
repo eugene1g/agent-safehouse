@@ -70,8 +70,15 @@ jobs:
           agent-browser install
           playwright install chromium-headless-shell
 
-      - name: Run test suite
+      - name: Run default suites without browser launch smokes
         env:
           SAFEHOUSE_BATS_JOBS: "4"
         run: |
-          ./tests/run.sh
+          ./tests/run.sh --negative-filter 'agent-browser|chromium-headless|chromium-full|playwright-chrome'
+
+      - name: Run browser launch integration smokes serially
+        run: |
+          bats \
+            tests/policy/integrations/chromium.bats \
+            tests/policy/integrations/playwright-chrome.bats \
+            tests/policy/integrations/agent-browser.bats
