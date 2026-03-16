@@ -16,21 +16,22 @@ load ../../test_helper.bash
 }
 
 @test "[EXECUTION] enable=agent-browser can open example.com and read the page title" {
-  local precheck_session sandbox_session socket_dir
+  local precheck_session sandbox_session precheck_socket_dir sandbox_socket_dir
 
   sft_require_cmd_or_skip agent-browser
 
   precheck_session="abp-${BATS_TEST_NUMBER}-$$"
   sandbox_session="abs-${BATS_TEST_NUMBER}-$$"
-  socket_dir="$(mktemp -d "/tmp/sft-ab.${BATS_TEST_NUMBER}.XXXXXX")" || return 1
+  precheck_socket_dir="$(mktemp -d "/tmp/sft-abp.${BATS_TEST_NUMBER}.XXXXXX")" || return 1
+  sandbox_socket_dir="$(mktemp -d "/tmp/sft-abs.${BATS_TEST_NUMBER}.XXXXXX")" || return 1
 
-  run agent_browser_get_example_title "$precheck_session" "$SAFEHOUSE_HOST_HOME" "$socket_dir"
+  run agent_browser_get_example_title "$precheck_session" "$SAFEHOUSE_HOST_HOME" "$precheck_socket_dir"
   [ "$status" -eq 0 ] || skip "agent-browser precheck failed outside sandbox"
 
   run safehouse_ok_env \
     "HOME=$SAFEHOUSE_HOST_HOME" \
-    "AGENT_BROWSER_SOCKET_DIR=$socket_dir" \
-    "AGENT_BROWSER_DEFAULT_TIMEOUT=10000" \
+    "AGENT_BROWSER_SOCKET_DIR=$sandbox_socket_dir" \
+    "AGENT_BROWSER_DEFAULT_TIMEOUT=30000" \
     -- \
     --enable=agent-browser \
     -- /bin/sh -c '
@@ -41,12 +42,12 @@ load ../../test_helper.bash
     trap cleanup EXIT
 
     agent-browser --session "$session_name" open https://example.com >/dev/null &&
-      agent-browser --session "$session_name" wait 500 >/dev/null &&
+      agent-browser --session "$session_name" wait --load networkidle >/dev/null &&
       agent-browser --session "$session_name" get title
   ' _ "$sandbox_session"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "Example Domain"
-  rm -rf -- "$socket_dir"
+  rm -rf -- "$precheck_socket_dir" "$sandbox_socket_dir"
 }
 
 agent_browser_get_example_title() {
@@ -54,7 +55,7 @@ agent_browser_get_example_title() {
 
   HOME="$home_dir" \
     AGENT_BROWSER_SOCKET_DIR="$socket_dir" \
-    AGENT_BROWSER_DEFAULT_TIMEOUT=10000 \
+    AGENT_BROWSER_DEFAULT_TIMEOUT=30000 \
     /bin/sh -c '
     session_name="$1"
     cleanup() {
@@ -63,7 +64,7 @@ agent_browser_get_example_title() {
     trap cleanup EXIT
 
     agent-browser --session "$session_name" open https://example.com >/dev/null &&
-      agent-browser --session "$session_name" wait 500 >/dev/null &&
+      agent-browser --session "$session_name" wait --load networkidle >/dev/null &&
       agent-browser --session "$session_name" get title
   ' _ "$session_name"
 }
