@@ -36,6 +36,20 @@ Agent Safehouse is designed around practical least privilege:
 
 It is a hardening layer, not a perfect security boundary against a determined attacker.
 
+## HOME access by default
+
+`HOME_DIR` is used to render precise home-relative rules in the assembled policy. By itself, it does not grant recursive read access to your home directory.
+
+Default Safehouse behavior is narrower:
+
+- metadata-only traversal on `/`, the path to `$HOME`, and `$HOME` itself so runtimes can probe explicitly allowed home-scoped paths
+- directory-root reads for `~/.config` and `~/.cache` so tools can discover XDG locations
+- a few explicit home-scoped files/directories from always-on profiles, such as git/ssh metadata and shared agent instruction folders
+
+In practice, `stat "$HOME"` can succeed while `ls "$HOME"` and `cat ~/secret.txt` still fail unless a more specific rule grants that path.
+
+If you want to remove even the default home exceptions, use `--append-profile`; appended profiles load last, so their deny rules can narrow earlier defaults.
+
 ## Documentation
 
 - Website: [agent-safehouse.dev](https://agent-safehouse.dev)

@@ -100,6 +100,20 @@ If your worktrees are always created under a stable folder such as `~/worktrees/
 safehouse --add-dirs-ro=~/worktrees/project-name -- codex --dangerously-bypass-approvals-and-sandbox
 ```
 
+## Default HOME Behavior
+
+Safehouse does not grant recursive `$HOME` reads by default.
+
+What it does grant by default is narrower:
+
+- metadata-only access to `/`, the path to `$HOME`, and `$HOME` itself so runtimes can probe explicitly allowed home-scoped paths
+- directory-root reads for `~/.config` and `~/.cache`
+- a few explicit home-scoped config paths from always-on profiles, such as git/ssh metadata and shared agent instruction folders
+
+So `stat "$HOME"` can succeed while `ls "$HOME"` and `cat ~/secret.txt` still fail unless another rule grants the path.
+
+If you want to tighten the default home allowances further, use `--append-profile`; appended profiles load last, so final deny rules there can narrow earlier defaults.
+
 ## Environment Modes
 
 ```bash

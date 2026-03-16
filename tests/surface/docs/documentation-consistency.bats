@@ -34,6 +34,20 @@ load ../../test_helper.bash
   sft_assert_file_not_contains "$assumptions_path" "forbidden-exec-sugid"
 }
 
+@test "docs explain HOME_DIR as narrow home-relative access, not broad home reads" {
+  local readme_path assumptions_path architecture_path usage_path
+
+  readme_path="${SAFEHOUSE_REPO_ROOT}/README.md"
+  assumptions_path="${SAFEHOUSE_REPO_ROOT}/docs/docs/default-assumptions.md"
+  architecture_path="${SAFEHOUSE_REPO_ROOT}/docs/docs/policy-architecture.md"
+  usage_path="${SAFEHOUSE_REPO_ROOT}/docs/docs/usage.md"
+
+  sft_assert_file_contains "$readme_path" "does not grant recursive read access to your home directory"
+  sft_assert_file_contains "$assumptions_path" 'Directory-root reads for `~/.config` and `~/.cache`'
+  sft_assert_file_contains "$architecture_path" 'It is not a blanket grant for `$HOME`.'
+  sft_assert_file_contains "$usage_path" 'So `stat "$HOME"` can succeed while `ls "$HOME"` and `cat ~/secret.txt` still fail unless another rule grants the path.'
+}
+
 @test "docs feature lists cover the runtime-supported enable catalog" {
   local options_path assumptions_path
   local supported_csv raw_feature feature

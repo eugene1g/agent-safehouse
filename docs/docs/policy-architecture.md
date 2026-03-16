@@ -48,4 +48,16 @@ Ancestor `literal` read grants are intentionally emitted for traversal compatibi
 
 Assembly logic in `/Users/eugene/server/agent-safehouse/bin/lib/policy/render.sh` replaces this with the actual absolute home path.
 
+`HOME_DIR` exists so profiles can express narrow home-relative rules through the shared helpers:
+
+- `home-literal`
+- `home-subpath`
+- `home-prefix`
+
+It is not a blanket grant for `$HOME`.
+
+Safehouse also generates a `file-read-metadata` block for `/`, the path to `$HOME`, and `$HOME` itself. That metadata-only traversal lets runtimes `stat` or walk toward explicitly allowed home-scoped paths without granting recursive reads of the whole home directory.
+
+In practice, that means `stat "$HOME"` can succeed while `ls "$HOME"` and `cat ~/secret.txt` still fail unless a more specific rule grants them.
+
 See also: [Bin Architecture](/docs/bin-architecture)

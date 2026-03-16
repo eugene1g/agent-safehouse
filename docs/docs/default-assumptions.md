@@ -16,6 +16,8 @@ These are baseline allowances intended to keep common workflows functional:
 - Selected workdir read/write (git root above CWD, otherwise CWD).
 - Existing linked Git worktrees for the selected repo root are granted read-only visibility when they exist at launch time.
 - Shared Git common-dir metadata for linked worktrees is granted read/write when it lives outside the selected workdir.
+- Metadata-only traversal on `/`, the path to `$HOME`, and `$HOME` itself so runtimes can reach explicitly allowed home-scoped paths without opening broad home reads.
+- Directory-root reads for `~/.config` and `~/.cache` so tools can discover XDG locations; contents under those trees still need more specific grants.
 - Core system/runtime paths required by shells, compilers, and package managers.
 - Toolchain profile access under `profiles/30-toolchains/`.
 - Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
@@ -54,6 +56,7 @@ Enable only when required for the current task:
 
 ## Not Granted (or Explicitly Denied) by Default
 
+- Broad recursive reads of `$HOME`, directory listing of `$HOME` itself, and arbitrary file reads under `$HOME` unless a narrower explicit rule grants that path.
 - SSH private keys under `~/.ssh`.
 - SSH agent sockets (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
 - Browser profile/cookie/session data, even when `browser-native-messaging` is enabled.
