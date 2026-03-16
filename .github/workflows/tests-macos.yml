@@ -71,5 +71,7 @@ jobs:
           playwright install chromium-headless-shell
 
       - name: Run test suite
+        env:
+          SAFEHOUSE_BATS_JOBS: "4"
         run: |
           ./tests/run.sh
