@@ -51,16 +51,11 @@ jobs:
       - name: Checkout branch
         uses: actions/checkout@v6
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-
       - name: Install test and browser dependencies
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
-          brew install bats-core parallel
+          brew install bats-core parallel node
           brew install --cask google-chrome temurin
           shopt -s nullglob
           temurin_homes=(/Library/Java/JavaVirtualMachines/temurin*.jdk/Contents/Home)
@@ -75,37 +70,6 @@ jobs:
           agent-browser install
           playwright install chromium-headless-shell
 
-      - name: Run default suites without browser launch smokes
-        env:
-          SAFEHOUSE_BATS_JOBS: "4"
+      - name: Run test suite
         run: |
-          ./tests/run.sh --negative-filter 'agent-browser|chromium-headless|chromium-full|playwright-chrome'
-
-      - name: Run agent-browser integration smoke serially
-        run: |
-          cleanup_browsers() {
-            [[ "${GITHUB_ACTIONS:-}" == "true" ]] || return 0
-            pkill -x "Google Chrome" >/dev/null 2>&1 || true
-            pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
-            pkill -f 'node .*agent-browser.*/dist/daemon.js' >/dev/null 2>&1 || true
-          }
-
-          trap cleanup_browsers EXIT
-          cleanup_browsers
-          bats --timing --print-output-on-failure \
-            tests/policy/integrations/agent-browser.bats
-
-      - name: Run Chromium and Playwright launch smokes serially
-        run: |
-          cleanup_browsers() {
-            [[ "${GITHUB_ACTIONS:-}" == "true" ]] || return 0
-            pkill -x "Google Chrome" >/dev/null 2>&1 || true
-            pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
-            pkill -f 'node .*agent-browser.*/dist/daemon.js' >/dev/null 2>&1 || true
-          }
-
-          trap cleanup_browsers EXIT
-          cleanup_browsers
-          bats --timing --print-output-on-failure \
-            tests/policy/integrations/chromium.bats \
-            tests/policy/integrations/playwright-chrome.bats
+          ./tests/run.sh
