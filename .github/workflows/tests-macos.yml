@@ -76,9 +76,17 @@ jobs:
         run: |
           ./tests/run.sh --negative-filter 'agent-browser|chromium-headless|chromium-full|playwright-chrome'
 
-      - name: Run browser launch integration smokes serially
+      - name: Run agent-browser integration smoke serially
         run: |
-          bats \
-            tests/policy/integrations/chromium.bats \
-            tests/policy/integrations/playwright-chrome.bats \
+          pkill -x "Google Chrome" >/dev/null 2>&1 || true
+          pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
+          bats --timing --print-output-on-failure \
             tests/policy/integrations/agent-browser.bats
+
+      - name: Run Chromium and Playwright launch smokes serially
+        run: |
+          pkill -x "Google Chrome" >/dev/null 2>&1 || true
+          pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
+          bats --timing --print-output-on-failure \
+            tests/policy/integrations/chromium.bats \
+            tests/policy/integrations/playwright-chrome.bats
