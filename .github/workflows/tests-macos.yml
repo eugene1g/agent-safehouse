@@ -84,6 +84,7 @@ jobs:
       - name: Run agent-browser integration smoke serially
         run: |
           cleanup_browsers() {
+            [[ "${GITHUB_ACTIONS:-}" == "true" ]] || return 0
             pkill -x "Google Chrome" >/dev/null 2>&1 || true
             pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
             pkill -f 'node .*agent-browser.*/dist/daemon.js' >/dev/null 2>&1 || true
@@ -97,6 +98,7 @@ jobs:
       - name: Run Chromium and Playwright launch smokes serially
         run: |
           cleanup_browsers() {
+            [[ "${GITHUB_ACTIONS:-}" == "true" ]] || return 0
             pkill -x "Google Chrome" >/dev/null 2>&1 || true
             pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
             pkill -f 'node .*agent-browser.*/dist/daemon.js' >/dev/null 2>&1 || true
