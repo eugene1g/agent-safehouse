@@ -33,15 +33,6 @@ load ../../test_helper.bash
   run agent_browser_get_page_title "$agent_browser_bin" "$precheck_session" "$smoke_url" "$SAFEHOUSE_HOST_HOME" "$precheck_socket_dir"
   [ "$status" -eq 0 ] || skip "agent-browser precheck failed outside sandbox"
 
-  safehouse_ok_env \
-    "HOME=$SAFEHOUSE_HOST_HOME" \
-    "AGENT_BROWSER_SOCKET_DIR=$sandbox_socket_dir" \
-    "AGENT_BROWSER_DEFAULT_TIMEOUT=30000" \
-    -- \
-    --add-dirs-ro="$agent_browser_runtime_root" \
-    --enable=agent-browser \
-    -- "$agent_browser_bin" --session "$sandbox_session" open "$smoke_url" >/dev/null
-
   run safehouse_ok_env \
     "HOME=$SAFEHOUSE_HOST_HOME" \
     "AGENT_BROWSER_SOCKET_DIR=$sandbox_socket_dir" \
@@ -49,14 +40,20 @@ load ../../test_helper.bash
     -- \
     --add-dirs-ro="$agent_browser_runtime_root" \
     --enable=agent-browser \
-    -- "$agent_browser_bin" --session "$sandbox_session" get title
+    -- /bin/sh -c '
+    agent_browser_bin="$1"
+    session_name="$2"
+    smoke_url="$3"
+    cleanup() {
+      "$agent_browser_bin" --session "$session_name" close >/dev/null 2>&1 || true
+    }
+    trap cleanup EXIT
+
+    "$agent_browser_bin" --session "$session_name" open "$smoke_url" >/dev/null &&
+      "$agent_browser_bin" --session "$session_name" get title
+  ' _ "$agent_browser_bin" "$sandbox_session" "$smoke_url"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "$expected_title"
-
-  HOME="$SAFEHOUSE_HOST_HOME" \
-    AGENT_BROWSER_SOCKET_DIR="$sandbox_socket_dir" \
-    AGENT_BROWSER_DEFAULT_TIMEOUT=30000 \
-    "$agent_browser_bin" --session "$sandbox_session" close >/dev/null 2>&1 || true
   rm -rf -- "$precheck_socket_dir" "$sandbox_socket_dir"
 }
 
