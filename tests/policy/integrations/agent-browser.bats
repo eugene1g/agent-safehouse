@@ -42,11 +42,19 @@ load ../../test_helper.bash
   # Validate the underlying runtime bundle instead of the agent-browser CLI.
   # Recent upstream native releases still report open IPC reliability bugs under
   # Safehouse-relevant flows: https://github.com/vercel-labs/agent-browser/issues/322
+  #
+  # Keep the negative half to plain file reads. Launching the denied browser
+  # bundle locally makes macOS surface a Crash Reporter dialog for the aborted
+  # Chrome-for-Testing process.
   HOME="$SAFEHOUSE_HOST_HOME" safehouse_denied \
     --enable=chromium-full \
-    -- /bin/sh -c '"$1" --use-mock-keychain --no-sandbox --headless=new --dump-dom "$2"' \
-    _ "$chrome_bin" "$smoke_url"
-  sft_assert_contains "$output" "blocked by sandbox"
+    -- /bin/sh -c '/usr/bin/head -c 4 "$1" >/dev/null' \
+    _ "$chrome_bin"
+
+  HOME="$SAFEHOUSE_HOST_HOME" safehouse_ok \
+    --enable=agent-browser \
+    -- /bin/sh -c '/usr/bin/head -c 4 "$1" >/dev/null' \
+    _ "$chrome_bin"
 
   allowed_output_file="$(mktemp "/tmp/sft-agent-browser-allowed.XXXXXX")" || return 1
   allowed_status=0
