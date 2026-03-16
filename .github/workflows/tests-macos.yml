@@ -51,11 +51,16 @@ jobs:
       - name: Checkout branch
         uses: actions/checkout@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
       - name: Install test and browser dependencies
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
-          brew install bats-core parallel node
+          brew install bats-core parallel
           brew install --cask google-chrome temurin
           shopt -s nullglob
           temurin_homes=(/Library/Java/JavaVirtualMachines/temurin*.jdk/Contents/Home)
