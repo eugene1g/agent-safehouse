@@ -1,6 +1,6 @@
 # E2E Agent TUI Tests
 
-This directory contains Bats-native boot-and-roundtrip checks for live agent CLIs.
+This directory contains Bats-native boot checks for live agent CLIs, with roundtrip probes where the agent can reach a deterministic prompt under test.
 
 Run the suite with:
 
@@ -35,7 +35,9 @@ Each agent file should:
 8. Launch the CLI with `sft_tmux_start safehouse [safehouse-args ...] -- [ENV=VALUE ...] <agent> [args...]`.
    Prefer `VAR=value sft_tmux_start safehouse --env-pass=VAR -- ...` for secrets so they stay out of the pane command line.
 9. Resolve any startup gates through `handle_startup_gates`, which should recurse until input is ready or fail after 5 passes.
-10. Confirm the probe roundtrip with `sft_tmux_assert_roundtrip`.
+10. For full interactive coverage, confirm the probe roundtrip with `sft_tmux_assert_roundtrip`.
+
+If an agent cannot provide a deterministic prompt-response roundtrip without real user auth, a startup-only smoke test is acceptable. In that case, stop after `handle_startup_gates` once the trust/login/input UI is visible.
 
 Use `sft_safehouse_run_capture` inside `login_agent` when an agent needs a one-time Safehouse-wrapped auth/bootstrap step before the interactive launch.
 
@@ -70,6 +72,8 @@ Use `sft_safehouse_run_capture` inside `login_agent` when an agent needs a one-t
 }
 ```
 
+Startup-only smoke tests use the same helper layout, but stop after `handle_startup_gates 1` and name the test `[E2E-TUI] <agent> boots to startup screen`.
+
 `handle_startup_gates` should:
 
 - build a list of gate-detection regexes
@@ -81,7 +85,8 @@ Use `sft_safehouse_run_capture` inside `login_agent` when an agent needs a one-t
 ## Naming
 
 - Use the `[E2E-TUI]` prefix for tests that drive a real interactive agent UI.
-- Use the title shape `[E2E-TUI] <agent> boots and completes roundtrip`.
+- Use the title shape `[E2E-TUI] <agent> boots and completes roundtrip` for full roundtrip tests.
+- Use the title shape `[E2E-TUI] <agent> boots to startup screen` for startup-only smoke tests.
 - Keep helper names and variable names aligned across files so the only differences are launch args, setup files, and gate actions.
 
 ## Debugging And Cleanup

@@ -21,6 +21,16 @@ load ../../test_helper.bash
   sft_assert_includes_source "$profile" "55-integrations-optional/keychain.sb"
 }
 
+@test "[POLICY-ONLY] copilot command grants bundled package cache roots" {
+  local profile
+  profile="$(safehouse_profile -- copilot)"
+
+  sft_assert_contains "$profile" '(home-subpath "/Library/Caches/copilot")'
+  sft_assert_contains "$profile" '(allow file-read-metadata'
+  sft_assert_contains "$profile" '(home-literal "/Library")'
+  sft_assert_contains "$profile" '(home-literal "/Library/Caches")'
+}
+
 @test "[POLICY-ONLY] claude command auto-injects browser-native-messaging profile" { # https://github.com/eugene1g/agent-safehouse/issues/16
   local profile
   profile="$(safehouse_profile -- claude)"

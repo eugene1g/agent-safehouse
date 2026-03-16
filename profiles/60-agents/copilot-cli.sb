@@ -10,9 +10,20 @@
 ;; - npm/pnpm global installs commonly expose the launcher via ~/.local/bin or ~/bin.
 ;; - Copilot CLI keeps config, logs, unpacked package assets, and session state
 ;;   under ~/.copilot by default (`--config-dir` overrides this at runtime).
+;; - The published Node SEA launcher also unpacks its bundled package into
+;;   ~/Library/Caches/copilot/pkg/... and resolves the entrypoint via ancestor
+;;   lstat/realpath calls. Keep writes scoped to the Copilot cache subtree
+;;   itself; the enclosing ~/Library and ~/Library/Caches ancestors only need
+;;   metadata traversal on a normal macOS home where those directories exist.
 
 (allow file-read* file-write*
     (home-prefix "/.local/bin/copilot")
     (home-prefix "/bin/copilot")
+    (home-subpath "/Library/Caches/copilot")
     (home-subpath "/.copilot")
+)
+
+(allow file-read-metadata
+    (home-literal "/Library")
+    (home-literal "/Library/Caches")
 )
