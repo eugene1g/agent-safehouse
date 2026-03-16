@@ -83,15 +83,27 @@ jobs:
 
       - name: Run agent-browser integration smoke serially
         run: |
-          pkill -x "Google Chrome" >/dev/null 2>&1 || true
-          pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
+          cleanup_browsers() {
+            pkill -x "Google Chrome" >/dev/null 2>&1 || true
+            pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
+            pkill -f 'node .*agent-browser.*/dist/daemon.js' >/dev/null 2>&1 || true
+          }
+
+          trap cleanup_browsers EXIT
+          cleanup_browsers
           bats --timing --print-output-on-failure \
             tests/policy/integrations/agent-browser.bats
 
       - name: Run Chromium and Playwright launch smokes serially
         run: |
-          pkill -x "Google Chrome" >/dev/null 2>&1 || true
-          pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
+          cleanup_browsers() {
+            pkill -x "Google Chrome" >/dev/null 2>&1 || true
+            pkill -f 'chrome-headless-shell|HeadlessShell' >/dev/null 2>&1 || true
+            pkill -f 'node .*agent-browser.*/dist/daemon.js' >/dev/null 2>&1 || true
+          }
+
+          trap cleanup_browsers EXIT
+          cleanup_browsers
           bats --timing --print-output-on-failure \
             tests/policy/integrations/chromium.bats \
             tests/policy/integrations/playwright-chrome.bats

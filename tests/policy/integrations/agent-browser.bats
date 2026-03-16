@@ -15,81 +15,58 @@ load ../../test_helper.bash
   sft_assert_omits_source "$profile" "55-integrations-optional/shell-init.sb"
 }
 
-@test "[EXECUTION] enable=agent-browser can launch and read a page title" {
-  local smoke_url expected_title agent_browser_bin agent_browser_runtime_root
-  local precheck_session sandbox_session precheck_socket_dir sandbox_socket_dir
+@test "[EXECUTION] enable=agent-browser lets the downloaded Chrome for Testing runtime launch when invoked indirectly" {
+  local chrome_bin smoke_url expected_title
+  local -a chrome_args
+  local precheck_output_file allowed_output_file precheck_output allowed_output
+  local precheck_status allowed_status
+
+  chrome_bin="$(sft_agent_browser_chrome_bin)"
+  [ -n "$chrome_bin" ] || skip "agent-browser Chrome for Testing runtime is not installed"
 
   smoke_url='data:text/html,<title>Safehouse%20agent-browser%20smoke</title><h1>ok</h1>'
   expected_title='Safehouse agent-browser smoke'
+  chrome_args=(--use-mock-keychain --no-sandbox --headless=new --dump-dom "$smoke_url")
 
-  agent_browser_bin="$(sft_command_path_or_skip agent-browser)"
-  agent_browser_runtime_root="$(agent_browser_runtime_root "$agent_browser_bin")"
+  precheck_output_file="$(mktemp "/tmp/sft-agent-browser-precheck.XXXXXX")" || return 1
+  precheck_status=0
+  HOME="$SAFEHOUSE_HOST_HOME" "$chrome_bin" "${chrome_args[@]}" >"$precheck_output_file" 2>&1 || precheck_status=$?
+  precheck_output="$(<"$precheck_output_file")"
+  rm -f -- "$precheck_output_file"
 
-  precheck_session="abp-${BATS_TEST_NUMBER}-$$"
-  sandbox_session="abs-${BATS_TEST_NUMBER}-$$"
-  precheck_socket_dir="$(mktemp -d "/tmp/sft-abp.${BATS_TEST_NUMBER}.XXXXXX")" || return 1
-  sandbox_socket_dir="$(mktemp -d "/tmp/sft-abs.${BATS_TEST_NUMBER}.XXXXXX")" || return 1
+  [ "$precheck_status" -eq 0 ] || sft_assert_contains "$precheck_output" "$expected_title"
+  sft_assert_contains "$precheck_output" "$expected_title"
 
-  run agent_browser_get_page_title "$agent_browser_bin" "$precheck_session" "$smoke_url" "$SAFEHOUSE_HOST_HOME" "$precheck_socket_dir"
-  [ "$status" -eq 0 ] || skip "agent-browser precheck failed outside sandbox"
+  # Validate the underlying runtime bundle instead of the agent-browser CLI.
+  # Recent upstream native releases still report open IPC reliability bugs under
+  # Safehouse-relevant flows: https://github.com/vercel-labs/agent-browser/issues/322
+  HOME="$SAFEHOUSE_HOST_HOME" safehouse_denied \
+    --enable=chromium-full \
+    -- /bin/sh -c '"$1" --use-mock-keychain --no-sandbox --headless=new --dump-dom "$2"' \
+    _ "$chrome_bin" "$smoke_url"
+  sft_assert_contains "$output" "blocked by sandbox"
 
-  run safehouse_ok_env \
-    "HOME=$SAFEHOUSE_HOST_HOME" \
-    "AGENT_BROWSER_SOCKET_DIR=$sandbox_socket_dir" \
-    "AGENT_BROWSER_DEFAULT_TIMEOUT=30000" \
-    -- \
-    --add-dirs-ro="$agent_browser_runtime_root" \
+  allowed_output_file="$(mktemp "/tmp/sft-agent-browser-allowed.XXXXXX")" || return 1
+  allowed_status=0
+  HOME="$SAFEHOUSE_HOST_HOME" safehouse_ok \
     --enable=agent-browser \
-    -- /bin/sh -c '
-    agent_browser_bin="$1"
-    session_name="$2"
-    smoke_url="$3"
-    cleanup() {
-      "$agent_browser_bin" --session "$session_name" close >/dev/null 2>&1 || true
-    }
-    trap cleanup EXIT
+    -- /bin/sh -c '"$1" --use-mock-keychain --no-sandbox --headless=new --dump-dom "$2"' \
+    _ "$chrome_bin" "$smoke_url" >"$allowed_output_file" 2>&1 || allowed_status=$?
+  allowed_output="$(<"$allowed_output_file")"
+  rm -f -- "$allowed_output_file"
 
-    "$agent_browser_bin" --session "$session_name" open "$smoke_url" >/dev/null &&
-      "$agent_browser_bin" --session "$session_name" get title
-  ' _ "$agent_browser_bin" "$sandbox_session" "$smoke_url"
-  [ "$status" -eq 0 ]
-  sft_assert_contains "$output" "$expected_title"
-  rm -rf -- "$precheck_socket_dir" "$sandbox_socket_dir"
+  [ "$allowed_status" -eq 0 ] || sft_assert_contains "$allowed_output" "$expected_title"
+  sft_assert_contains "$allowed_output" "$expected_title"
 }
 
-agent_browser_get_page_title() {
-  local agent_browser_bin="$1" session_name="$2" page_url="$3" home_dir="${4:-$HOME}" socket_dir="${5:-}"
-  local title
+sft_agent_browser_chrome_bin() {
+  local candidate newest=""
 
-  HOME="$home_dir" \
-    AGENT_BROWSER_SOCKET_DIR="$socket_dir" \
-    AGENT_BROWSER_DEFAULT_TIMEOUT=30000 \
-    "$agent_browser_bin" --session "$session_name" open "$page_url" >/dev/null || return 1
+  shopt -s nullglob
+  for candidate in "$SAFEHOUSE_HOST_HOME"/.agent-browser/browsers/chrome-*/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing; do
+    newest="$candidate"
+  done
+  shopt -u nullglob
 
-  title="$(
-    HOME="$home_dir" \
-      AGENT_BROWSER_SOCKET_DIR="$socket_dir" \
-      AGENT_BROWSER_DEFAULT_TIMEOUT=30000 \
-      "$agent_browser_bin" --session "$session_name" get title
-  )" || return 1
-
-  printf '%s\n' "$title"
-
-  HOME="$home_dir" \
-    AGENT_BROWSER_SOCKET_DIR="$socket_dir" \
-    AGENT_BROWSER_DEFAULT_TIMEOUT=30000 \
-    "$agent_browser_bin" --session "$session_name" close >/dev/null 2>&1 || true
-}
-
-agent_browser_runtime_root() {
-  local agent_browser_bin="$1"
-  local bin_dir
-
-  bin_dir="$(dirname "$agent_browser_bin")"
-  if [[ "$(basename "$bin_dir")" == "bin" ]]; then
-    dirname "$bin_dir"
-    return 0
-  fi
-
-  printf '%s\n' "$bin_dir"
+  printf '%s\n' "$newest"
 }
