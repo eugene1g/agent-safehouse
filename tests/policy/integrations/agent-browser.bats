@@ -20,10 +20,9 @@ load ../../test_helper.bash
 
   sft_require_cmd_or_skip agent-browser
 
-  precheck_session="safehouse-agent-browser-precheck-${BATS_TEST_NUMBER}-$$"
-  sandbox_session="safehouse-agent-browser-sandbox-${BATS_TEST_NUMBER}-$$"
-  socket_dir="$(sft_workspace_path ".agent-browser-sockets-${BATS_TEST_NUMBER}")" || return 1
-  mkdir -p "$socket_dir"
+  precheck_session="abp-${BATS_TEST_NUMBER}-$$"
+  sandbox_session="abs-${BATS_TEST_NUMBER}-$$"
+  socket_dir="$(mktemp -d "/tmp/sft-ab.${BATS_TEST_NUMBER}.XXXXXX")" || return 1
 
   run agent_browser_get_example_title "$precheck_session" "$SAFEHOUSE_HOST_HOME" "$socket_dir"
   [ "$status" -eq 0 ] || skip "agent-browser precheck failed outside sandbox"
@@ -47,6 +46,7 @@ load ../../test_helper.bash
   ' _ "$sandbox_session"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "Example Domain"
+  rm -rf -- "$socket_dir"
 }
 
 agent_browser_get_example_title() {
