@@ -16,13 +16,14 @@ load ../../test_helper.bash
 }
 
 @test "[EXECUTION] enable=agent-browser can launch and read a page title" {
-  local smoke_url expected_title agent_browser_bin
+  local smoke_url expected_title agent_browser_bin agent_browser_runtime_root
   local precheck_session sandbox_session precheck_socket_dir sandbox_socket_dir
 
   smoke_url='data:text/html,<title>Safehouse%20agent-browser%20smoke</title><h1>ok</h1>'
   expected_title='Safehouse agent-browser smoke'
 
   agent_browser_bin="$(sft_command_path_or_skip agent-browser)"
+  agent_browser_runtime_root="$(agent_browser_runtime_root "$agent_browser_bin")"
 
   precheck_session="abp-${BATS_TEST_NUMBER}-$$"
   sandbox_session="abs-${BATS_TEST_NUMBER}-$$"
@@ -37,6 +38,7 @@ load ../../test_helper.bash
     "AGENT_BROWSER_SOCKET_DIR=$sandbox_socket_dir" \
     "AGENT_BROWSER_DEFAULT_TIMEOUT=30000" \
     -- \
+    --add-dirs-ro="$agent_browser_runtime_root" \
     --enable=agent-browser \
     -- "$agent_browser_bin" --session "$sandbox_session" open "$smoke_url" >/dev/null
 
@@ -45,6 +47,7 @@ load ../../test_helper.bash
     "AGENT_BROWSER_SOCKET_DIR=$sandbox_socket_dir" \
     "AGENT_BROWSER_DEFAULT_TIMEOUT=30000" \
     -- \
+    --add-dirs-ro="$agent_browser_runtime_root" \
     --enable=agent-browser \
     -- "$agent_browser_bin" --session "$sandbox_session" get title
   [ "$status" -eq 0 ]
@@ -79,4 +82,17 @@ agent_browser_get_page_title() {
     AGENT_BROWSER_SOCKET_DIR="$socket_dir" \
     AGENT_BROWSER_DEFAULT_TIMEOUT=30000 \
     "$agent_browser_bin" --session "$session_name" close >/dev/null 2>&1 || true
+}
+
+agent_browser_runtime_root() {
+  local agent_browser_bin="$1"
+  local bin_dir
+
+  bin_dir="$(dirname "$agent_browser_bin")"
+  if [[ "$(basename "$bin_dir")" == "bin" ]]; then
+    dirname "$bin_dir"
+    return 0
+  fi
+
+  printf '%s\n' "$bin_dir"
 }
