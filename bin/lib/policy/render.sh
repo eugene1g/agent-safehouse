@@ -45,6 +45,126 @@ policy_render_append_profile() {
 
   content="$(policy_source_read_profile_content "$profile_key")" || return 1
   printf '%s\n\n' "$content" >&"$policy_render_target_fd"
+  policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "file-read*" "file-write*" || return 1
+}
+
+policy_render_list_profile_absolute_path_rules_for_operation() {
+  local content="$1"
+  local operation="$2"
+  local excluded_operation="${3:-}"
+  local line in_matching_block=0 matcher path allow_prefix
+
+  allow_prefix="(allow ${operation}"
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$in_matching_block" -eq 0 ]]; then
+      if [[ "$line" =~ ^[[:space:]]*\(allow[[:space:]]+ ]] && [[ "$line" == *"$allow_prefix"* ]] && [[ -z "$excluded_operation" || "$line" != *"$excluded_operation"* ]]; then
+        in_matching_block=1
+      fi
+      continue
+    fi
+
+    if [[ "$line" =~ ^[[:space:]]*\) ]]; then
+      in_matching_block=0
+      continue
+    fi
+
+    if [[ "$line" =~ \((literal|subpath)[[:space:]]+\"(/[^\"]*)\"\) ]]; then
+      matcher="${BASH_REMATCH[1]}"
+      path="${BASH_REMATCH[2]}"
+      printf '%s|%s\n' "$matcher" "$path"
+    fi
+  done <<< "$content"
+}
+
+policy_render_resolve_builtin_absolute_path() {
+  local path="$1"
+  local resolved_path=""
+
+  [[ "$path" == /* ]] || return 1
+  [[ -e "$path" ]] || return 1
+
+  resolved_path="$(safehouse_normalize_abs_path "$path" 2>/dev/null)" || return 1
+  [[ "$resolved_path" != "$path" ]] || return 1
+
+  printf '%s\n' "$resolved_path"
+}
+
+policy_render_emit_resolved_builtin_path_rule() {
+  local profile_key="$1"
+  local matcher="$2"
+  local original_path="$3"
+  local resolved_path="$4"
+  local operation="$5"
+  local escaped_resolved_path
+
+  policy_render_write_line ";; #safehouse-test-id:resolved-built-in-path# Resolved target for built-in ${operation} path from ${profile_key}: ${original_path} -> ${resolved_path}"
+  policy_render_emit_path_ancestor_literals "$resolved_path" "resolved built-in ${operation} path" || return 1
+  escaped_resolved_path="$(safehouse_escape_for_sb "$resolved_path")" || return 1
+  policy_render_write_line "(allow ${operation} (${matcher} \"${escaped_resolved_path}\"))"
+  policy_render_write_blank
+}
+
+policy_render_emit_resolved_builtin_path_rules() {
+  local profile_key="$1"
+  local content="$2"
+  local operation="$3"
+  local excluded_operation="${4:-}"
+  local entry matcher path resolved_path resolved_key
+  local -a candidate_entries=()
+  local -a existing_rule_keys=()
+  local -a emitted_rule_keys=()
+
+  [[ "$profile_key" == profiles/* ]] || return 0
+
+  while IFS= read -r entry || [[ -n "$entry" ]]; do
+    candidate_entries+=("$entry")
+  done < <(policy_render_list_profile_absolute_path_rules_for_operation "$content" "$operation" "$excluded_operation")
+
+  if [[ "${#candidate_entries[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  for entry in "${candidate_entries[@]}"; do
+    matcher="${entry%%|*}"
+    path="${entry#*|}"
+    safehouse_array_append_unique existing_rule_keys "${matcher}:${path}"
+  done
+
+  for entry in "${candidate_entries[@]}"; do
+    matcher="${entry%%|*}"
+    path="${entry#*|}"
+    resolved_path="$(policy_render_resolve_builtin_absolute_path "$path" || true)"
+    [[ -n "$resolved_path" ]] || continue
+
+    resolved_key="${matcher}:${resolved_path}"
+    if [[ "${#existing_rule_keys[@]}" -gt 0 ]] && safehouse_array_contains_exact "$resolved_key" "${existing_rule_keys[@]}"; then
+      continue
+    fi
+    if [[ "${#emitted_rule_keys[@]}" -gt 0 ]] && safehouse_array_contains_exact "$resolved_key" "${emitted_rule_keys[@]}"; then
+      continue
+    fi
+
+    policy_render_emit_resolved_builtin_path_rule "$profile_key" "$matcher" "$path" "$resolved_path" "$operation" || return 1
+    emitted_rule_keys+=("$resolved_key")
+  done
+}
+
+policy_render_emit_resolved_builtin_path_rules_for_profiles() {
+  local operation="$1"
+  local excluded_operation=""
+  if [[ "${2:-}" == profiles/* || -z "${2:-}" ]]; then
+    shift
+  else
+    excluded_operation="$2"
+    shift 2
+  fi
+  local profile_key content
+
+  for profile_key in "$@"; do
+    content="$(policy_source_read_profile_content "$profile_key")" || return 1
+    policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "$operation" "$excluded_operation" || return 1
+  done
 }
 
 policy_render_emit_policy_origin_preamble() {

@@ -2893,14 +2893,9 @@ safehouse_expand_tilde() {
   esac
 }
 
-safehouse_normalize_abs_path() {
+safehouse_normalize_abs_path_fallback() {
   local input="$1"
-  local parent base parent_resolved
-
-  if command -v realpath >/dev/null 2>&1; then
-    realpath "$input"
-    return 0
-  fi
+  local current current_parent current_base link_target hop_count=0
 
   if [[ -d "$input" ]]; then
     (
@@ -2910,19 +2905,96 @@ safehouse_normalize_abs_path() {
     return 0
   fi
 
-  parent="$(dirname "$input")"
-  base="$(basename "$input")"
-  if [[ ! -d "$parent" ]]; then
-    safehouse_fail "Cannot normalize path; parent directory does not exist: ${parent} (input: ${input})"
+  current_parent="$(dirname "$input")"
+  current_base="$(basename "$input")"
+  if [[ ! -d "$current_parent" ]]; then
+    safehouse_fail "Cannot normalize path; parent directory does not exist: ${current_parent} (input: ${input})"
     return 1
   fi
 
-  parent_resolved="$(cd "$parent" && pwd -P)" || {
-    safehouse_fail "Cannot normalize path; failed to resolve parent directory: ${parent} (input: ${input})"
+  current_parent="$(cd "$current_parent" && pwd -P)" || {
+    safehouse_fail "Cannot normalize path; failed to resolve parent directory: ${current_parent} (input: ${input})"
+    return 1
+  }
+  current="${current_parent}/${current_base}"
+
+  if command -v readlink >/dev/null 2>&1; then
+    while [[ -L "$current" ]]; do
+      hop_count=$((hop_count + 1))
+      if [[ "$hop_count" -gt 64 ]]; then
+        safehouse_fail "Cannot normalize path; symlink resolution exceeded 64 hops: ${input}"
+        return 1
+      fi
+
+      link_target="$(readlink "$current")" || {
+        safehouse_fail "Cannot normalize path; failed to read symlink target: ${current} (input: ${input})"
+        return 1
+      }
+
+      if [[ "$link_target" == /* ]]; then
+        current="$link_target"
+      else
+        current="$(dirname "$current")/${link_target}"
+      fi
+
+      if [[ -d "$current" ]]; then
+        current="$(
+          cd "$current" || exit
+          pwd -P
+        )" || {
+          safehouse_fail "Cannot normalize path; failed to resolve directory symlink target: ${current} (input: ${input})"
+          return 1
+        }
+        continue
+      fi
+
+      current_parent="$(dirname "$current")"
+      current_base="$(basename "$current")"
+      if [[ ! -d "$current_parent" ]]; then
+        safehouse_fail "Cannot normalize path; parent directory does not exist: ${current_parent} (input: ${input})"
+        return 1
+      fi
+
+      current_parent="$(cd "$current_parent" && pwd -P)" || {
+        safehouse_fail "Cannot normalize path; failed to resolve parent directory: ${current_parent} (input: ${input})"
+        return 1
+      }
+      current="${current_parent}/${current_base}"
+    done
+  fi
+
+  if [[ -d "$current" ]]; then
+    (
+      cd "$current" || exit
+      pwd -P
+    )
+    return 0
+  fi
+
+  current_parent="$(dirname "$current")"
+  current_base="$(basename "$current")"
+  if [[ ! -d "$current_parent" ]]; then
+    safehouse_fail "Cannot normalize path; parent directory does not exist: ${current_parent} (input: ${input})"
+    return 1
+  fi
+
+  current_parent="$(cd "$current_parent" && pwd -P)" || {
+    safehouse_fail "Cannot normalize path; failed to resolve parent directory: ${current_parent} (input: ${input})"
     return 1
   }
 
-  printf '%s/%s\n' "$parent_resolved" "$base"
+  printf '%s/%s\n' "$current_parent" "$current_base"
+}
+
+safehouse_normalize_abs_path() {
+  local input="$1"
+
+  if command -v realpath >/dev/null 2>&1; then
+    realpath "$input"
+    return 0
+  fi
+
+  safehouse_normalize_abs_path_fallback "$input"
 }
 
 # shellcheck shell=bash
@@ -4872,6 +4944,126 @@ policy_render_append_profile() {
 
   content="$(policy_source_read_profile_content "$profile_key")" || return 1
   printf '%s\n\n' "$content" >&"$policy_render_target_fd"
+  policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "file-read*" "file-write*" || return 1
+}
+
+policy_render_list_profile_absolute_path_rules_for_operation() {
+  local content="$1"
+  local operation="$2"
+  local excluded_operation="${3:-}"
+  local line in_matching_block=0 matcher path allow_prefix
+
+  allow_prefix="(allow ${operation}"
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$in_matching_block" -eq 0 ]]; then
+      if [[ "$line" =~ ^[[:space:]]*\(allow[[:space:]]+ ]] && [[ "$line" == *"$allow_prefix"* ]] && [[ -z "$excluded_operation" || "$line" != *"$excluded_operation"* ]]; then
+        in_matching_block=1
+      fi
+      continue
+    fi
+
+    if [[ "$line" =~ ^[[:space:]]*\) ]]; then
+      in_matching_block=0
+      continue
+    fi
+
+    if [[ "$line" =~ \((literal|subpath)[[:space:]]+\"(/[^\"]*)\"\) ]]; then
+      matcher="${BASH_REMATCH[1]}"
+      path="${BASH_REMATCH[2]}"
+      printf '%s|%s\n' "$matcher" "$path"
+    fi
+  done <<< "$content"
+}
+
+policy_render_resolve_builtin_absolute_path() {
+  local path="$1"
+  local resolved_path=""
+
+  [[ "$path" == /* ]] || return 1
+  [[ -e "$path" ]] || return 1
+
+  resolved_path="$(safehouse_normalize_abs_path "$path" 2>/dev/null)" || return 1
+  [[ "$resolved_path" != "$path" ]] || return 1
+
+  printf '%s\n' "$resolved_path"
+}
+
+policy_render_emit_resolved_builtin_path_rule() {
+  local profile_key="$1"
+  local matcher="$2"
+  local original_path="$3"
+  local resolved_path="$4"
+  local operation="$5"
+  local escaped_resolved_path
+
+  policy_render_write_line ";; #safehouse-test-id:resolved-built-in-path# Resolved target for built-in ${operation} path from ${profile_key}: ${original_path} -> ${resolved_path}"
+  policy_render_emit_path_ancestor_literals "$resolved_path" "resolved built-in ${operation} path" || return 1
+  escaped_resolved_path="$(safehouse_escape_for_sb "$resolved_path")" || return 1
+  policy_render_write_line "(allow ${operation} (${matcher} \"${escaped_resolved_path}\"))"
+  policy_render_write_blank
+}
+
+policy_render_emit_resolved_builtin_path_rules() {
+  local profile_key="$1"
+  local content="$2"
+  local operation="$3"
+  local excluded_operation="${4:-}"
+  local entry matcher path resolved_path resolved_key
+  local -a candidate_entries=()
+  local -a existing_rule_keys=()
+  local -a emitted_rule_keys=()
+
+  [[ "$profile_key" == profiles/* ]] || return 0
+
+  while IFS= read -r entry || [[ -n "$entry" ]]; do
+    candidate_entries+=("$entry")
+  done < <(policy_render_list_profile_absolute_path_rules_for_operation "$content" "$operation" "$excluded_operation")
+
+  if [[ "${#candidate_entries[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  for entry in "${candidate_entries[@]}"; do
+    matcher="${entry%%|*}"
+    path="${entry#*|}"
+    safehouse_array_append_unique existing_rule_keys "${matcher}:${path}"
+  done
+
+  for entry in "${candidate_entries[@]}"; do
+    matcher="${entry%%|*}"
+    path="${entry#*|}"
+    resolved_path="$(policy_render_resolve_builtin_absolute_path "$path" || true)"
+    [[ -n "$resolved_path" ]] || continue
+
+    resolved_key="${matcher}:${resolved_path}"
+    if [[ "${#existing_rule_keys[@]}" -gt 0 ]] && safehouse_array_contains_exact "$resolved_key" "${existing_rule_keys[@]}"; then
+      continue
+    fi
+    if [[ "${#emitted_rule_keys[@]}" -gt 0 ]] && safehouse_array_contains_exact "$resolved_key" "${emitted_rule_keys[@]}"; then
+      continue
+    fi
+
+    policy_render_emit_resolved_builtin_path_rule "$profile_key" "$matcher" "$path" "$resolved_path" "$operation" || return 1
+    emitted_rule_keys+=("$resolved_key")
+  done
+}
+
+policy_render_emit_resolved_builtin_path_rules_for_profiles() {
+  local operation="$1"
+  local excluded_operation=""
+  if [[ "${2:-}" == profiles/* || -z "${2:-}" ]]; then
+    shift
+  else
+    excluded_operation="$2"
+    shift 2
+  fi
+  local profile_key content
+
+  for profile_key in "$@"; do
+    content="$(policy_source_read_profile_content "$profile_key")" || return 1
+    policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "$operation" "$excluded_operation" || return 1
+  done
 }
 
 policy_render_emit_policy_origin_preamble() {
@@ -7012,6 +7204,35 @@ policy_embedded_optional_integration_features=(
   "xcode"
 )
 
+policy_dist_preassembled_fixed_before_home_keys=(
+  "profiles/10-system-runtime.sb"
+)
+
+policy_dist_preassembled_fixed_after_home_keys=(
+  "profiles/20-network.sb"
+  "profiles/30-toolchains/apple-toolchain-core.sb"
+  "profiles/30-toolchains/bun.sb"
+  "profiles/30-toolchains/deno.sb"
+  "profiles/30-toolchains/go.sb"
+  "profiles/30-toolchains/java.sb"
+  "profiles/30-toolchains/node.sb"
+  "profiles/30-toolchains/perl.sb"
+  "profiles/30-toolchains/php.sb"
+  "profiles/30-toolchains/python.sb"
+  "profiles/30-toolchains/ruby.sb"
+  "profiles/30-toolchains/runtime-managers.sb"
+  "profiles/30-toolchains/rust.sb"
+  "profiles/40-shared/agent-common.sb"
+)
+
+policy_dist_preassembled_core_integration_keys=(
+  "profiles/50-integrations-core/container-runtime-default-deny.sb"
+  "profiles/50-integrations-core/git.sb"
+  "profiles/50-integrations-core/launch-services.sb"
+  "profiles/50-integrations-core/scm-clis.sb"
+  "profiles/50-integrations-core/ssh-agent-default-deny.sb"
+)
+
 policy_embedded_supported_enable_features="1password, agent-browser, browser-native-messaging, chromium-full, chromium-headless, cleanshot, clipboard, cloud-credentials, docker, electron, kubectl, lldb, macos-gui, microphone, playwright-chrome, process-control, shell-init, spotlight, ssh, xcode, all-agents, all-apps, wide-read"
 
 policy_dist_emit_embedded_profile_requirement_tokens() {
@@ -8552,13 +8773,16 @@ policy_selection_validate_agent_command_alias_catalog() {
 policy_render_emit_fixed_sections() {
   policy_render_append_resolved_base_profile "profiles/00-base.sb" || return 1
   policy_dist_append_preassembled_fixed_before_home || return 1
+  policy_render_emit_resolved_builtin_path_rules_for_profiles "file-read*" "file-write*" "${policy_dist_preassembled_fixed_before_home_keys[@]}" || return 1
   policy_render_emit_home_ancestor_metadata_access || return 1
   policy_dist_append_preassembled_fixed_after_home || return 1
+  policy_render_emit_resolved_builtin_path_rules_for_profiles "file-read*" "file-write*" "${policy_dist_preassembled_fixed_after_home_keys[@]}" || return 1
 }
 
 policy_render_emit_integration_sections() {
   policy_render_emit_integration_preamble
   policy_dist_append_preassembled_core_integrations || return 1
+  policy_render_emit_resolved_builtin_path_rules_for_profiles "file-read*" "file-write*" "${policy_dist_preassembled_core_integration_keys[@]}" || return 1
   policy_render_append_profile "profiles/50-integrations-core/worktree-common-dir.sb" || return 1
   policy_render_append_profile "profiles/50-integrations-core/worktrees.sb" || return 1
   policy_render_append_optional_profiles || return 1

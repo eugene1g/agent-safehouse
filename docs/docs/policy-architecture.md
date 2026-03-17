@@ -40,6 +40,25 @@ Safehouse uses standard sandbox matchers:
 
 Ancestor `literal` read grants are intentionally emitted for traversal compatibility.
 
+## Built-In Absolute Path Resolution
+
+Built-in `profiles/*` modules are authored with explicit absolute paths such as `/etc`, `/private/etc/localtime`, or `/private/var/select/sh`.
+
+During policy rendering, Safehouse checks built-in absolute `literal` and `subpath` entries in `allow file-read*` stanzas and resolves symlink targets on the current host. If a path resolves somewhere else, Safehouse emits:
+
+- ancestor `literal` grants for the resolved target path
+- a matching `literal` or `subpath` read grant for that resolved target
+
+This keeps built-in macOS compatibility paths working when the authored path is a symlink but the sandbox needs the real target path to match.
+
+Current scope is intentionally narrow:
+
+- built-in `profiles/*` content only
+- absolute `literal` and `subpath` rules only
+- `allow file-read*` stanzas only
+
+Dynamic CLI/config grants already normalize user-provided paths separately. Read/write, metadata-only, `home-*`, `prefix`, and `regex` rules are not auto-expanded by this mechanism today.
+
 ## Home Placeholder Replacement
 
 `profiles/00-base.sb` uses `HOME_DIR` placeholder token:

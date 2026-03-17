@@ -15,6 +15,8 @@
 
 Static `dist/profiles/*` files and app-specific launcher scripts are no longer generated.
 
+The embedded fixed-profile chunks in `dist/safehouse.sh` still go through runtime policy rendering for generated sections such as HOME replacement, workdir/grant emission, and built-in absolute-path symlink resolution. That keeps `bin/safehouse.sh` and `dist/safehouse.sh` byte-for-byte aligned even when host-specific paths like `/private/etc/localtime` resolve differently across machines.
+
 ## Desktop Apps
 
 Known `.app` bundles are selected automatically when you launch their inner

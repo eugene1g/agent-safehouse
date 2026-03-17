@@ -698,6 +698,9 @@ emit_embedded_overrides() {
   local escaped_supported_enable_features
 
   emit_array_declaration "policy_embedded_optional_integration_features" "${embedded_optional_integration_features[@]}"
+  emit_array_declaration "policy_dist_preassembled_fixed_before_home_keys" "${dist_preassembled_fixed_before_home_keys[@]}"
+  emit_array_declaration "policy_dist_preassembled_fixed_after_home_keys" "${dist_preassembled_fixed_after_home_keys[@]}"
+  emit_array_declaration "policy_dist_preassembled_core_integration_keys" "${dist_preassembled_core_integration_keys[@]}"
   escaped_supported_enable_features="$(escape_for_shell_double_quotes "$embedded_supported_enable_features")"
   printf 'policy_embedded_supported_enable_features="%s"\n\n' "$escaped_supported_enable_features"
   emit_embedded_profile_requirements_function
@@ -874,13 +877,16 @@ policy_selection_validate_agent_command_alias_catalog() {
 policy_render_emit_fixed_sections() {
   policy_render_append_resolved_base_profile "profiles/00-base.sb" || return 1
   policy_dist_append_preassembled_fixed_before_home || return 1
+  policy_render_emit_resolved_builtin_path_rules_for_profiles "file-read*" "file-write*" "${policy_dist_preassembled_fixed_before_home_keys[@]}" || return 1
   policy_render_emit_home_ancestor_metadata_access || return 1
   policy_dist_append_preassembled_fixed_after_home || return 1
+  policy_render_emit_resolved_builtin_path_rules_for_profiles "file-read*" "file-write*" "${policy_dist_preassembled_fixed_after_home_keys[@]}" || return 1
 }
 
 policy_render_emit_integration_sections() {
   policy_render_emit_integration_preamble
   policy_dist_append_preassembled_core_integrations || return 1
+  policy_render_emit_resolved_builtin_path_rules_for_profiles "file-read*" "file-write*" "${policy_dist_preassembled_core_integration_keys[@]}" || return 1
   policy_render_append_profile "profiles/50-integrations-core/worktree-common-dir.sb" || return 1
   policy_render_append_profile "profiles/50-integrations-core/worktrees.sb" || return 1
   policy_render_append_optional_profiles || return 1

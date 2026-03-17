@@ -10,6 +10,14 @@
 
 - No profiles changed.
 
+### Bug Fixes
+
+- Built-in absolute `file-read*` paths now resolve symlink targets at policy render time, so macOS compatibility paths such as `/private/etc/resolv.conf` and `/private/etc/localtime` keep working when the real file lives elsewhere.
+
+### Chores
+
+- Clarified the policy architecture, distribution, and README docs around built-in path resolution and its current scope.
+
 ## [0.5.0] - 2026-03-17
 
 ### Upgrade Notes

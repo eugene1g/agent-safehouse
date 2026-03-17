@@ -70,3 +70,24 @@ load ../../test_helper.bash
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "weird-path-ok"
 }
+
+@test "file symlink grants normalize to the resolved target path" {
+  local target_dir symlink_dir target_file symlink_file policy
+
+  target_dir="$(sft_external_dir "symlink-target")" || return 1
+  symlink_dir="$(sft_external_dir "symlink-source")" || return 1
+  target_file="${target_dir}/real.txt"
+  symlink_file="${symlink_dir}/link.txt"
+
+  printf '%s\n' "via-symlink" > "$target_file"
+  /bin/ln -sf "$target_file" "$symlink_file"
+
+  policy="$(safehouse_profile --add-dirs-ro "$symlink_file")"
+
+  sft_assert_contains "$policy" "(literal \"${target_file}\")"
+  sft_assert_not_contains "$policy" "(literal \"${symlink_file}\")"
+
+  run safehouse_ok --add-dirs-ro "$symlink_file" -- /bin/cat "$target_file"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "via-symlink"
+}
