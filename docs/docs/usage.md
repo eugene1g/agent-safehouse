@@ -3,7 +3,7 @@
 ## Common Patterns
 
 ```bash
-# Run Claude in current repo (git root auto-selected as workdir)
+# Run Claude in the current directory
 safehouse claude --dangerously-skip-permissions
 
 # Grant extra writable directories
@@ -27,9 +27,17 @@ safehouse --workdir=/tmp/scratch -- claude --dangerously-skip-permissions
 # Disable automatic workdir grants; use only explicit grants
 safehouse --workdir= --add-dirs-ro=/repos/shared-lib --add-dirs=/tmp/scratch -- aider
 
+# Launch from a nested folder but grant the enclosing repo explicitly
+cd ~/src/monorepo/apps/agent
+safehouse --add-dirs=~/src/monorepo claude --dangerously-skip-permissions
+
 # Pre-grant a stable worktree root for future cross-worktree read context without restarting
 safehouse --add-dirs-ro=~/worktrees -- claude --dangerously-skip-permissions
 ```
+
+By default, Safehouse keeps the selected workdir at the exact directory where you launch it. If you start inside `~/src/monorepo/apps/agent`, that directory becomes the default read/write grant even when `~/src/monorepo` is a Git repo. This avoids accidentally widening access when a larger repo or home-directory Git tree lives above the folder you actually want to sandbox.
+
+If you intentionally want broader repo access from a nested launch, grant it explicitly with `--add-dirs=/path/to/repo` for read/write access or `--add-dirs-ro=/path/to/repo` for read-only context.
 
 ## Config via Environment Variables
 

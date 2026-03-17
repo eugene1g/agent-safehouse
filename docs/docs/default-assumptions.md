@@ -14,6 +14,7 @@ This page documents the baseline assumptions Safehouse makes so default behavior
 These are baseline allowances intended to keep common workflows functional:
 
 - Selected invocation directory read/write by default.
+- Safehouse does not auto-widen the default workdir to an enclosing Git repo; broader parent-repo access must be granted explicitly.
 - Existing linked Git worktrees are granted read-only visibility only when the selected workdir itself is a Git worktree root.
 - Shared Git common-dir metadata for linked worktrees is granted read/write only when the selected workdir itself is a linked Git worktree root and that metadata lives outside the selected workdir.
 - Metadata-only traversal on `/`, the path to `$HOME`, and `$HOME` itself so runtimes can reach explicitly allowed home-scoped paths without opening broad home reads.
@@ -73,6 +74,7 @@ Enable only when required for the current task:
 ## Operational Defaults for Common Scenarios
 
 - **Daily coding agent use**: no optional integrations; rely on workdir + minimal explicit grants.
+- **Nested folder inside a larger repo**: the default workdir stays on the nested folder; add `--add-dirs` or `--add-dirs-ro` if you intentionally want the enclosing repo.
 - **Multi-worktree repo use**: existing worktrees are readable by default at launch; add `--add-dirs-ro` for a stable worktree parent if you need future worktrees for read context without restarting, or `--add-dirs` if you intentionally want broader write access.
 - **Cross-repo read context**: add `--add-dirs-ro` for specific sibling paths or files.
 - **Cloud task burst**: enable `cloud-credentials` only for that run/session.

@@ -4,7 +4,11 @@
 
 ### Upgrade Notes
 
-- No special notes.
+- Safehouse now keeps the default workdir at the exact invocation directory instead of walking up to an enclosing Git root. This avoids accidentally widening access when you launch from a deeply nested folder inside a larger repo or beneath a home-directory Git tree. If you intentionally want broader repo access from a nested launch, grant it explicitly with `--add-dirs=/path/to/repo` or `--add-dirs-ro=/path/to/repo`.
+
+### Bug Fixes
+
+- Ancestor `.git` directories without real repository metadata no longer widen the default workdir.
 
 ### Changed Sandboxing Profiles
 

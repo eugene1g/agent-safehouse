@@ -43,6 +43,23 @@ load ../../test_helper.bash
   sft_assert_contains "$output" ".safehouse:1: expected key=value"
 }
 
+@test "[POLICY-ONLY] trusted workdir config is not discovered from an enclosing git repo by default" {
+  local repo_root nested_dir readonly_dir profile
+
+  sft_require_cmd_or_skip git
+
+  repo_root="$(sft_external_dir "nested-config-repo")" || return 1
+  nested_dir="${repo_root}/nested/work"
+  readonly_dir="$(sft_external_dir "nested-config-ro")" || return 1
+
+  mkdir -p "$nested_dir" || return 1
+  git -C "$repo_root" init -q || return 1
+  printf 'add-dirs-ro=%s\n' "$readonly_dir" > "${repo_root}/.safehouse"
+
+  profile="$(safehouse_profile_in_dir "$nested_dir" --trust-workdir-config)"
+  sft_assert_not_contains "$profile" "$readonly_dir"
+}
+
 @test "trusted workdir config rejects unknown keys" {
   local config_file
 

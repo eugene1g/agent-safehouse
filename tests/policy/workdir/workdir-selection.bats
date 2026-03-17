@@ -73,6 +73,10 @@ sft_setup_linked_git_worktree_fixture() {
 
   safehouse_denied_in_dir "$nested_dir" -- /bin/sh -c "touch '$blocked_file'"
   sft_assert_path_absent "$blocked_file"
+
+  run safehouse_ok_in_dir "$nested_dir" -- git status --short
+  [ "$status" -ne 0 ]
+  sft_assert_contains "$output" "not a git repository"
 }
 
 @test "[EXECUTION] linked git worktrees can write shared git metadata without manual extra grants" { # https://github.com/eugene1g/agent-safehouse/issues/37
@@ -95,4 +99,17 @@ sft_setup_linked_git_worktree_fixture() {
 
   safehouse_denied_in_dir "$git_linked_worktree" -- /bin/sh -c "touch '$blocked_file'"
   sft_assert_path_absent "$blocked_file"
+}
+
+@test "[EXECUTION] nested linked worktree paths stay constrained to the invocation directory by default" {
+  local nested_dir
+
+  sft_setup_linked_git_worktree_fixture || return 1
+  nested_dir="${git_linked_worktree}/nested/work"
+
+  mkdir -p "$nested_dir"
+
+  run safehouse_ok_in_dir "$nested_dir" -- git status --short
+  [ "$status" -ne 0 ]
+  sft_assert_contains "$output" "not a git repository"
 }

@@ -67,6 +67,10 @@ Safehouse resolves the effective workdir in this order:
 2. `SAFEHOUSE_WORKDIR` (`SAFEHOUSE_WORKDIR=` also disables the automatic workdir grant)
 3. Otherwise the invocation directory
 
+Safehouse does not walk up to an enclosing Git repo when choosing the default workdir. Launching from `repo/subdir` grants `repo/subdir`, not `repo/`. This keeps deeply nested folders scoped to the directory you actually started in, even when a much larger repo or a personal Git tree exists above it.
+
+If you intentionally want broader repo access from a nested launch, grant it explicitly with `--add-dirs=/path/to/repo` for read/write access or `--add-dirs-ro=/path/to/repo` for read-only context.
+
 When the effective workdir is a Git worktree root:
 
 - If the current worktree uses a shared Git common dir outside the selected workdir, that common dir gets automatic read/write access.
@@ -100,6 +104,7 @@ Supported keys:
 - `add-dirs=PATHS`
 
 By default this file is ignored. It is loaded only with `--trust-workdir-config` (or `SAFEHOUSE_TRUST_WORKDIR_CONFIG`).
+Because the default workdir is the invocation directory, Safehouse does not auto-discover `.safehouse` files from enclosing Git repo roots when you launch from a nested subdirectory.
 Trusted config parsing fails fast on malformed lines and unknown keys.
 
 ## `--env=FILE` Format

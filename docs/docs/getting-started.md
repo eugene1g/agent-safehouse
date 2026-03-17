@@ -119,7 +119,7 @@ Run the real unsandboxed binary with `command <agent>` when needed.
 ## First Commands
 
 ```bash
-# Generate policy for current repo and print policy path
+# Generate policy for the current directory and print policy path
 safehouse
 
 # Run an agent inside sandbox
