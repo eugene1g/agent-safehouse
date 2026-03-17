@@ -81,3 +81,15 @@ load ../../test_helper.bash
 
   safehouse_ok -- /bin/sh -c "cd '$SAFEHOUSE_WORKSPACE' && git init && git config user.email test@test && git config user.name test && printf x > f && git add f && git commit -m init"
 }
+
+@test "[EXECUTION] bundler can read the macOS system default gemspec catalog inside the sandbox" {
+  sft_require_cmd_or_skip bundle
+  sft_require_cmd_or_skip ruby
+
+  run /bin/sh -c 'bundle --version && ruby -e '\''require "bundler"; puts Bundler::VERSION'\'''
+  if [[ "$status" -ne 0 ]]; then
+    skip "bundler precheck failed outside sandbox"
+  fi
+
+  safehouse_ok -- /bin/sh -c 'bundle --version && ruby -e '\''require "bundler"; puts Bundler::VERSION'\'''
+}

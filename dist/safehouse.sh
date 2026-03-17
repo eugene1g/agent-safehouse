@@ -700,6 +700,15 @@ __SAFEHOUSE_EMBEDDED_profiles_30_toolchains_python_sb__
 
 ;; Covers common Ruby managers and gem/bundler caches.
 
+;; System Ruby and Bundler enumerate the default gemspec catalog under
+;; /Library/Ruby/Gems/... even for read-only commands like `bundle --version`.
+;; Keep this read-only so the macOS-managed default gem set remains immutable.
+(allow file-read*
+    (literal "/Library")
+    (literal "/Library/Ruby")
+    (subpath "/Library/Ruby/Gems")
+)
+
 (allow file-read* file-write*
     (home-subpath "/.rbenv")
     (home-subpath "/.rvm")
@@ -8151,6 +8160,15 @@ policy_dist_append_preassembled_fixed_after_home() {
 ;; ---------------------------------------------------------------------------
 
 ;; Covers common Ruby managers and gem/bundler caches.
+
+;; System Ruby and Bundler enumerate the default gemspec catalog under
+;; /Library/Ruby/Gems/... even for read-only commands like `bundle --version`.
+;; Keep this read-only so the macOS-managed default gem set remains immutable.
+(allow file-read*
+    (literal "/Library")
+    (literal "/Library/Ruby")
+    (subpath "/Library/Ruby/Gems")
+)
 
 (allow file-read* file-write*
     (home-subpath "/.rbenv")
