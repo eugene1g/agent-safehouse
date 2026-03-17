@@ -46,8 +46,13 @@ safehouse_git_normalize_discovery_cwd() {
 safehouse_git_marker_path_is_repo_root() {
   local marker_path="$1"
   local first_line=""
+  local git_dir=""
+  local marker_dir=""
 
   if [[ -d "$marker_path" ]]; then
+    [[ -f "${marker_path}/HEAD" ]] || return 1
+    [[ -d "${marker_path}/objects" ]] || return 1
+    [[ -d "${marker_path}/refs" ]] || return 1
     return 0
   fi
 
@@ -56,7 +61,22 @@ safehouse_git_marker_path_is_repo_root() {
   fi
 
   IFS= read -r first_line < "$marker_path" || true
-  [[ "$first_line" == gitdir:\ * ]]
+  [[ "$first_line" == gitdir:\ * ]] || return 1
+
+  git_dir="${first_line#gitdir: }"
+  [[ -n "$git_dir" ]] || return 1
+
+  marker_dir="${marker_path%/*}"
+  if [[ "$git_dir" == /* ]]; then
+    [[ -d "$git_dir" && -f "${git_dir}/HEAD" ]]
+    return $?
+  fi
+
+  (
+    cd "$marker_dir" || exit 1
+    cd "$git_dir" || exit 1
+    [[ -f "$(pwd -P)/HEAD" ]]
+  )
 }
 
 safehouse_git_find_root_from_filesystem() {
