@@ -38,6 +38,20 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "(literal \"${resolved_resolv}\")"
 }
 
+@test "[POLICY-ONLY] default profile keeps xcode-select pointer symlinks unexpanded" {
+  local profile
+
+  [ -e /private/var/select/developer_dir ] || skip "/private/var/select/developer_dir is not present"
+  [ -e /private/var/db/xcode_select_link ] || skip "/private/var/db/xcode_select_link is not present"
+
+  profile="$(safehouse_profile)"
+
+  sft_assert_not_contains "$profile" "/private/var/select/developer_dir ->"
+  sft_assert_not_contains "$profile" "/var/select/developer_dir ->"
+  sft_assert_not_contains "$profile" "/private/var/db/xcode_select_link ->"
+  sft_assert_not_contains "$profile" "/var/db/xcode_select_link ->"
+}
+
 @test "[POLICY-ONLY] default profile includes always-on network, shared, and core integration sources" {
   local profile
 

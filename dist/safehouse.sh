@@ -1561,19 +1561,19 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_kubectl_sb__
     (literal "/Library")                                               ;; Ancestor traversal for selected developer toolchain roots.
     (literal "/Library/Developer")                                     ;; Ancestor traversal for Command Line Tools.
     (subpath "/Library/Developer/CommandLineTools")                    ;; Command Line Tools root (lldb, LLDB.framework, debugserver resources).
+    (literal "/Library/Developer/PrivateFrameworks")                   ;; CoreDevice/DVT private frameworks LLDB may load on Xcode-backed hosts.
+    (subpath "/Library/Developer/PrivateFrameworks")
     (literal "/Applications")                                          ;; Ancestor traversal for Xcode app bundles.
-    (literal "/Applications/Xcode.app")                                ;; Xcode app root when xcode-select targets the default bundle.
-    (subpath "/Applications/Xcode.app/Contents/Developer")             ;; Full Xcode developer toolchain root.
-    (literal "/Applications/Xcode-beta.app")                           ;; Xcode beta app root when selected explicitly.
-    (subpath "/Applications/Xcode-beta.app/Contents/Developer")        ;; Xcode beta developer toolchain root.
+    (subpath "/Applications/Xcode.app")                                ;; Full bundle read; LLDB may load SharedFrameworks outside Contents/Developer.
+    (subpath "/Applications/Xcode-beta.app")                           ;; Beta bundle variant when selected explicitly.
+    (regex #"^/Applications/Xcode[^/]*\.app(/.*)?$")                 ;; Version-suffixed or renamed Xcode bundles selected via xcode-select.
     (literal "/System")                                                ;; Ancestor traversal for /System/Volumes/Data compatibility aliases.
     (literal "/System/Volumes")                                        ;; Ancestor traversal for /System/Volumes/Data compatibility aliases.
     (literal "/System/Volumes/Data")                                   ;; Ancestor traversal for /System/Volumes/Data compatibility aliases.
     (literal "/System/Volumes/Data/Applications")                      ;; Ancestor traversal for Data-backed /Applications paths.
-    (literal "/System/Volumes/Data/Applications/Xcode.app")            ;; Data-backed Xcode app root on some path-resolution flows.
-    (subpath "/System/Volumes/Data/Applications/Xcode.app/Contents/Developer")
-    (literal "/System/Volumes/Data/Applications/Xcode-beta.app")       ;; Data-backed Xcode beta app root on some path-resolution flows.
-    (subpath "/System/Volumes/Data/Applications/Xcode-beta.app/Contents/Developer")
+    (subpath "/System/Volumes/Data/Applications/Xcode.app")            ;; Data-backed default bundle alias on some path-resolution flows.
+    (subpath "/System/Volumes/Data/Applications/Xcode-beta.app")       ;; Data-backed beta bundle alias on some path-resolution flows.
+    (regex #"^/System/Volumes/Data/Applications/Xcode[^/]*\.app(/.*)?$")
 )
 
 (allow process-info-pidinfo)           ;; Host process status/introspection used by debugger inspection flows.
@@ -4976,6 +4976,26 @@ policy_render_list_profile_absolute_path_rules_for_operation() {
   done <<< "$content"
 }
 
+policy_render_should_skip_resolved_builtin_path() {
+  local profile_key="$1"
+  local path="$2"
+
+  [[ "$profile_key" == "profiles/10-system-runtime.sb" ]] || return 1
+
+  case "$path" in
+    /private/var/select/developer_dir|/var/select/developer_dir|/private/var/db/xcode_select_link|/var/db/xcode_select_link)
+      # These are host-selection pointers, not compatibility aliases like /etc -> /private/etc.
+      # Resolving them at render time would make the default policy silently inherit whatever
+      # developer root xcode-select currently targets. On CI hosts that can redirect the sandbox
+      # from CLT into a full versioned Xcode bundle. Keep that wider Xcode surface explicit in
+      # the xcode/lldb integrations instead of auto-following these selector symlinks here.
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 policy_render_resolve_builtin_absolute_path() {
   local path="$1"
   local resolved_path=""
@@ -5033,6 +5053,9 @@ policy_render_emit_resolved_builtin_path_rules() {
   for entry in "${candidate_entries[@]}"; do
     matcher="${entry%%|*}"
     path="${entry#*|}"
+    if policy_render_should_skip_resolved_builtin_path "$profile_key" "$path"; then
+      continue
+    fi
     resolved_path="$(policy_render_resolve_builtin_absolute_path "$path" || true)"
     [[ -n "$resolved_path" ]] || continue
 

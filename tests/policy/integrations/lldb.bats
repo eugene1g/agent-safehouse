@@ -9,6 +9,11 @@ load ../../test_helper.bash
 
   sft_assert_includes_source "$profile" "55-integrations-optional/lldb.sb"
   sft_assert_includes_source "$profile" "55-integrations-optional/process-control.sb"
+  sft_assert_omits_source "$profile" "55-integrations-optional/xcode.sb"
+  sft_assert_contains "$profile" '(subpath "/Library/Developer/PrivateFrameworks")'
+  sft_assert_contains "$profile" '(regex #"^/Applications/Xcode[^/]*\.app(/.*)?$")'
+  sft_assert_contains "$profile" '(regex #"^/System/Volumes/Data/Applications/Xcode[^/]*\.app(/.*)?$")'
+  sft_assert_not_contains "$profile" '(home-subpath "/Library/Developer/Xcode")'
 }
 
 @test "[EXECUTION] lldb stays denied by default and with process-control alone, then becomes allowed with enable=lldb" {

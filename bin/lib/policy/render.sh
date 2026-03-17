@@ -77,6 +77,26 @@ policy_render_list_profile_absolute_path_rules_for_operation() {
   done <<< "$content"
 }
 
+policy_render_should_skip_resolved_builtin_path() {
+  local profile_key="$1"
+  local path="$2"
+
+  [[ "$profile_key" == "profiles/10-system-runtime.sb" ]] || return 1
+
+  case "$path" in
+    /private/var/select/developer_dir|/var/select/developer_dir|/private/var/db/xcode_select_link|/var/db/xcode_select_link)
+      # These are host-selection pointers, not compatibility aliases like /etc -> /private/etc.
+      # Resolving them at render time would make the default policy silently inherit whatever
+      # developer root xcode-select currently targets. On CI hosts that can redirect the sandbox
+      # from CLT into a full versioned Xcode bundle. Keep that wider Xcode surface explicit in
+      # the xcode/lldb integrations instead of auto-following these selector symlinks here.
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 policy_render_resolve_builtin_absolute_path() {
   local path="$1"
   local resolved_path=""
@@ -134,6 +154,9 @@ policy_render_emit_resolved_builtin_path_rules() {
   for entry in "${candidate_entries[@]}"; do
     matcher="${entry%%|*}"
     path="${entry#*|}"
+    if policy_render_should_skip_resolved_builtin_path "$profile_key" "$path"; then
+      continue
+    fi
     resolved_path="$(policy_render_resolve_builtin_absolute_path "$path" || true)"
     [[ -n "$resolved_path" ]] || continue
 
