@@ -28,7 +28,15 @@ load ../../test_helper.bash
   local profile
   profile="$(safehouse_profile)"
 
+  sft_assert_contains "$profile" "(home-literal \"/.local/state\")"
   sft_assert_contains "$profile" "(home-subpath \"/.local/state/fnm_multishells\")"
+}
+
+@test "[POLICY-ONLY] node toolchain grants the fnm runtime install root" { # issue #13
+  local profile
+  profile="$(safehouse_profile)"
+
+  sft_assert_contains "$profile" "(home-subpath \"/.local/share/fnm\")"
 }
 
 @test "[POLICY-ONLY] apple toolchain core includes the curated CLT aliases used by common builds" { # https://github.com/eugene1g/agent-safehouse/issues/57
@@ -155,6 +163,7 @@ load ../../test_helper.bash
   node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
   case "$node_bin" in
     /opt/*|/usr/*|/bin/*|/sbin/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.local/share/fnm/*|\
     "${SAFEHOUSE_HOST_HOME}"/.local/share/mise/*|\
     "${SAFEHOUSE_HOST_HOME}"/Library/pnpm/*|\
     "${SAFEHOUSE_HOST_HOME}"/.nvm/*|\
