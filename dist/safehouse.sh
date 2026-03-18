@@ -602,6 +602,13 @@ __SAFEHOUSE_EMBEDDED_profiles_30_toolchains_java_sb__
     (home-subpath "/Library/Application Support/turborepo")
 
 )
+
+;; fnm injects per-shell bin shims under ~/.local/state/fnm_multishells/... .
+;; Node's child-process PATH resolution can return EPERM if it hits those
+;; entries without metadata access, even when a later PATH entry would work.
+(allow file-read-metadata
+    (home-subpath "/.local/state/fnm_multishells")
+)
 __SAFEHOUSE_EMBEDDED_profiles_30_toolchains_node_sb__
       ;;
     "profiles/30-toolchains/perl.sb")
@@ -8329,6 +8336,13 @@ policy_dist_append_preassembled_fixed_after_home() {
     (home-subpath "/Library/Caches/turbo")
     (home-subpath "/Library/Application Support/turborepo")
 
+)
+
+;; fnm injects per-shell bin shims under ~/.local/state/fnm_multishells/... .
+;; Node's child-process PATH resolution can return EPERM if it hits those
+;; entries without metadata access, even when a later PATH entry would work.
+(allow file-read-metadata
+    (home-subpath "/.local/state/fnm_multishells")
 )
 
 ;; ---------------------------------------------------------------------------

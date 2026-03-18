@@ -68,3 +68,10 @@
     (home-subpath "/Library/Application Support/turborepo")
 
 )
+
+;; fnm injects per-shell bin shims under ~/.local/state/fnm_multishells/... .
+;; Node's child-process PATH resolution can return EPERM if it hits those
+;; entries without metadata access, even when a later PATH entry would work.
+(allow file-read-metadata
+    (home-subpath "/.local/state/fnm_multishells")
+)
