@@ -70,6 +70,14 @@ jobs:
           agent-browser install
           playwright install chromium-headless-shell
 
+      - name: Install Rust toolchain
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew install rustup-init
+          rustup-init -y --profile minimal --default-toolchain stable --no-modify-path
+          printf '%s\n' "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
+
       - name: Run test suite
         run: |
           ./tests/run.sh
