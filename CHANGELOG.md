@@ -10,6 +10,28 @@
 
 - No profiles changed.
 
+## [0.5.2] - 2026-03-18
+
+### Upgrade Notes
+
+- No special notes.
+
+### Bug Fixes
+
+- The default Apple Command Line Tools profile now includes `ranlib` plus common compiler aliases and low-risk archive and inspection helpers, restoring `cargo build` and other static-archive workflows that implicitly invoke `ranlib` inside the sandbox.
+
+### Chores
+
+- Added execution coverage for `ar` archive creation and Rust `cargo build` of a `staticlib`, and installed a stable Rust toolchain in the macOS test workflow so this regression is exercised in CI.
+
+### Thanks
+
+- @Sixeight surfacing the missing `ranlib` allowance behind the Rust staticlib failure fixed in this release in [#57](https://github.com/eugene1g/agent-safehouse/issues/57).
+
+### Changed Sandboxing Profiles
+
+- [`apple-toolchain-core.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.5.1...v0.5.2#diff-2e94e17a0cc2897fd42614396f336402efeab2c61bf5164883c16af81389fb2b): Added `ranlib`, common compiler aliases, and related low-risk inspection helpers to the curated CLT allowlist so static archive builds work by default without broadening access to debugger tooling.
+
 ## [0.5.1] - 2026-03-17
 
 ### Upgrade Notes
