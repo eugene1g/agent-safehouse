@@ -36,3 +36,20 @@ load ../../test_helper.bash
   sft_assert_contains "$app_profile" "(subpath \"${resolved_app_dir}\")"
   sft_assert_not_contains "$non_app_profile" "LookupApp.app"
 }
+
+@test "[POLICY-ONLY] Codex.app command paths select the desktop app profile and omit the CLI profile" {
+  local codex_app_dir codex_app_bin codex_profile resolved_app_dir
+
+  codex_app_dir="$(sft_workspace_path "Codex.app")"
+  codex_app_bin="${codex_app_dir}/Contents/MacOS/codex"
+
+  sft_make_fake_command "$codex_app_bin"
+  codex_profile="$(safehouse_profile -- "$codex_app_bin")"
+  resolved_app_dir="$(cd "$codex_app_dir" && pwd -P)"
+
+  sft_assert_contains "$codex_profile" "(subpath \"${resolved_app_dir}\")"
+  sft_assert_includes_source "$codex_profile" "65-apps/codex-app.sb"
+  sft_assert_includes_source "$codex_profile" "55-integrations-optional/electron.sb"
+  sft_assert_includes_source "$codex_profile" "55-integrations-optional/keychain.sb"
+  sft_assert_omits_source "$codex_profile" "60-agents/codex.sb"
+}
