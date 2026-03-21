@@ -12,7 +12,8 @@
     ;; Node version managers.
     (home-subpath "/.nvm")
     (home-subpath "/.fnm")
-    (home-subpath "/.local/share/fnm")  ;; Current fnm default install root for managed Node runtimes and package manager payloads.
+    (home-subpath "/.local/share/fnm")  ;; Linux/XDG default fnm install root for managed Node runtimes and package manager payloads.
+    (home-subpath "/Library/Application Support/fnm")  ;; macOS default fnm install root when XDG_DATA_HOME is unset.
 
     ;; npm
     (home-subpath "/.npm")
@@ -73,8 +74,9 @@
 ;; fnm injects per-shell bin shims under ~/.local/state/fnm_multishells/... .
 ;; Node's child-process PATH resolution can return EPERM if it hits those
 ;; entries without metadata access, even when a later PATH entry would work.
-;; Current fnm releases commonly pair those shims with runtimes under
-;; ~/.local/share/fnm, which the Node toolchain block above grants read/write.
+;; Current fnm releases commonly pair those shims with runtimes under one of
+;; the default fnm install roots above, which the Node toolchain block grants
+;; read/write.
 (allow file-read-metadata
     (home-literal "/.local/state")
     (home-subpath "/.local/state/fnm_multishells")
