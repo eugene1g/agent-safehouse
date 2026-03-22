@@ -55,7 +55,7 @@ jobs:
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
-          brew install bats-core parallel node
+          brew install bats-core parallel node fnm
           brew install --cask google-chrome temurin
           shopt -s nullglob
           temurin_homes=(/Library/Java/JavaVirtualMachines/temurin*.jdk/Contents/Home)
@@ -81,3 +81,22 @@ jobs:
       - name: Run test suite
         run: |
           ./tests/run.sh
+
+      - name: Run fnm-backed node PATH regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(fnm env --shell bash)"
+          fnm install 24
+          fnm use 24
+          echo "node => $(command -v node)"
+          echo "npm  => $(command -v npm)"
+          case "$(command -v npm)" in
+            "$HOME"/.local/state/fnm_multishells/*/bin/npm)
+              ;;
+            *)
+              echo "npm is not resolving through an fnm multishell path" >&2
+              exit 1
+              ;;
+          esac
+          bats --filter 'real fnm multishell PATH entry' tests/policy/runtime/toolchains.bats

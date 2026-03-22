@@ -12,6 +12,8 @@
     ;; Node version managers.
     (home-subpath "/.nvm")
     (home-subpath "/.fnm")
+    (home-subpath "/.local/share/fnm")  ;; Linux/XDG default fnm install root for managed Node runtimes and package manager payloads.
+    (home-subpath "/Library/Application Support/fnm")  ;; macOS default fnm install root when XDG_DATA_HOME is unset.
 
     ;; npm
     (home-subpath "/.npm")
@@ -67,4 +69,15 @@
     (home-subpath "/Library/Caches/turbo")
     (home-subpath "/Library/Application Support/turborepo")
 
+)
+
+;; fnm injects per-shell bin shims under ~/.local/state/fnm_multishells/... .
+;; Node's child-process PATH resolution can return EPERM if it hits those
+;; entries without metadata access, even when a later PATH entry would work.
+;; On macOS, Node can also lstat ~/Library/Application Support while resolving
+;; entrypoints or global package shims stored under the fnm install root there.
+(allow file-read-metadata
+    (home-literal "/.local/state")
+    (home-subpath "/.local/state/fnm_multishells")
+    (home-literal "/Library/Application Support")
 )
