@@ -24,12 +24,13 @@ load ../../test_helper.bash
   done
 }
 
-@test "[POLICY-ONLY] node toolchain grants fnm multishell metadata traversal" { # issue #13
+@test "[POLICY-ONLY] node toolchain grants fnm metadata traversal" { # issue #13
   local profile
   profile="$(safehouse_profile)"
 
   sft_assert_contains "$profile" "(home-literal \"/.local/state\")"
   sft_assert_contains "$profile" "(home-subpath \"/.local/state/fnm_multishells\")"
+  sft_assert_contains "$profile" "(home-literal \"/Library/Application Support\")"
 }
 
 @test "[POLICY-ONLY] node toolchain grants the fnm runtime install roots" { # issue #13
@@ -197,6 +198,41 @@ load ../../test_helper.bash
     "$DIST_SAFEHOUSE" -- "$node_bin" -e 'const {spawnSync}=require("node:child_process"); const r=spawnSync("npm", [], {stdio: "ignore"}); if (r.error) { console.error(r.error.code || r.error.message); process.exit(1); } process.exit(r.status ?? 1);'
   rm -rf -- "$blocked_root"
   [ "$status" -eq 0 ]
+}
+
+@test "[EXECUTION] node can execute a script from the macOS fnm install root" { # issue #13
+  sft_require_cmd_or_skip node
+
+  local node_bin fake_home fnm_root entrypoint
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
+  case "$node_bin" in
+    /opt/*|/usr/*|/bin/*|/sbin/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.local/share/fnm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.local/share/mise/*|\
+    "${SAFEHOUSE_HOST_HOME}"/Library/pnpm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.nvm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.fnm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.asdf/*)
+      ;;
+    *)
+      skip "node path is not in a supported safehouse location: ${node_bin}"
+      ;;
+  esac
+
+  fake_home="$(sft_fake_home)" || return 1
+  fnm_root="${fake_home}/Library/Application Support/fnm"
+  entrypoint="${fnm_root}/safehouse-fnm-macos-entry.js"
+  mkdir -p "$fnm_root" || return 1
+  printf 'process.stdout.write("fnm-app-support-ok\\n")\n' > "$entrypoint"
+
+  run env HOME="$fake_home" "$node_bin" "$entrypoint"
+  if [[ "$status" -ne 0 ]] || [[ "$output" != "fnm-app-support-ok" ]]; then
+    skip "node precheck failed outside sandbox"
+  fi
+
+  run env HOME="$fake_home" "$DIST_SAFEHOUSE" -- "$node_bin" "$entrypoint"
+  [ "$status" -eq 0 ]
+  [ "$output" = "fnm-app-support-ok" ]
 }
 
 @test "[EXECUTION] node child processes can resolve npm root -g through a real fnm multishell PATH entry" { # issue #13

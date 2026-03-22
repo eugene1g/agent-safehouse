@@ -74,10 +74,10 @@
 ;; fnm injects per-shell bin shims under ~/.local/state/fnm_multishells/... .
 ;; Node's child-process PATH resolution can return EPERM if it hits those
 ;; entries without metadata access, even when a later PATH entry would work.
-;; Current fnm releases commonly pair those shims with runtimes under one of
-;; the default fnm install roots above, which the Node toolchain block grants
-;; read/write.
+;; On macOS, Node can also lstat ~/Library/Application Support while resolving
+;; entrypoints or global package shims stored under the fnm install root there.
 (allow file-read-metadata
     (home-literal "/.local/state")
     (home-subpath "/.local/state/fnm_multishells")
+    (home-literal "/Library/Application Support")
 )
