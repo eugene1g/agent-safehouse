@@ -75,6 +75,9 @@ policy_selection_select_matching_app_bundle() {
     claude.app)
       policy_selection_append_scoped_profile "profiles/65-apps/claude-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
+    codex.app)
+      policy_selection_append_scoped_profile "profiles/65-apps/codex-app.sb" "app bundle match: ${app_bundle_base}"
+      ;;
     "visual studio code.app"|"visual studio code - insiders.app")
       policy_selection_append_scoped_profile "profiles/65-apps/vscode-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
@@ -138,6 +141,10 @@ policy_selection_should_skip_command_alias_match() {
   local app_bundle_base="$3"
 
   if [[ "$app_bundle_base" == "claude.app" && "$profile_key" == "profiles/60-agents/claude-code.sb" && "$command_alias" == "claude" ]]; then
+    return 0
+  fi
+
+  if [[ "$app_bundle_base" == "codex.app" && "$profile_key" == "profiles/60-agents/codex.sb" && "$command_alias" == "codex" ]]; then
     return 0
   fi
 

@@ -67,6 +67,7 @@ PROFILE_KEYS=(
   "profiles/60-agents/opencode.sb"
   "profiles/60-agents/pi.sb"
   "profiles/65-apps/claude-app.sb"
+  "profiles/65-apps/codex-app.sb"
   "profiles/65-apps/vscode-app.sb"
 )
 
@@ -2504,6 +2505,50 @@ __SAFEHOUSE_EMBEDDED_profiles_60_agents_pi_sb__
 )
 __SAFEHOUSE_EMBEDDED_profiles_65_apps_claude_app_sb__
       ;;
+    "profiles/65-apps/codex-app.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_codex_app_sb__'
+;; ---------------------------------------------------------------------------
+;; App: OpenAI Codex Desktop
+;; OpenAI Codex Desktop app bundle, preferences, and data paths.
+;; Source: 65-apps/codex-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/electron.sb$$
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/keychain.sb     (desktop auth flows)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView; transitively pulls macos-gui)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Codex")
+    (home-subpath "/Library/Caches/com.openai.codex")
+    (home-subpath "/Library/Logs/com.openai.codex")
+    (home-subpath "/Library/HTTPStorages/com.openai.codex")
+    (home-literal "/Library/HTTPStorages/com.openai.codex.binarycookies")
+)
+
+(allow file-read*
+    (subpath "/Applications/Codex.app")
+    (home-literal "/Library/Preferences/com.openai.codex.plist")
+)
+
+;; Codex Desktop persists app preferences via cfprefsd under its own domain.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.openai.codex")
+)
+
+;; Shared AppKit/Mach/fsctl allowances are provided by:
+;;   55-integrations-optional/macos-gui.sb
+;; This profile adds only app-specific IPC grants.
+(allow mach-lookup
+    (global-name-regex #"^com\.openai\.codex\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.openai\.codex-spks")
+)
+
+(allow mach-register
+    (global-name-regex #"^com\.openai\.codex\.MachPortRendezvousServer\.")
+    (global-name-regex #"^com\.openai\.codex-spks")
+)
+__SAFEHOUSE_EMBEDDED_profiles_65_apps_codex_app_sb__
+      ;;
     "profiles/65-apps/vscode-app.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_vscode_app_sb__'
 ;; ---------------------------------------------------------------------------
@@ -3900,6 +3945,9 @@ policy_selection_select_matching_app_bundle() {
     claude.app)
       policy_selection_append_scoped_profile "profiles/65-apps/claude-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
+    codex.app)
+      policy_selection_append_scoped_profile "profiles/65-apps/codex-app.sb" "app bundle match: ${app_bundle_base}"
+      ;;
     "visual studio code.app"|"visual studio code - insiders.app")
       policy_selection_append_scoped_profile "profiles/65-apps/vscode-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
@@ -3963,6 +4011,10 @@ policy_selection_should_skip_command_alias_match() {
   local app_bundle_base="$3"
 
   if [[ "$app_bundle_base" == "claude.app" && "$profile_key" == "profiles/60-agents/claude-code.sb" && "$command_alias" == "claude" ]]; then
+    return 0
+  fi
+
+  if [[ "$app_bundle_base" == "codex.app" && "$profile_key" == "profiles/60-agents/codex.sb" && "$command_alias" == "codex" ]]; then
     return 0
   fi
 
@@ -7562,6 +7614,9 @@ policy_dist_emit_embedded_profile_requirement_tokens() {
     "profiles/65-apps/claude-app.sb")
       printf '%s\n' "55-integrations-optional/electron.sb" "60-agents/claude-code.sb"
       ;;
+    "profiles/65-apps/codex-app.sb")
+      printf '%s\n' "55-integrations-optional/keychain.sb" "55-integrations-optional/electron.sb"
+      ;;
     "profiles/65-apps/vscode-app.sb")
       printf '%s\n' "55-integrations-optional/keychain.sb" "55-integrations-optional/electron.sb"
       ;;
@@ -7750,6 +7805,9 @@ policy_dist_emit_embedded_profile_command_alias_tokens() {
     "profiles/65-apps/claude-app.sb")
       printf '%s\n' "claude-app"
       ;;
+    "profiles/65-apps/codex-app.sb")
+      printf '%s\n' "codex-app"
+      ;;
     "profiles/65-apps/vscode-app.sb")
       printf '%s\n' "vscode-app"
       ;;
@@ -7936,6 +7994,9 @@ policy_dist_emit_embedded_profile_exec_env_defaults() {
       :
       ;;
     "profiles/65-apps/claude-app.sb")
+      :
+      ;;
+    "profiles/65-apps/codex-app.sb")
       :
       ;;
     "profiles/65-apps/vscode-app.sb")
