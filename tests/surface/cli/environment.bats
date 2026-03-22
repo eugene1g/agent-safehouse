@@ -169,6 +169,8 @@ EOF
 
   run rg -F -- "--no-sandbox -w \"\$@\"" "$shim_path"
   [ "$status" -eq 0 ]
+  run rg -F -- "</dev/null >\"\$stdout_path\" 2>\"\$stderr_path\"" "$shim_path"
+  [ "$status" -eq 0 ]
 }
 
 @test "[EXECUTION] claude does not inject a VS Code editor shim when only enable=all-apps is set" {
