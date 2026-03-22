@@ -24,6 +24,7 @@ SAFEHOUSE_LIB_SOURCE_MANIFEST=(
 
   # Runtime + commands
   "runtime/environment.sh"
+  "runtime/editor-shims.sh"
   "runtime/launch.sh"
   "commands/update.sh"
   "commands/policy.sh"

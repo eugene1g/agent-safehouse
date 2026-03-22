@@ -38,6 +38,7 @@
 - `shell-init`
 - `process-control`
 - `lldb`
+- `vscode`
 - `xcode`
 - `all-agents`
 - `all-apps`

@@ -49,6 +49,7 @@ Enable only when required for the current task:
 - `playwright-chrome`: Playwright Chrome-family channels plus injected `PLAYWRIGHT_MCP_SANDBOX=false`.
 - `process-control`: host process enumeration/signalling for local supervision tools.
 - `lldb`: LLDB/debugger toolchain access plus debugger-grade host process inspection.
+- `vscode`: Visual Studio Code desktop/editor integration, including Claude editor handoff support.
 - `xcode`: full Xcode developer roots plus Xcode/CoreSimulator user state.
 - `macos-gui`: GUI app-related integration paths.
 - `electron`: Electron integration (also enables `macos-gui`).

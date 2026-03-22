@@ -35,6 +35,10 @@ cmd_execute_apply_named_env_pass_overrides() {
   safehouse_array_copy runtime_execution_environment runtime_env_pass_merged_exec_environment
 }
 
+cmd_execute_apply_exec_compat_shims() {
+  runtime_apply_claude_editor_shim_environment runtime_execution_environment || return 1
+}
+
 cmd_execute_apply_safehouse_env_defaults() {
   runtime_merge_exec_environment_defaults_if_missing runtime_execution_environment \
     "APP_SANDBOX_CONTAINER_ID=agent-safehouse"
@@ -44,6 +48,7 @@ cmd_execute_build_environment() {
   cmd_execute_resolve_base_environment || return 1
   cmd_execute_apply_profile_env_defaults || return 1
   cmd_execute_apply_named_env_pass_overrides || return 1
+  cmd_execute_apply_exec_compat_shims || return 1
   cmd_execute_apply_safehouse_env_defaults || return 1
 }
 
@@ -58,6 +63,10 @@ cmd_execute_run() {
   fi
 
   cmd_execute_build_environment || {
+    cmd_cleanup_rendered_policy
+    return 1
+  }
+  runtime_prepare_exec_compat_shims || {
     cmd_cleanup_rendered_policy
     return 1
   }

@@ -36,6 +36,11 @@
 )
 
 (allow file-read*
+    ;; The VS Code CLI wrapper (`bash /usr/local/bin/code ...`) can make the
+    ;; nested Code binary probe the system app root before it resolves the app
+    ;; bundle itself.
+    (literal "/Applications")
+
     ;; Common install locations
     (subpath "/Applications/Visual Studio Code.app")
     (subpath "/Applications/Visual Studio Code - Insiders.app")

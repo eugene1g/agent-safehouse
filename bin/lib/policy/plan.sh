@@ -333,6 +333,36 @@ policy_plan_inject_implied_optional_integrations() {
   done
 }
 
+policy_plan_resolve_enabled_optional_scoped_profile_requirements() {
+  local changed=1
+  local requirement_token required_profile_key
+
+  while [[ "$changed" -eq 1 ]]; do
+    changed=0
+
+    if [[ "${#policy_plan_enabled_optional_requirement_tokens[@]}" -eq 0 ]]; then
+      return 0
+    fi
+
+    for requirement_token in "${policy_plan_enabled_optional_requirement_tokens[@]}"; do
+      [[ -n "$requirement_token" ]] || continue
+      if ! required_profile_key="$(policy_plan_scoped_profile_key_from_requirement_token "$requirement_token")"; then
+        continue
+      fi
+
+      if policy_plan_append_scoped_profile_key "$required_profile_key" "required by enabled optional integration"; then
+        policy_plan_append_profile_requirement_tokens_to_target "$required_profile_key" "selected" || return 1
+        changed=1
+      fi
+    done
+
+    if [[ "$changed" -eq 1 ]]; then
+      policy_plan_resolve_selected_scoped_profile_requirements || return 1
+      policy_plan_inject_implied_optional_integrations || return 1
+    fi
+  done
+}
+
 policy_plan_finalize_optional_integrations() {
   local feature
 
@@ -422,6 +452,7 @@ policy_plan_build() {
   policy_plan_resolve_selected_scoped_profile_requirements || return 1
   policy_plan_resolve_explicit_optional_integrations || return 1
   policy_plan_inject_implied_optional_integrations || return 1
+  policy_plan_resolve_enabled_optional_scoped_profile_requirements || return 1
   policy_plan_finalize_optional_integrations || return 1
   policy_plan_normalize_dynamic_path_grants || return 1
   policy_plan_collect_profile_runtime_env_defaults || return 1

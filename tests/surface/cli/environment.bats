@@ -3,6 +3,17 @@
 
 load ../../test_helper.bash
 
+create_env_printer_command() {
+  local path="$1"
+
+  cat >"$path" <<'EOF'
+#!/bin/sh
+printf 'EDITOR=%s\n' "${EDITOR:-}"
+printf 'VISUAL=%s\n' "${VISUAL:-}"
+EOF
+  chmod 755 "$path" || return 1
+}
+
 @test "[EXECUTION] default sanitized mode drops unrelated host vars while preserving core runtime env" {
   SAFEHOUSE_TEST_SECRET="safehouse-secret" \
   safehouse_ok -- /bin/sh -c '
@@ -120,6 +131,108 @@ EOF
 @test "[EXECUTION] caller-provided PLAYWRIGHT_MCP_SANDBOX overrides the playwright-chrome profile default" {
   PLAYWRIGHT_MCP_SANDBOX="true" \
     safehouse_ok --enable=playwright-chrome -- /bin/sh -c '[ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "true" ]'
+}
+
+@test "[EXECUTION] claude does not inject a VS Code editor shim by default" {
+  local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
+  local normalized_home=""
+  local shim_path=""
+
+  create_env_printer_command "$claude_bin"
+  normalized_home="$(cd "$HOME" && pwd -P)"
+  shim_path="${normalized_home}/.cache/claude/safehouse-claude-vscode-editor.sh"
+
+  safehouse_run -- "./claude"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "EDITOR="
+  sft_assert_contains "$output" "VISUAL="
+  [ ! -e "$shim_path" ]
+}
+
+@test "[EXECUTION] claude injects a VS Code editor shim when enable=vscode is set and EDITOR/VISUAL are unset" {
+  local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
+  local normalized_home=""
+  local shim_path=""
+
+  [[ -x "/Applications/Visual Studio Code.app/Contents/MacOS/Code" || -x "/Applications/Visual Studio Code - Insiders.app/Contents/MacOS/Code - Insiders" ]] ||
+    skip "requires VS Code or VS Code Insiders"
+
+  create_env_printer_command "$claude_bin"
+  normalized_home="$(cd "$HOME" && pwd -P)"
+  shim_path="${normalized_home}/.cache/claude/safehouse-claude-vscode-editor.sh"
+
+  safehouse_run --enable=vscode -- "./claude"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "EDITOR=${shim_path}"
+  sft_assert_contains "$output" "VISUAL=${shim_path}"
+  sft_assert_file_exists "$shim_path"
+
+  run rg -F -- "--no-sandbox -w \"\$@\"" "$shim_path"
+  [ "$status" -eq 0 ]
+}
+
+@test "[EXECUTION] claude does not inject a VS Code editor shim when only enable=all-apps is set" {
+  local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
+  local normalized_home=""
+  local shim_path=""
+
+  create_env_printer_command "$claude_bin"
+  normalized_home="$(cd "$HOME" && pwd -P)"
+  shim_path="${normalized_home}/.cache/claude/safehouse-claude-vscode-editor.sh"
+
+  safehouse_run --enable=all-apps -- "./claude"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "EDITOR="
+  sft_assert_contains "$output" "VISUAL="
+  [ ! -e "$shim_path" ]
+}
+
+@test "[EXECUTION] caller-provided EDITOR suppresses the claude editor shim" {
+  local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
+  local normalized_home=""
+  local shim_path=""
+
+  create_env_printer_command "$claude_bin"
+  normalized_home="$(cd "$HOME" && pwd -P)"
+  shim_path="${normalized_home}/.cache/claude/safehouse-claude-vscode-editor.sh"
+
+  safehouse_run_env EDITOR="/tmp/custom-editor" -- --enable=vscode --env-pass=EDITOR -- "./claude"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "EDITOR=/tmp/custom-editor"
+  sft_assert_contains "$output" "VISUAL="
+  [ ! -e "$shim_path" ]
+}
+
+@test "[EXECUTION] caller-provided VISUAL suppresses the claude editor shim" {
+  local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
+  local normalized_home=""
+  local shim_path=""
+
+  create_env_printer_command "$claude_bin"
+  normalized_home="$(cd "$HOME" && pwd -P)"
+  shim_path="${normalized_home}/.cache/claude/safehouse-claude-vscode-editor.sh"
+
+  safehouse_run_env VISUAL="/tmp/custom-visual" -- --enable=vscode --env-pass=VISUAL -- "./claude"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "EDITOR="
+  sft_assert_contains "$output" "VISUAL=/tmp/custom-visual"
+  [ ! -e "$shim_path" ]
+}
+
+@test "[EXECUTION] non-claude commands do not receive the VS Code editor shim even when enable=vscode is set" {
+  local cmd_bin="${SAFEHOUSE_WORKSPACE}/not-claude"
+  local normalized_home=""
+  local shim_path=""
+
+  create_env_printer_command "$cmd_bin"
+  normalized_home="$(cd "$HOME" && pwd -P)"
+  shim_path="${normalized_home}/.cache/claude/safehouse-claude-vscode-editor.sh"
+
+  safehouse_run --enable=vscode -- "./not-claude"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "EDITOR="
+  sft_assert_contains "$output" "VISUAL="
+  [ ! -e "$shim_path" ]
 }
 
 @test "[EXECUTION] default sanitized mode sets APP_SANDBOX_CONTAINER_ID=agent-safehouse" {
