@@ -39,6 +39,27 @@ load ../../test_helper.bash
   sft_assert_file_contains "$profile_log" "profile env defaults: PLAYWRIGHT_MCP_SANDBOX=false"
 }
 
+@test "--explain reports command resolution details and debug hints" {
+  local explain_log fake_cmd fake_cmd_name
+
+  explain_log="$(sft_workspace_path "explain-command.log")"
+  mkdir -p "${HOME}/.local/bin" || return 1
+  fake_cmd="$(mktemp "${HOME}/.local/bin/explain-cmd.XXXXXX")" || return 1
+  fake_cmd_name="$(basename "$fake_cmd")"
+
+  sft_make_fake_command "$fake_cmd"
+
+  safehouse_ok --explain --stdout -- "$fake_cmd_name" >/dev/null 2>"$explain_log"
+
+  sft_assert_file_contains "$explain_log" "invoked command: ${fake_cmd_name}"
+  sft_assert_file_contains "$explain_log" "profile target command: ${fake_cmd_name}"
+  sft_assert_file_contains "$explain_log" "host PATH matches: (none)"
+  sft_assert_file_contains "$explain_log" "execution PATH: "
+  sft_assert_file_contains "$explain_log" "execution PATH matches: ${fake_cmd}"
+  sft_assert_file_contains "$explain_log" "shell wrapper note: interactive-shell aliases/functions are not introspected; run \`type -a ${fake_cmd_name}\` in your shell if wrapper resolution may matter"
+  sft_assert_file_contains "$explain_log" "sandbox denial log hint: /usr/bin/log show --last 2m --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
+}
+
 @test "--explain reports default git worktree common-dir and sibling read grants" {
   local explain_log repo_root worktree_parent linked_worktree sibling_worktree git_common_dir
 
