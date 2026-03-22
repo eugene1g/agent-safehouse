@@ -46,6 +46,7 @@ policy_render_append_profile() {
   content="$(policy_source_read_profile_content "$profile_key")" || return 1
   printf '%s\n\n' "$content" >&"$policy_render_target_fd"
   policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "file-read*" "file-write*" || return 1
+  policy_render_emit_resolved_home_path_rules "$profile_key" "$content" || return 1
 }
 
 policy_render_list_profile_absolute_path_rules_for_operation() {
@@ -73,6 +74,33 @@ policy_render_list_profile_absolute_path_rules_for_operation() {
       matcher="${BASH_REMATCH[1]}"
       path="${BASH_REMATCH[2]}"
       printf '%s|%s\n' "$matcher" "$path"
+    fi
+  done <<< "$content"
+}
+
+policy_render_list_profile_home_path_rules() {
+  local content="$1"
+  local line in_matching_block=0 matcher path operations
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$in_matching_block" -eq 0 ]]; then
+      if [[ "$line" =~ ^[[:space:]]*\(allow[[:space:]]+ ]]; then
+        operations="${line#*\(allow }"
+        operations="$(safehouse_trim_whitespace "$operations")"
+        in_matching_block=1
+      fi
+      continue
+    fi
+
+    if [[ "$line" =~ ^[[:space:]]*\) ]]; then
+      in_matching_block=0
+      continue
+    fi
+
+    if [[ "$line" =~ \((home-literal|home-subpath|home-prefix)[[:space:]]+\"(/[^\"]*)\"\) ]]; then
+      matcher="${BASH_REMATCH[1]#home-}"
+      path="${BASH_REMATCH[2]}"
+      printf '%s|%s|%s\n' "$operations" "$matcher" "$path"
     fi
   done <<< "$content"
 }
@@ -110,6 +138,20 @@ policy_render_resolve_builtin_absolute_path() {
   printf '%s\n' "$resolved_path"
 }
 
+policy_render_resolve_home_scoped_path() {
+  local rel_path="$1"
+  local original_path resolved_path
+
+  original_path="${policy_req_home_dir}${rel_path}"
+  [[ "$original_path" == /* ]] || return 1
+  [[ -e "$original_path" ]] || return 1
+
+  resolved_path="$(safehouse_normalize_abs_path "$original_path" 2>/dev/null)" || return 1
+  [[ "$resolved_path" != "$original_path" ]] || return 1
+
+  printf '%s\n' "$resolved_path"
+}
+
 policy_render_emit_resolved_builtin_path_rule() {
   local profile_key="$1"
   local matcher="$2"
@@ -122,6 +164,21 @@ policy_render_emit_resolved_builtin_path_rule() {
   policy_render_emit_path_ancestor_literals "$resolved_path" "resolved built-in ${operation} path" || return 1
   escaped_resolved_path="$(safehouse_escape_for_sb "$resolved_path")" || return 1
   policy_render_write_line "(allow ${operation} (${matcher} \"${escaped_resolved_path}\"))"
+  policy_render_write_blank
+}
+
+policy_render_emit_resolved_home_path_rule() {
+  local profile_key="$1"
+  local operations="$2"
+  local matcher="$3"
+  local original_path="$4"
+  local resolved_path="$5"
+  local escaped_resolved_path
+
+  policy_render_write_line ";; #safehouse-test-id:resolved-home-path# Resolved target for home-scoped ${operations} path from ${profile_key}: ${original_path} -> ${resolved_path}"
+  policy_render_emit_path_ancestor_literals "$resolved_path" "resolved home-scoped ${operations} path" || return 1
+  escaped_resolved_path="$(safehouse_escape_for_sb "$resolved_path")" || return 1
+  policy_render_write_line "(allow ${operations} (${matcher} \"${escaped_resolved_path}\"))"
   policy_render_write_blank
 }
 
@@ -171,6 +228,35 @@ policy_render_emit_resolved_builtin_path_rules() {
     policy_render_emit_resolved_builtin_path_rule "$profile_key" "$matcher" "$path" "$resolved_path" "$operation" || return 1
     emitted_rule_keys+=("$resolved_key")
   done
+}
+
+policy_render_emit_resolved_home_path_rules() {
+  local profile_key="$1"
+  local content="$2"
+  local entry operations matcher rel_path original_path resolved_path rule_key
+  local -a emitted_rule_keys=()
+
+  [[ "$profile_key" == profiles/* ]] || return 0
+
+  while IFS= read -r entry || [[ -n "$entry" ]]; do
+    [[ -n "$entry" ]] || continue
+    operations="${entry%%|*}"
+    entry="${entry#*|}"
+    matcher="${entry%%|*}"
+    rel_path="${entry#*|}"
+    original_path="${policy_req_home_dir}${rel_path}"
+
+    resolved_path="$(policy_render_resolve_home_scoped_path "$rel_path" || true)"
+    [[ -n "$resolved_path" ]] || continue
+
+    rule_key="${operations}|${matcher}|${resolved_path}"
+    if [[ "${#emitted_rule_keys[@]}" -gt 0 ]] && safehouse_array_contains_exact "$rule_key" "${emitted_rule_keys[@]}"; then
+      continue
+    fi
+
+    policy_render_emit_resolved_home_path_rule "$profile_key" "$operations" "$matcher" "$original_path" "$resolved_path" || return 1
+    emitted_rule_keys+=("$rule_key")
+  done < <(policy_render_list_profile_home_path_rules "$content")
 }
 
 policy_render_emit_resolved_builtin_path_rules_for_profiles() {
