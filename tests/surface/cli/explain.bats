@@ -65,3 +65,31 @@ load ../../test_helper.bash
   sft_assert_file_contains "$explain_log" "git worktree common dir grant: ${git_common_dir}"
   sft_assert_file_contains "$explain_log" "git linked worktree read grants: ${repo_root} ${sibling_worktree}"
 }
+
+@test "--explain skips stale linked worktree admin entries without surfacing realpath errors" {
+  local explain_log repo_root worktree_parent stale_worktree sibling_worktree
+
+  sft_require_cmd_or_skip git
+
+  explain_log="$(sft_workspace_path "explain-stale-worktree.log")"
+  repo_root="$(sft_external_dir "explain-stale-git-worktree")" || return 1
+  worktree_parent="$(dirname "$repo_root")"
+  stale_worktree="${worktree_parent}/stale-worktree"
+  sibling_worktree="${worktree_parent}/review-worktree"
+
+  git -C "$repo_root" init -q || return 1
+  printf '%s\n' "tracked" > "${repo_root}/tracked.txt"
+  git -C "$repo_root" add tracked.txt || return 1
+  git -C "$repo_root" -c user.name=test -c user.email=test@example.com commit -q -m init || return 1
+  git -C "$repo_root" branch stale || return 1
+  git -C "$repo_root" branch review || return 1
+  git -C "$repo_root" worktree add -q "$stale_worktree" stale || return 1
+  git -C "$repo_root" worktree add -q "$sibling_worktree" review || return 1
+  rm -rf "$stale_worktree" || return 1
+
+  safehouse_ok_in_dir "$repo_root" --explain --stdout >/dev/null 2>"$explain_log"
+
+  sft_assert_file_not_contains "$explain_log" "realpath:"
+  sft_assert_file_contains "$explain_log" "git linked worktree read grants: ${sibling_worktree}"
+  sft_assert_file_not_contains "$explain_log" "$stale_worktree"
+}

@@ -3273,20 +3273,21 @@ safehouse_emit_git_worktree_paths_from_filesystem() {
 
   for entry_dir in "${common_dir}/worktrees"/*; do
     [[ -d "$entry_dir" ]] || continue
-    [[ -f "${entry_dir}/gitdir" ]] || return 1
+    [[ -f "${entry_dir}/gitdir" ]] || continue
 
     IFS= read -r gitdir_path < "${entry_dir}/gitdir" || true
-    [[ -n "$gitdir_path" ]] || return 1
+    [[ -n "$gitdir_path" ]] || continue
 
     if [[ "$gitdir_path" == /* ]]; then
-      gitdir_path="$(safehouse_normalize_abs_path "$gitdir_path")" || return 1
+      [[ -e "$gitdir_path" ]] || continue
     else
-      gitdir_path="$(safehouse_git_resolve_path_from_base_dir "$entry_dir" "$gitdir_path" || true)"
-      [[ -n "$gitdir_path" ]] || return 1
+      gitdir_path="${entry_dir%/}/${gitdir_path}"
+      [[ -e "$gitdir_path" ]] || continue
     fi
 
+    gitdir_path="$(safehouse_normalize_abs_path "$gitdir_path")" || return 1
     worktree_path="${gitdir_path%/*}"
-    [[ -n "$worktree_path" && -d "$worktree_path" ]] || return 1
+    [[ -n "$worktree_path" && -d "$worktree_path" ]] || continue
 
     normalized_path="$(safehouse_normalize_abs_path "$worktree_path")" || return 1
     printf '%s\n' "$normalized_path"
