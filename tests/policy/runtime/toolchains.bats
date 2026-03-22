@@ -200,37 +200,34 @@ load ../../test_helper.bash
   [ "$status" -eq 0 ]
 }
 
-@test "[EXECUTION] node can execute a script from the macOS fnm install root" { # issue #13
-  sft_require_cmd_or_skip node
+@test "[EXECUTION] node reproduces the macOS fnm parent traversal failure when app-support metadata is denied" { # issue #13
+  local node_bin entrypoint deny_overlay
+  node_bin="$(sft_supported_node_bin_or_skip)" || return 1
+  entrypoint="$(sft_setup_fnm_macos_entrypoint_fixture)" || return 1
+  deny_overlay="$(sft_write_fnm_app_support_metadata_deny_overlay)" || return 1
 
-  local node_bin fake_home fnm_root entrypoint
-  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
-  case "$node_bin" in
-    /opt/*|/usr/*|/bin/*|/sbin/*|\
-    "${SAFEHOUSE_HOST_HOME}"/.local/share/fnm/*|\
-    "${SAFEHOUSE_HOST_HOME}"/.local/share/mise/*|\
-    "${SAFEHOUSE_HOST_HOME}"/Library/pnpm/*|\
-    "${SAFEHOUSE_HOST_HOME}"/.nvm/*|\
-    "${SAFEHOUSE_HOST_HOME}"/.fnm/*|\
-    "${SAFEHOUSE_HOST_HOME}"/.asdf/*)
-      ;;
-    *)
-      skip "node path is not in a supported safehouse location: ${node_bin}"
-      ;;
-  esac
-
-  fake_home="$(sft_fake_home)" || return 1
-  fnm_root="${fake_home}/Library/Application Support/fnm"
-  entrypoint="${fnm_root}/safehouse-fnm-macos-entry.js"
-  mkdir -p "$fnm_root" || return 1
-  printf 'process.stdout.write("fnm-app-support-ok\\n")\n' > "$entrypoint"
-
-  run env HOME="$fake_home" "$node_bin" "$entrypoint"
+  run env HOME="$HOME" "$node_bin" "$entrypoint"
   if [[ "$status" -ne 0 ]] || [[ "$output" != "fnm-app-support-ok" ]]; then
     skip "node precheck failed outside sandbox"
   fi
 
-  run env HOME="$fake_home" "$DIST_SAFEHOUSE" -- "$node_bin" "$entrypoint"
+  run env HOME="$HOME" "$DIST_SAFEHOUSE" --append-profile="$deny_overlay" -- "$node_bin" "$entrypoint"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"EPERM"* ]]
+  [[ "$output" == *"Library/Application Support"* ]]
+}
+
+@test "[EXECUTION] node can execute a script from the macOS fnm install root under the default policy" { # issue #13
+  local node_bin entrypoint
+  node_bin="$(sft_supported_node_bin_or_skip)" || return 1
+  entrypoint="$(sft_setup_fnm_macos_entrypoint_fixture)" || return 1
+
+  run env HOME="$HOME" "$node_bin" "$entrypoint"
+  if [[ "$status" -ne 0 ]] || [[ "$output" != "fnm-app-support-ok" ]]; then
+    skip "node precheck failed outside sandbox"
+  fi
+
+  run env HOME="$HOME" "$DIST_SAFEHOUSE" -- "$node_bin" "$entrypoint"
   [ "$status" -eq 0 ]
   [ "$output" = "fnm-app-support-ok" ]
 }
@@ -281,4 +278,46 @@ load ../../test_helper.bash
   fi
 
   safehouse_ok -- /bin/sh -c 'bundle --version && ruby -e '\''require "bundler"; puts Bundler::VERSION'\'''
+}
+
+sft_supported_node_bin_or_skip() {
+  sft_require_cmd_or_skip node
+
+  local node_bin
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
+  case "$node_bin" in
+    /opt/*|/usr/*|/bin/*|/sbin/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.local/share/fnm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.local/share/mise/*|\
+    "${SAFEHOUSE_HOST_HOME}"/Library/pnpm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.nvm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.fnm/*|\
+    "${SAFEHOUSE_HOST_HOME}"/.asdf/*)
+      ;;
+    *)
+      skip "node path is not in a supported safehouse location: ${node_bin}"
+      ;;
+  esac
+
+  printf '%s\n' "$node_bin"
+}
+
+sft_setup_fnm_macos_entrypoint_fixture() {
+  local fnm_root entrypoint
+
+  fnm_root="${HOME}/Library/Application Support/fnm"
+  entrypoint="${fnm_root}/safehouse-fnm-macos-entry.js"
+  mkdir -p "$fnm_root" || return 1
+  printf 'process.stdout.write("fnm-app-support-ok\\n")\n' > "$entrypoint"
+
+  printf '%s\n' "$entrypoint"
+}
+
+sft_write_fnm_app_support_metadata_deny_overlay() {
+  local overlay_path
+
+  overlay_path="$(sft_workspace_path "deny-app-support-metadata.sb")" || return 1
+  printf '%s\n' '(deny file-read-metadata (home-literal "/Library/Application Support"))' > "$overlay_path"
+
+  printf '%s\n' "$overlay_path"
 }
