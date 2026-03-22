@@ -14,6 +14,11 @@
     (home-prefix "/.opencode/bin/opencode")
     (home-prefix "/.local/bin/opencode")
     (home-prefix "/bin/opencode")
+    (home-literal "/.config")                       ;; Needed so mkdir -p can create/update ~/.config/opencode.
+    (home-literal "/.cache")                        ;; Needed so mkdir -p can create/update ~/.cache/opencode.
+    (home-literal "/.local")                        ;; Needed so mkdir -p can create ~/.local/{share,state}/opencode.
+    (home-literal "/.local/share")                  ;; Needed so mkdir -p can create ~/.local/share/opencode.
+    (home-literal "/.local/state")                  ;; Needed so mkdir -p can create ~/.local/state/opencode.
     (home-subpath "/.opencode")
     (home-subpath "/.config/opencode")
     (home-subpath "/.cache/opencode")
