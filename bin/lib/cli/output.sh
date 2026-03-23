@@ -104,6 +104,13 @@ Policy scope options:
       Append an additional sandbox profile file after generated rules
       Repeatable; files are appended in argument order
 
+  --allow-profile-writes
+      Skip automatic deny-write rules for appended profile files.
+      By default, Safehouse emits a deny file-write* rule for each
+      --append-profile path so agents cannot modify loaded policy files.
+      Use this flag if you intentionally want the sandboxed process to
+      be able to write to appended profile files.
+
   --output PATH
   --output=PATH
       Write policy to a specific file path
