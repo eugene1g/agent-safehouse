@@ -25,7 +25,7 @@ These are baseline allowances intended to keep common workflows functional:
 - Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
 - Agent-specific profile selection for the wrapped command.
 - Network access (open by default).
-- Sanitized runtime environment (not full shell env by default; preserves `SDKROOT` when set).
+- Sanitized runtime environment (not full shell env by default; preserves `SDKROOT`, `EDITOR`, and `VISUAL` when set).
 - SSH metadata read support (`~/.ssh/config`, `~/.ssh/known_hosts`) for git-over-ssh workflows.
 
 ## Opt-In (Disabled by Default)
@@ -49,6 +49,7 @@ Enable only when required for the current task:
 - `playwright-chrome`: Playwright Chrome-family channels plus injected `PLAYWRIGHT_MCP_SANDBOX=false`.
 - `process-control`: host process enumeration/signalling for local supervision tools.
 - `lldb`: LLDB/debugger toolchain access plus debugger-grade host process inspection.
+- `vscode`: Visual Studio Code desktop/editor integration, including cold-start Claude editor handoff support. Without `--enable=vscode`, Claude can only reuse an already-running VS Code instance for external-editor handoff. If `EDITOR` or `VISUAL` is set, Safehouse does not inject the VS Code-specific Claude fallback.
 - `xcode`: full Xcode developer roots plus Xcode/CoreSimulator user state.
 - `macos-gui`: GUI app-related integration paths.
 - `electron`: Electron integration (also enables `macos-gui`).

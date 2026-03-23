@@ -12,6 +12,8 @@ runtime_default_sanitized_exec_passthrough_vars=(
   COLORTERM
   TERM_PROGRAM
   TERM_PROGRAM_VERSION
+  EDITOR
+  VISUAL
   TMP
   TEMP
   LANG

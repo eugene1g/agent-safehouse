@@ -1,0 +1,17 @@
+;; ---------------------------------------------------------------------------
+;; Integration: VS Code
+;; Explicit VS Code desktop/editor support for workflows that want to launch
+;; Visual Studio Code from inside the sandbox, including Claude editor handoff.
+;; Source: 55-integrations-optional/vscode.sb
+;; $$require=65-apps/vscode-app.sb$$
+;; ---------------------------------------------------------------------------
+
+;; This integration is intentionally opt-in.
+;;
+;; Why:
+;; - Not every Claude Code run needs or wants desktop VS Code access.
+;; - The Claude editor handoff shim should only activate when the caller
+;;   explicitly enables VS Code support with --enable=vscode.
+;;
+;; The actual app bundle, Electron, and persistence allowances are provided by
+;; the required 65-apps/vscode-app.sb profile.
