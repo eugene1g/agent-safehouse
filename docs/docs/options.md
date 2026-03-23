@@ -115,12 +115,16 @@ Path: `<workdir>/.safehouse`
 
 Supported keys:
 
-- `add-dirs-ro=PATHS`
-- `add-dirs=PATHS`
+- `add-dirs-ro=PATHS` — colon-separated read-only path grants; repeatable
+- `add-dirs=PATHS` — colon-separated read/write path grants; repeatable
+- `enable=FEATURES` — same values as `--enable`; comma-separated, repeatable
+- `append-profile=PATH` — path relative to the workdir or absolute; repeatable
 
 By default this file is ignored. It is loaded only with `--trust-workdir-config` (or `SAFEHOUSE_TRUST_WORKDIR_CONFIG`).
 Because the default workdir is the invocation directory, Safehouse does not auto-discover `.safehouse` files from enclosing Git repo roots when you launch from a nested subdirectory.
 Trusted config parsing fails fast on malformed lines and unknown keys.
+
+Workdir config `append-profile=` files are applied before CLI `--append-profile` files, so CLI flags always take final precedence.
 
 ## `--env=FILE` Format
 

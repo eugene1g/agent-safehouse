@@ -178,6 +178,11 @@ policy_explain_print_summary() {
     else
       echo "  add-dirs (normalized): $(safehouse_join_by_space)"
     fi
+    if [[ "$(safehouse_array_length policy_req_workdir_config_append_profile_paths)" -gt 0 ]]; then
+      echo "  workdir config appended profiles: $(safehouse_join_by_space "${policy_req_workdir_config_append_profile_paths[@]}")"
+    else
+      echo "  workdir config appended profiles: $(safehouse_join_by_space)"
+    fi
     if [[ "${#policy_plan_optional_integrations_explicit_included[@]}" -gt 0 ]]; then
       echo "  optional integrations explicitly enabled: $(safehouse_join_by_space "${policy_plan_optional_integrations_explicit_included[@]}")"
     else

@@ -125,3 +125,19 @@ load ../../test_helper.bash
   sft_assert_file_contains "$explain_log" "git linked worktree read grants: ${sibling_worktree}"
   sft_assert_file_not_contains "$explain_log" "$stale_worktree"
 }
+
+@test "--explain reports exec-env-default from workdir config append-profile=" {
+  local explain_log profile_file config_file workdir
+
+  explain_log="$(sft_workspace_path "explain-workdir-cfg-env.log")"
+  workdir="$(sft_external_dir "explain-workdir-cfg-env")" || return 1
+  profile_file="${workdir}/extra.sb"
+  config_file="${workdir}/.safehouse"
+
+  printf ';; $$exec-env-default=SAFEHOUSE_CFG_TEST=from-config$$\n' > "$profile_file"
+  printf 'append-profile=%s\n' "$profile_file" > "$config_file"
+
+  safehouse_ok_in_dir "$workdir" --trust-workdir-config --explain --stdout >/dev/null 2>"$explain_log"
+
+  sft_assert_file_contains "$explain_log" "profile env defaults: SAFEHOUSE_CFG_TEST=from-config"
+}
