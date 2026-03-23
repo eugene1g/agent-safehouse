@@ -7,7 +7,8 @@
 | `--add-dirs=PATHS` | Colon-separated file/directory paths to grant read/write |
 | `--add-dirs-ro=PATHS` | Colon-separated file/directory paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
-| `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
+| `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` in this session (`--trust-workdir-config=BOOL` also supported) |
+| `--always-trust-workdir-config` | Trust and load `<workdir>/.safehouse` in this and future sessions (`--always-trust-workdir-config=BOOL` also supported) |
 | `--allow-workdir-config-writes` | Skip the terminal deny-write rule for `<workdir>/.safehouse` (default: deny) |
 | `--append-profile=PATH` | Append sandbox profile file after generated rules (repeatable) |
 | `--allow-profile-writes` | Skip automatic deny-write rules for `--append-profile` files (default: deny) |
@@ -125,6 +126,24 @@ Because the default workdir is the invocation directory, Safehouse does not auto
 Trusted config parsing fails fast on malformed lines and unknown keys.
 
 Workdir config `append-profile=` files are applied before CLI `--append-profile` files, so CLI flags always take final precedence.
+
+## Trusted Workdirs File
+
+Path: `~/.config/safehouse/trusted-workdirs`
+
+Format: one absolute directory path per line; blank lines and `#` comments are ignored.
+
+This file is written by `--always-trust-workdir-config`. To remove an entry, either run `safehouse --always-trust-workdir-config=false` from the directory or edit the file directly.
+
+When the current workdir matches an entry in this file, `.safehouse` is automatically trusted without any flag on every invocation.
+
+Trust precedence order (highest to lowest):
+
+1. `--always-trust-workdir-config=true` (writes to file, trusts this session)
+2. `--trust-workdir-config` (trusts this session only)
+3. `SAFEHOUSE_TRUST_WORKDIR_CONFIG` env var
+4. `~/.config/safehouse/trusted-workdirs` file match
+5. Default (not trusted)
 
 ## `--env=FILE` Format
 
