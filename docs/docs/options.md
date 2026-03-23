@@ -46,6 +46,12 @@
 
 Common Apple shimmed developer tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are available by default via `profiles/30-toolchains/apple-toolchain-core.sb`; this is not an optional `--enable` feature.
 
+`vscode` is explicit cold-start editor integration for Visual Studio Code. For Claude's external-editor handoff:
+
+- Without `--enable=vscode`, Safehouse can only reuse an already-running VS Code or VS Code Insiders instance.
+- With `--enable=vscode`, Safehouse may cold-start an isolated VS Code editor window for the temp Claude prompt file.
+- If `EDITOR` or `VISUAL` is already set, Safehouse leaves Claude's editor selection alone and does not inject the VS Code fallback shim.
+
 ## Parsing and Separator Behavior
 
 - Path/feature flags accept both `--flag=value` and `--flag value`.
@@ -88,6 +94,8 @@ Path grant merge order:
 ## Environment Variables
 
 Prefer sanitized mode plus `--env-pass` or `SAFEHOUSE_ENV_PASS` when only a few host variables are needed. For one-off child env values, put `NAME=VALUE` immediately after `--`, for example `safehouse -- MYVAR=123 printenv MYVAR`. `--env` disables that boundary and forwards the entire inherited host environment, including cloud credentials, API keys, and other secrets.
+
+The default sanitized environment already preserves a small terminal/editor baseline, including `TERM`, locale variables, `SDKROOT`, `EDITOR`, and `VISUAL`.
 
 - `SAFEHOUSE_ADD_DIRS_RO`: colon-separated read-only path grants
 - `SAFEHOUSE_ADD_DIRS`: colon-separated read/write path grants

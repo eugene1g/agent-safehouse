@@ -13,6 +13,14 @@
 ;; - optional Claude Desktop MCP import source in ~/Library/Application Support/Claude
 ;; - optional user-level guidance file at ~/CLAUDE.md (granted via shared profile)
 
+;; ---------------------------------------------------------------------------
+;; Core Claude Code Runtime Surface
+;; Rules in this section are for normal Claude CLI operation: binary resolution,
+;; local state/config, managed policy, and MCP import sources.
+;; Keep editor/app-specific handoff allowances in the dedicated section below so
+;; they do not get mixed into the baseline Claude runtime contract.
+;; ---------------------------------------------------------------------------
+
 (allow file-read* file-write*
     (home-prefix "/.local/bin/claude")
     (home-subpath "/.cache/claude")
@@ -32,4 +40,23 @@
     (literal "/Library/Application Support/ClaudeCode/managed-settings.json")
     (literal "/Library/Application Support/ClaudeCode/managed-mcp.json")
     (literal "/Library/Application Support/ClaudeCode/CLAUDE.md")
+)
+
+;; ---------------------------------------------------------------------------
+;; VS Code External-Editor Handoff Surface
+;; These metadata-only allowances are not needed for regular Claude CLI work.
+;; They exist solely for Claude's Ctrl+G editor handoff when Safehouse reuses an
+;; already-running unsandboxed VS Code / VS Code Insiders instance.
+;;
+;; Keep this section intentionally narrow and separate from the core Claude
+;; runtime rules above:
+;; - enough for `open -b com.microsoft.VSCode ...` to resolve the installed app
+;;   bundle through Launch Services
+;; - not enough to cold-start VS Code or run the app binary itself
+;; - the broader cold-start/editor surface remains behind `--enable=vscode`
+;; ---------------------------------------------------------------------------
+(allow file-read-metadata
+    (literal "/Applications")
+    (subpath "/Applications/Visual Studio Code.app")
+    (subpath "/Applications/Visual Studio Code - Insiders.app")
 )

@@ -80,6 +80,9 @@ safehouse --enable=process-control -- claude --dangerously-skip-permissions
 # LLDB/debugger allowances for agent-driven native debugging
 safehouse --enable=lldb -- claude --dangerously-skip-permissions
 
+# Cold-start VS Code for Claude's Ctrl+G external-editor handoff
+safehouse --enable=vscode -- claude --dangerously-skip-permissions
+
 # Full Xcode developer roots plus DerivedData / CoreSimulator state
 safehouse --enable=xcode -- xcodebuild -scheme MyApp build
 
@@ -93,6 +96,13 @@ Common Apple shimmed tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bi
 `--enable=lldb` opens the sandbox side for LLDB/debugger workflows, but macOS can still deny attach to protected or non-debuggable targets.
 
 `--enable=xcode` is for Xcode builds, simulator/device tooling, and per-user Xcode state. It does not grant debugger task-port access; keep `--enable=lldb` separate for real debugger sessions.
+
+For Claude's external-editor handoff (`Ctrl+G`) with VS Code:
+
+- Plain `safehouse -- claude ...` can reuse an already-running unsandboxed VS Code or VS Code Insiders instance.
+- If VS Code is not already running, use `--enable=vscode` so Safehouse can cold-start it.
+- The explicit `--enable=vscode` cold-start path launches a separate Safehouse-managed VS Code profile for the temporary Claude prompt editor, so it does not reuse your normal VS Code settings, extensions, or recently-opened list.
+- If you already set `EDITOR` or `VISUAL`, Safehouse passes that through by default and skips its Claude-specific VS Code fallback shim.
 
 ## Git Worktrees
 

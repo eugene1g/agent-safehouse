@@ -1,7 +1,8 @@
 ;; ---------------------------------------------------------------------------
 ;; App: Visual Studio Code
 ;; VS Code / VS Code Insiders desktop app bundle, preferences, and data paths,
-;; including DeveloperTools state and optional extension pairing storage.
+;; including DeveloperTools state, optional extension pairing storage, and the
+;; isolated Safehouse-managed Claude editor profile used for cold-start handoff.
 ;; Source: 65-apps/vscode-app.sb
 ;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/electron.sb$$
 ;; ---------------------------------------------------------------------------
@@ -20,6 +21,8 @@
     (home-subpath "/Library/Application Support/Microsoft/DeveloperTools")
     (home-subpath "/Library/Application Support/com.openai.chat/app_pairing_extensions")
     (home-subpath "/.vscode")
+    (home-subpath "/.cache/claude/vscode-editor-stable")
+    (home-subpath "/.cache/claude/vscode-editor-insiders")
 
     ;; Direct plist writes/unlink probes used during some Electron preference sync flows.
     (home-literal "/Library/Preferences/com.microsoft.VSCode.plist")

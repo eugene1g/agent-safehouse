@@ -20,6 +20,8 @@ load ../../test_helper.bash
 
   sft_assert_includes_source "$profile" "55-integrations-optional/vscode.sb"
   sft_assert_includes_source "$profile" "65-apps/vscode-app.sb"
+  sft_assert_contains "$profile" '(home-subpath "/.cache/claude/vscode-editor-stable")'
+  sft_assert_contains "$profile" '(home-subpath "/.cache/claude/vscode-editor-insiders")'
 }
 
 @test "[EXECUTION] VS Code CLI can report its version when launched via bash if the CLI is installed" {

@@ -61,3 +61,16 @@ load ../../test_helper.bash
   sft_assert_includes_source "$claude_profile" "60-agents/claude-code.sb"
   sft_assert_includes_source "$copilot_profile" "60-agents/copilot-cli.sb"
 }
+
+@test "[POLICY-ONLY] claude command includes narrow VS Code bundle metadata for editor reuse" {
+  local claude_profile
+
+  claude_profile="$(safehouse_profile -- claude)"
+
+  sft_assert_contains "$claude_profile" '(allow file-read-metadata'
+  sft_assert_contains "$claude_profile" '(literal "/Applications")'
+  sft_assert_contains "$claude_profile" '(subpath "/Applications/Visual Studio Code.app")'
+  sft_assert_contains "$claude_profile" '(subpath "/Applications/Visual Studio Code - Insiders.app")'
+  sft_assert_omits_source "$claude_profile" "55-integrations-optional/vscode.sb"
+  sft_assert_omits_source "$claude_profile" "65-apps/vscode-app.sb"
+}
