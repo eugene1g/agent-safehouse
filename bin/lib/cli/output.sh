@@ -97,7 +97,13 @@ Policy scope options:
 
   --trust-workdir-config
   --trust-workdir-config=BOOL
-      Trust and load <workdir>/.safehouse (default: disabled)
+      Trust and load <workdir>/.safehouse this session (default: disabled)
+
+  --always-trust-workdir-config
+  --always-trust-workdir-config=BOOL
+      Trust and load <workdir>/.safehouse this and future sessions (default:
+      disabled). Remember <workdir> in ~/.config/safehouse/trusted-workdirs.
+      Conflicts with --trust-workdir-config=false/0/no/off.
 
   --allow-workdir-config-writes
       Skip the terminal deny-write rule for the workdir config file.
@@ -167,5 +173,10 @@ Config file:
       Supports keys:
         add-dirs-ro=PATHS
         add-dirs=PATHS
+
+  ~/.config/safehouse/trusted-workdirs (optional, always read)
+      One trusted directory path per line; blank lines and # comments allowed
+      Written by --always-trust-workdir-config. To remove entries edit directly
+      or use --always-trust-workdir-config=false.
 USAGE
 }

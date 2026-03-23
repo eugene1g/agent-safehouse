@@ -2844,6 +2844,7 @@ safehouse_project_github_url="https://github.com/eugene1g/agent-safehouse"
 safehouse_project_release_asset_url="${safehouse_project_github_url}/releases/latest/download/safehouse.sh"
 safehouse_project_head_asset_url="https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/safehouse.sh"
 safehouse_workdir_config_filename=".safehouse"
+safehouse_trusted_workdirs_config_relpath=".config/safehouse/trusted-workdirs"
 
 resolve_safehouse_project_version() {
   local version=""
@@ -4290,6 +4291,9 @@ policy_req_git_worktree_common_dir=""
 policy_req_git_linked_worktree_paths=()
 policy_req_trust_workdir_config=0
 policy_req_trust_workdir_config_source="default"
+policy_req_trusted_workdirs_path=""
+policy_req_trusted_workdirs_loaded=0
+policy_req_trusted_workdirs=()
 policy_req_workdir_config_path=""
 policy_req_workdir_config_loaded=0
 policy_req_workdir_config_found=0
@@ -4449,6 +4453,9 @@ policy_request_reset() {
   policy_req_git_linked_worktree_paths=()
   policy_req_trust_workdir_config=0
   policy_req_trust_workdir_config_source="default"
+  policy_req_trusted_workdirs_path=""
+  policy_req_trusted_workdirs_loaded=0
+  safehouse_array_clear policy_req_trusted_workdirs
   policy_req_workdir_config_path=""
   policy_req_workdir_config_loaded=0
   policy_req_workdir_config_found=0
@@ -4525,15 +4532,120 @@ policy_request_collect_env_add_dir_inputs() {
   fi
 }
 
+# Trim a trusted-workdirs line and, when it points at an existing directory,
+# canonicalize it with safehouse_normalize_abs_path so comparisons survive
+# macOS path aliases (e.g. /var/... vs /private/var/...). Blank/comment lines
+# and entries whose directory does not exist are returned trimmed but unchanged.
+policy_request_canonicalize_trusted_workdir_entry() {
+  local entry trimmed
+
+  entry="$1"
+  trimmed="$(safehouse_trim_whitespace "$entry")"
+  if [[ -n "$trimmed" && -d "$trimmed" ]]; then
+    safehouse_normalize_abs_path "$trimmed" || return 1
+    return 0
+  fi
+  printf '%s\n' "$trimmed"
+}
+
+policy_request_load_trusted_workdirs() {
+  local line trimmed canonical
+
+  policy_req_trusted_workdirs_path="${HOME}/${safehouse_trusted_workdirs_config_relpath}"
+  safehouse_array_clear policy_req_trusted_workdirs
+  policy_req_trusted_workdirs_loaded=0
+
+  if [[ ! -e "$policy_req_trusted_workdirs_path" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$policy_req_trusted_workdirs_path" ]]; then
+    safehouse_fail "Trusted workdirs path exists but is not a regular file: $policy_req_trusted_workdirs_path"
+    return 1
+  fi
+  if [[ ! -r "$policy_req_trusted_workdirs_path" ]]; then
+    safehouse_fail "Trusted workdirs file is not readable: $policy_req_trusted_workdirs_path"
+    return 1
+  fi
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    trimmed="$(safehouse_trim_whitespace "$line")"
+    [[ -n "$trimmed" ]] || continue
+    [[ "${trimmed:0:1}" == "#" ]] && continue
+    canonical="$(policy_request_canonicalize_trusted_workdir_entry "$trimmed")" || return 1
+    [[ -n "$canonical" ]] || continue
+    policy_req_trusted_workdirs+=("$canonical")
+  done < "$policy_req_trusted_workdirs_path"
+
+  policy_req_trusted_workdirs_loaded=1
+}
+
+policy_request_write_always_trust_workdir() {
+  local trusted_file parent_dir existing_line existing_canonical
+
+  [[ -n "$policy_req_effective_workdir" ]] || return 0
+
+  trusted_file="${policy_req_trusted_workdirs_path}"
+
+  if [[ -f "$trusted_file" ]]; then
+    while IFS= read -r existing_line || [[ -n "$existing_line" ]]; do
+      existing_canonical="$(policy_request_canonicalize_trusted_workdir_entry "$existing_line")" || return 1
+      if [[ "$existing_canonical" == "$policy_req_effective_workdir" ]]; then
+        return 0
+      fi
+    done < "$trusted_file"
+  fi
+
+  parent_dir="$(dirname "$trusted_file")"
+  mkdir -p "$parent_dir" || return 1
+  printf '%s\n' "$policy_req_effective_workdir" >> "$trusted_file" || return 1
+}
+
+policy_request_remove_always_trust_workdir() {
+  local trusted_file tmp_file line canonical
+
+  trusted_file="${policy_req_trusted_workdirs_path}"
+  [[ -f "$trusted_file" ]] || return 0
+
+  tmp_file="${trusted_file}.tmp.$$"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    canonical="$(policy_request_canonicalize_trusted_workdir_entry "$line")" || { rm -f "$tmp_file"; return 1; }
+    if [[ "$canonical" != "$policy_req_effective_workdir" ]]; then
+      printf '%s\n' "$line"
+    fi
+  done < "$trusted_file" > "$tmp_file" || { rm -f "$tmp_file"; return 1; }
+  mv "$tmp_file" "$trusted_file" || return 1
+}
+
 policy_request_resolve_trust_workdir_config() {
   local env_trust_value=""
 
+  # --always-trust-workdir-config=true: write to file AND trust this session
+  if [[ "$cli_policy_always_trust_workdir_config" -eq 1 ]]; then
+    policy_request_write_always_trust_workdir || return 1
+    policy_req_trust_workdir_config=1
+    policy_req_trust_workdir_config_source="--always-trust-workdir-config"
+    return 0
+  fi
+
+  # --always-trust-workdir-config=false: remove from file, also purge in-memory list
+  if [[ "$cli_policy_always_trust_workdir_config_set" -eq 1 && "$cli_policy_always_trust_workdir_config" -eq 0 ]]; then
+    policy_request_remove_always_trust_workdir || return 1
+    local -a filtered_trusted=()
+    local tw
+    for tw in "${policy_req_trusted_workdirs[@]+"${policy_req_trusted_workdirs[@]}"}"; do
+      [[ "$tw" == "$policy_req_effective_workdir" ]] || filtered_trusted+=("$tw")
+    done
+    policy_req_trusted_workdirs=("${filtered_trusted[@]+"${filtered_trusted[@]}"}")
+  fi
+
+  # CLI --trust-workdir-config takes next highest precedence
   if [[ "$cli_policy_trust_workdir_config_set" -eq 1 ]]; then
     policy_req_trust_workdir_config="$cli_policy_trust_workdir_config_value"
     policy_req_trust_workdir_config_source="--trust-workdir-config"
     return 0
   fi
 
+  # SAFEHOUSE_TRUST_WORKDIR_CONFIG env var
   if [[ "${SAFEHOUSE_TRUST_WORKDIR_CONFIG+x}" == "x" ]]; then
     env_trust_value="${SAFEHOUSE_TRUST_WORKDIR_CONFIG}"
     if policy_value_is_truthy "$env_trust_value"; then
@@ -4548,6 +4660,18 @@ policy_request_resolve_trust_workdir_config() {
     fi
     policy_req_trust_workdir_config_source="SAFEHOUSE_TRUST_WORKDIR_CONFIG"
     return 0
+  fi
+
+  # Check trusted-workdirs file
+  if [[ "${#policy_req_trusted_workdirs[@]}" -gt 0 && -n "$policy_req_effective_workdir" ]]; then
+    local trusted_workdir
+    for trusted_workdir in "${policy_req_trusted_workdirs[@]}"; do
+      if [[ "$trusted_workdir" == "$policy_req_effective_workdir" ]]; then
+        policy_req_trust_workdir_config=1
+        policy_req_trust_workdir_config_source="trusted-workdirs"
+        return 0
+      fi
+    done
   fi
 
   policy_req_trust_workdir_config=0
@@ -4796,8 +4920,9 @@ policy_request_build() {
   policy_request_collect_env_add_dir_inputs env_add_dirs_ro_inputs env_add_dirs_rw_inputs || return 1
   safehouse_array_copy cli_add_dirs_ro_inputs cli_policy_add_dirs_ro_values
   safehouse_array_copy cli_add_dirs_rw_inputs cli_policy_add_dirs_rw_values
-  policy_request_resolve_trust_workdir_config || return 1
+  policy_request_load_trusted_workdirs || return 1
   policy_request_resolve_effective_workdir || return 1
+  policy_request_resolve_trust_workdir_config || return 1
   policy_request_resolve_effective_workdir_git_root || return 1
   policy_request_resolve_git_worktree_common_dir_access || return 1
   policy_request_resolve_git_linked_worktree_access || return 1
@@ -6206,7 +6331,7 @@ policy_explain_prepare_runtime_debug_environment() {
 
 policy_explain_print_summary() {
   local workdir_status config_status keychain_status exec_env_status env_pass_names_status profile_env_defaults_status
-  local git_worktree_common_dir_status git_worktree_paths_status
+  local git_worktree_common_dir_status git_worktree_paths_status trusted_workdirs_status trust_source_display
   local idx profile reason
   local host_command_matches execution_command_matches execution_path shell_wrapper_note runtime_debug_env_available=0
 
@@ -6292,6 +6417,27 @@ policy_explain_print_summary() {
     execution_command_matches="$(policy_explain_path_matches "${policy_req_invoked_command_path}" "$execution_path")"
   fi
 
+  if [[ "${#policy_req_trusted_workdirs[@]}" -gt 0 ]]; then
+    trusted_workdirs_status="$(safehouse_join_by_space "${policy_req_trusted_workdirs[@]}")"
+  else
+    trusted_workdirs_status="$(safehouse_join_by_space)"
+  fi
+
+  case "${policy_req_trust_workdir_config_source:-default}" in
+    --always-trust-workdir-config)
+      trust_source_display="--always-trust-workdir-config (persisted to ${policy_req_trusted_workdirs_path})"
+      ;;
+    --trust-workdir-config)
+      trust_source_display="--trust-workdir-config (this session only)"
+      ;;
+    trusted-workdirs)
+      trust_source_display="${policy_req_trusted_workdirs_path}"
+      ;;
+    *)
+      trust_source_display="${policy_req_trust_workdir_config_source:-default}"
+      ;;
+  esac
+
   shell_wrapper_note=""
   if [[ -n "${policy_req_invoked_command_path:-}" && "${policy_req_invoked_command_path}" != */* ]]; then
     shell_wrapper_note="interactive-shell aliases/functions are not introspected; run \`type -a ${policy_req_invoked_command_path}\` in your shell if wrapper resolution may matter"
@@ -6300,7 +6446,7 @@ policy_explain_print_summary() {
   {
     echo "safehouse explain:"
     echo "  effective workdir: ${workdir_status} (source: ${policy_req_effective_workdir_source:-unknown})"
-    echo "  workdir config trust: $([[ "$policy_req_trust_workdir_config" -eq 1 ]] && echo "enabled" || echo "disabled") (source: ${policy_req_trust_workdir_config_source})"
+    echo "  workdir config trust: $([[ "$policy_req_trust_workdir_config" -eq 1 ]] && echo "enabled" || echo "disabled") (source: ${trust_source_display})"
     echo "  workdir config: ${config_status}"
     echo "  git worktree common dir grant: ${git_worktree_common_dir_status}"
     echo "  git linked worktree read grants: ${git_worktree_paths_status}"
@@ -7655,7 +7801,13 @@ Policy scope options:
 
   --trust-workdir-config
   --trust-workdir-config=BOOL
-      Trust and load <workdir>/.safehouse (default: disabled)
+      Trust and load <workdir>/.safehouse this session (default: disabled)
+
+  --always-trust-workdir-config
+  --always-trust-workdir-config=BOOL
+      Trust and load <workdir>/.safehouse this and future sessions (default:
+      disabled). Remember <workdir> in ~/.config/safehouse/trusted-workdirs.
+      Conflicts with --trust-workdir-config=false/0/no/off.
 
   --allow-workdir-config-writes
       Skip the terminal deny-write rule for the workdir config file.
@@ -7725,6 +7877,11 @@ Config file:
       Supports keys:
         add-dirs-ro=PATHS
         add-dirs=PATHS
+
+  ~/.config/safehouse/trusted-workdirs (optional, always read)
+      One trusted directory path per line; blank lines and # comments allowed
+      Written by --always-trust-workdir-config. To remove entries edit directly
+      or use --always-trust-workdir-config=false.
 USAGE
 }
 
@@ -7750,6 +7907,8 @@ cli_policy_workdir_value=""
 cli_policy_trust_workdir_config_set=0
 cli_policy_trust_workdir_config_value=0
 cli_policy_allow_workdir_config_writes=0
+cli_policy_always_trust_workdir_config=0
+cli_policy_always_trust_workdir_config_set=0
 cli_policy_append_profiles=()
 cli_policy_allow_profile_writes=0
 cli_policy_output_path=""
@@ -7779,6 +7938,8 @@ cli_parse_reset() {
   cli_policy_trust_workdir_config_set=0
   cli_policy_trust_workdir_config_value=0
   cli_policy_allow_workdir_config_writes=0
+  cli_policy_always_trust_workdir_config=0
+  cli_policy_always_trust_workdir_config_set=0
   cli_policy_append_profiles=()
   cli_policy_allow_profile_writes=0
   cli_policy_output_path=""
@@ -7945,6 +8106,14 @@ cli_finalize_post_parse_state() {
   cli_finalize_runtime_env_inputs || return 1
   cli_finalize_wrapped_command_inputs || return 1
 
+  if [[ "$cli_policy_always_trust_workdir_config" -eq 1 && \
+        "$cli_policy_trust_workdir_config_set" -eq 1 && \
+        "$cli_policy_trust_workdir_config_value" -eq 0 ]]; then
+    safehouse_fail \
+      "--trust-workdir-config=false conflicts with --always-trust-workdir-config=true"
+    return 1
+  fi
+
   if [[ "${#cli_command_exec_args[@]}" -gt 0 ]]; then
     cli_has_command=1
   else
@@ -8053,6 +8222,29 @@ cli_parse_policy_flag_option() {
       ;;
     --allow-workdir-config-writes)
       cli_policy_allow_workdir_config_writes=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --always-trust-workdir-config)
+      cli_policy_always_trust_workdir_config=1
+      cli_policy_always_trust_workdir_config_set=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --always-trust-workdir-config=*)
+      local always_trust_value
+      if policy_value_is_truthy "${current_arg#*=}"; then
+        always_trust_value=1
+      elif policy_value_is_falsey "${current_arg#*=}"; then
+        always_trust_value=0
+      else
+        safehouse_fail \
+          "Invalid value for --always-trust-workdir-config: ${current_arg#*=}" \
+          "Supported values: 1/0, true/false, yes/no, on/off"
+        return 1
+      fi
+      cli_policy_always_trust_workdir_config=$always_trust_value
+      cli_policy_always_trust_workdir_config_set=1
       cli_parse_consumed_args=1
       return 0
       ;;
