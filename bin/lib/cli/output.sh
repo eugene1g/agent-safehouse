@@ -99,6 +99,14 @@ Policy scope options:
   --trust-workdir-config=BOOL
       Trust and load <workdir>/.safehouse (default: disabled)
 
+  --allow-workdir-config-writes
+      Skip the terminal deny-write rule for .safehouse config files.
+      By default, Safehouse always emits a deny file-write* rule for any
+      .safehouse file as the very last rule in the policy, ensuring agents
+      cannot modify workdir config regardless of path grants. Use this flag
+      only if you intentionally want the sandboxed process to be able to
+      write to .safehouse files.
+
   --append-profile PATH
   --append-profile=PATH
       Append an additional sandbox profile file after generated rules
