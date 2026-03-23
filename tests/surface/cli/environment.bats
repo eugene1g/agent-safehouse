@@ -239,13 +239,13 @@ EOF
   sft_assert_contains "$output" "SAFEHOUSE_CLAUDE_VSCODE_MODE=reuse"
   sft_assert_file_exists "$shim_path"
 
-  run rg -F -- "running_vscode_bundle_id" "$shim_path"
+  run /usr/bin/grep -F -- "running_vscode_bundle_id" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "/usr/bin/open -b \"\$bundle_id\" \"\$file_path\"" "$shim_path"
+  run /usr/bin/grep -F -- "/usr/bin/open -b \"\$bundle_id\" \"\$file_path\"" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "editor_file_signature" "$shim_path"
+  run /usr/bin/grep -F -- "editor_file_signature" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "wait_for_editor_file_change \"\$file_path\" \"\$baseline_signature\"" "$shim_path"
+  run /usr/bin/grep -F -- "wait_for_editor_file_change \"\$file_path\" \"\$baseline_signature\"" "$shim_path"
   [ "$status" -eq 0 ]
 }
 
@@ -274,23 +274,23 @@ EOF
   sft_assert_contains "$output" "SAFEHOUSE_CLAUDE_VSCODE_MODE=full"
   sft_assert_file_exists "$shim_path"
 
-  run rg -F -- "--no-sandbox" "$shim_path"
+  run /usr/bin/grep -F -- "--no-sandbox" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "--disable-extensions" "$shim_path"
+  run /usr/bin/grep -F -- "--disable-extensions" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "--disable-workspace-trust" "$shim_path"
+  run /usr/bin/grep -F -- "--disable-workspace-trust" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "--user-data-dir \"\$full_user_data_dir\"" "$shim_path"
+  run /usr/bin/grep -F -- "--user-data-dir \"\$full_user_data_dir\"" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "--extensions-dir \"\$full_extensions_dir\"" "$shim_path"
+  run /usr/bin/grep -F -- "--extensions-dir \"\$full_extensions_dir\"" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "launch_code_detached" "$shim_path"
+  run /usr/bin/grep -F -- "launch_code_detached" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "wait_for_editor_file_change_or_process_exit" "$shim_path"
+  run /usr/bin/grep -F -- "wait_for_editor_file_change_or_process_exit" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "\"window.restoreWindows\": \"none\"" "$shim_path"
+  run /usr/bin/grep -F -- "\"window.restoreWindows\": \"none\"" "$shim_path"
   [ "$status" -eq 0 ]
-  run rg -F -- "prepare_full_mode_profile_dirs stable" "$shim_path"
+  run /usr/bin/grep -F -- "prepare_full_mode_profile_dirs stable" "$shim_path"
   [ "$status" -eq 0 ]
 }
 
