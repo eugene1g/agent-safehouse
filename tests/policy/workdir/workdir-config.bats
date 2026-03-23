@@ -68,7 +68,74 @@ load ../../test_helper.bash
 
   safehouse_run --trust-workdir-config --stdout
   [ "$status" -ne 0 ]
-  sft_assert_contains "$output" "Invalid config key in "
-  sft_assert_contains "$output" ".safehouse:1: allow-home"
-  sft_assert_contains "$output" "Supported keys: add-dirs-ro, add-dirs"
+  sft_assert_contains "$output" "Unknown key in workdir config: allow-home"
+  sft_assert_contains "$output" "Supported keys: add-dirs-ro, add-dirs, enable, append-profile"
+}
+
+@test "[POLICY-ONLY] trusted .safehouse with enable=docker enables docker integration" {
+  local config_file explain_log
+
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+  explain_log="$(sft_workspace_path "explain.log")" || return 1
+
+  printf 'enable=docker\n' > "$config_file"
+
+  trusted_profile="$(safehouse_profile --trust-workdir-config)"
+  sft_assert_contains "$trusted_profile" "Integration: Docker"
+
+  safehouse_ok --trust-workdir-config --explain --stdout >/dev/null 2>"$explain_log"
+  sft_assert_file_contains "$explain_log" "docker"
+}
+
+@test "[POLICY-ONLY] trusted .safehouse with append-profile= appends the profile" {
+  local config_file profile_file profile_dir profile
+
+  profile_dir="$(mktemp -d "${SAFEHOUSE_WORKSPACE}/profiles.XXXXXX")" || return 1
+  profile_file="${profile_dir}/custom.sb"
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+
+  printf ';; custom-test-marker\n(allow file-read* (literal "/tmp"))\n' > "$profile_file"
+
+  printf 'append-profile=%s\n' "$profile_file" > "$config_file"
+
+  profile="$(safehouse_profile --trust-workdir-config)"
+  sft_assert_contains "$profile" "#safehouse-test-id:workdir-config-append-profile#"
+  sft_assert_contains "$profile" "custom-test-marker"
+}
+
+@test "[POLICY-ONLY] trusted .safehouse append-profile appears before --append-profile in policy" {
+  local config_file workdir_profile_file cli_profile_file profile
+
+  workdir_profile_file="$(sft_workspace_path "workdir-extra.sb")" || return 1
+  cli_profile_file="$(sft_workspace_path "cli-extra.sb")" || return 1
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+
+  printf ';; workdir-config-marker\n' > "$workdir_profile_file"
+  printf ';; cli-append-marker\n' > "$cli_profile_file"
+
+  printf 'append-profile=%s\n' "$workdir_profile_file" > "$config_file"
+
+  profile="$(safehouse_profile --trust-workdir-config --append-profile="$cli_profile_file")"
+  sft_assert_order "$profile" "#safehouse-test-id:workdir-config-append-profile#" "#safehouse-test-id:append-profile#"
+}
+
+@test "[POLICY-ONLY] untrusted .safehouse enable= is ignored" {
+  local config_file profile
+
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+  printf 'enable=docker\n' > "$config_file"
+
+  profile="$(safehouse_profile)"
+  sft_assert_not_contains "$profile" "Integration: Docker"
+}
+
+@test "unknown key in .safehouse fails" {
+  local config_file
+
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+  printf 'badkey=value\n' > "$config_file"
+
+  safehouse_run --trust-workdir-config --stdout
+  [ "$status" -ne 0 ]
+  sft_assert_contains "$output" "Unknown key in workdir config: badkey"
 }
