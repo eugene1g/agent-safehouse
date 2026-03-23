@@ -72,3 +72,50 @@ load ../../test_helper.bash
   sft_assert_contains "$output" ".safehouse:1: allow-home"
   sft_assert_contains "$output" "Supported keys: add-dirs-ro, add-dirs"
 }
+
+@test "[POLICY-ONLY] generated policy contains terminal deny sentinel for .safehouse writes" {
+  local profile
+
+  profile="$(safehouse_profile)"
+  sft_assert_contains "$profile" "#safehouse-test-id:terminal-deny-safehouse#"
+}
+
+@test "[POLICY-ONLY] terminal deny rule appears after workdir grant" {
+  local profile
+
+  profile="$(safehouse_profile)"
+  sft_assert_order "$profile" "#safehouse-test-id:workdir-grant#" "#safehouse-test-id:terminal-deny-safehouse#"
+}
+
+@test "[POLICY-ONLY] --allow-workdir-config-writes suppresses the terminal deny rule" {
+  local profile
+
+  profile="$(safehouse_profile --allow-workdir-config-writes)"
+  sft_assert_not_contains "$profile" "terminal-deny-safehouse"
+}
+
+@test "[EXECUTION] terminal deny rule blocks writes to <workdir>/.safehouse" {
+  local config_path
+
+  config_path="$(sft_workspace_path ".safehouse")" || return 1
+
+  safehouse_denied -- /bin/sh -c "printf 'add-dirs=/tmp\n' > '$config_path'"
+}
+
+@test "[EXECUTION] terminal deny rule does not block writes to <workdir>/sub/.safehouse" {
+  local sub_dir sub_config_path
+
+  sub_dir="$(sft_workspace_path "sub")" || return 1
+  sub_config_path="${sub_dir}/.safehouse"
+  mkdir -p "$sub_dir" || return 1
+
+  safehouse_ok -- /bin/sh -c "printf 'add-dirs=/tmp\n' > '$sub_config_path'"
+}
+
+@test "[EXECUTION] --allow-workdir-config-writes permits writes to <workdir>/.safehouse" {
+  local config_path
+
+  config_path="$(sft_workspace_path ".safehouse")" || return 1
+
+  safehouse_ok --allow-workdir-config-writes -- /bin/sh -c "printf 'add-dirs=/tmp\n' > '$config_path'"
+}

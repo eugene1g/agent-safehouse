@@ -229,6 +229,7 @@ policy_explain_print_summary() {
         echo "  selected scoped profile: ${profile} (${reason})"
       done
     fi
+    echo "  allow workdir config writes: $([[ "$policy_req_allow_workdir_config_writes" -eq 1 ]] && echo "enabled" || echo "disabled (default)")"
     echo "  sandbox denial log hint: /usr/bin/log show --last 2m --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
   } >&2
 }
