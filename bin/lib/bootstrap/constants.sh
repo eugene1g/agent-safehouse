@@ -13,6 +13,7 @@ safehouse_project_github_url="https://github.com/eugene1g/agent-safehouse"
 safehouse_project_release_asset_url="${safehouse_project_github_url}/releases/latest/download/safehouse.sh"
 safehouse_project_head_asset_url="https://raw.githubusercontent.com/eugene1g/agent-safehouse/main/dist/safehouse.sh"
 safehouse_workdir_config_filename=".safehouse"
+safehouse_trusted_workdirs_config_relpath=".config/safehouse/trusted-workdirs"
 
 resolve_safehouse_project_version() {
   local version=""

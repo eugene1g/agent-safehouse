@@ -25,6 +25,9 @@ policy_req_git_worktree_common_dir=""
 policy_req_git_linked_worktree_paths=()
 policy_req_trust_workdir_config=0
 policy_req_trust_workdir_config_source="default"
+policy_req_trusted_workdirs_path=""
+policy_req_trusted_workdirs_loaded=0
+policy_req_trusted_workdirs=()
 policy_req_workdir_config_path=""
 policy_req_workdir_config_loaded=0
 policy_req_workdir_config_found=0
@@ -162,6 +165,9 @@ policy_request_reset() {
   policy_req_git_linked_worktree_paths=()
   policy_req_trust_workdir_config=0
   policy_req_trust_workdir_config_source="default"
+  policy_req_trusted_workdirs_path=""
+  policy_req_trusted_workdirs_loaded=0
+  safehouse_array_clear policy_req_trusted_workdirs
   policy_req_workdir_config_path=""
   policy_req_workdir_config_loaded=0
   policy_req_workdir_config_found=0
@@ -235,15 +241,92 @@ policy_request_collect_env_add_dir_inputs() {
   fi
 }
 
+policy_request_load_trusted_workdirs() {
+  local line trimmed
+
+  policy_req_trusted_workdirs_path="${HOME}/${safehouse_trusted_workdirs_config_relpath}"
+  safehouse_array_clear policy_req_trusted_workdirs
+
+  if [[ ! -f "$policy_req_trusted_workdirs_path" ]]; then
+    policy_req_trusted_workdirs_loaded=0
+    return 0
+  fi
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    trimmed="$(safehouse_trim_whitespace "$line")"
+    [[ -n "$trimmed" ]] || continue
+    [[ "${trimmed:0:1}" == "#" ]] && continue
+    policy_req_trusted_workdirs+=("$trimmed")
+  done < "$policy_req_trusted_workdirs_path"
+
+  policy_req_trusted_workdirs_loaded=1
+}
+
+policy_request_write_always_trust_workdir() {
+  local trusted_file parent_dir line existing_line
+
+  [[ -n "$policy_req_effective_workdir" ]] || return 0
+
+  trusted_file="${policy_req_trusted_workdirs_path}"
+
+  if [[ -f "$trusted_file" ]]; then
+    while IFS= read -r existing_line || [[ -n "$existing_line" ]]; do
+      if [[ "$existing_line" == "$policy_req_effective_workdir" ]]; then
+        return 0
+      fi
+    done < "$trusted_file"
+  fi
+
+  parent_dir="$(dirname "$trusted_file")"
+  mkdir -p "$parent_dir" || return 1
+  printf '%s\n' "$policy_req_effective_workdir" >> "$trusted_file" || return 1
+}
+
+policy_request_remove_always_trust_workdir() {
+  local trusted_file tmp_file line
+
+  trusted_file="${policy_req_trusted_workdirs_path}"
+  [[ -f "$trusted_file" ]] || return 0
+
+  tmp_file="${trusted_file}.tmp.$$"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" != "$policy_req_effective_workdir" ]]; then
+      printf '%s\n' "$line"
+    fi
+  done < "$trusted_file" > "$tmp_file" || { rm -f "$tmp_file"; return 1; }
+  mv "$tmp_file" "$trusted_file" || return 1
+}
+
 policy_request_resolve_trust_workdir_config() {
   local env_trust_value=""
 
+  # --always-trust-workdir-config=true: write to file AND trust this session
+  if [[ "$cli_policy_always_trust_workdir_config" -eq 1 ]]; then
+    policy_request_write_always_trust_workdir || return 1
+    policy_req_trust_workdir_config=1
+    policy_req_trust_workdir_config_source="--always-trust-workdir-config"
+    return 0
+  fi
+
+  # --always-trust-workdir-config=false: remove from file, also purge in-memory list
+  if [[ "$cli_policy_always_trust_workdir_config_set" -eq 1 && "$cli_policy_always_trust_workdir_config" -eq 0 ]]; then
+    policy_request_remove_always_trust_workdir || return 1
+    local -a filtered_trusted=()
+    local tw
+    for tw in "${policy_req_trusted_workdirs[@]+"${policy_req_trusted_workdirs[@]}"}"; do
+      [[ "$tw" == "$policy_req_effective_workdir" ]] || filtered_trusted+=("$tw")
+    done
+    policy_req_trusted_workdirs=("${filtered_trusted[@]+"${filtered_trusted[@]}"}")
+  fi
+
+  # CLI --trust-workdir-config takes next highest precedence
   if [[ "$cli_policy_trust_workdir_config_set" -eq 1 ]]; then
     policy_req_trust_workdir_config="$cli_policy_trust_workdir_config_value"
     policy_req_trust_workdir_config_source="--trust-workdir-config"
     return 0
   fi
 
+  # SAFEHOUSE_TRUST_WORKDIR_CONFIG env var
   if [[ "${SAFEHOUSE_TRUST_WORKDIR_CONFIG+x}" == "x" ]]; then
     env_trust_value="${SAFEHOUSE_TRUST_WORKDIR_CONFIG}"
     if policy_value_is_truthy "$env_trust_value"; then
@@ -258,6 +341,18 @@ policy_request_resolve_trust_workdir_config() {
     fi
     policy_req_trust_workdir_config_source="SAFEHOUSE_TRUST_WORKDIR_CONFIG"
     return 0
+  fi
+
+  # Check trusted-workdirs file
+  if [[ "${#policy_req_trusted_workdirs[@]}" -gt 0 && -n "$policy_req_effective_workdir" ]]; then
+    local trusted_workdir
+    for trusted_workdir in "${policy_req_trusted_workdirs[@]}"; do
+      if [[ "$trusted_workdir" == "$policy_req_effective_workdir" ]]; then
+        policy_req_trust_workdir_config=1
+        policy_req_trust_workdir_config_source="trusted-workdirs"
+        return 0
+      fi
+    done
   fi
 
   policy_req_trust_workdir_config=0
@@ -477,8 +572,9 @@ policy_request_build() {
   policy_request_collect_env_add_dir_inputs env_add_dirs_ro_inputs env_add_dirs_rw_inputs || return 1
   safehouse_array_copy cli_add_dirs_ro_inputs cli_policy_add_dirs_ro_values
   safehouse_array_copy cli_add_dirs_rw_inputs cli_policy_add_dirs_rw_values
-  policy_request_resolve_trust_workdir_config || return 1
+  policy_request_load_trusted_workdirs || return 1
   policy_request_resolve_effective_workdir || return 1
+  policy_request_resolve_trust_workdir_config || return 1
   policy_request_resolve_effective_workdir_git_root || return 1
   policy_request_resolve_git_worktree_common_dir_access || return 1
   policy_request_resolve_git_linked_worktree_access || return 1

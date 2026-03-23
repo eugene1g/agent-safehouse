@@ -8,6 +8,7 @@
 | `--add-dirs-ro=PATHS` | Colon-separated file/directory paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
+| `--always-trust-workdir-config` | Persist workdir to `~/.config/safehouse/trusted-workdirs` and trust it for this session (`--always-trust-workdir-config=BOOL` also supported) |
 | `--append-profile=PATH` | Append sandbox profile file after generated rules (repeatable) |
 | `--enable=FEATURES` | Enable optional features (see list below) |
 | `--env` | Pass the full inherited host env to the wrapped command, including secrets (incompatible with `--env-pass`) |
@@ -115,6 +116,24 @@ Supported keys:
 By default this file is ignored. It is loaded only with `--trust-workdir-config` (or `SAFEHOUSE_TRUST_WORKDIR_CONFIG`).
 Because the default workdir is the invocation directory, Safehouse does not auto-discover `.safehouse` files from enclosing Git repo roots when you launch from a nested subdirectory.
 Trusted config parsing fails fast on malformed lines and unknown keys.
+
+## Trusted Workdirs File
+
+Path: `~/.config/safehouse/trusted-workdirs`
+
+Format: one absolute directory path per line; blank lines and `#` comments are ignored.
+
+This file is written by `--always-trust-workdir-config`. To remove an entry, either run `safehouse --always-trust-workdir-config=false` from the directory or edit the file directly.
+
+When the current workdir matches an entry in this file, `.safehouse` is automatically trusted without any flag on every invocation.
+
+Trust precedence order (highest to lowest):
+
+1. `--always-trust-workdir-config=true` (writes to file, trusts this session)
+2. `--trust-workdir-config` (trusts this session only)
+3. `SAFEHOUSE_TRUST_WORKDIR_CONFIG` env var
+4. `~/.config/safehouse/trusted-workdirs` file match
+5. Default (not trusted)
 
 ## `--env=FILE` Format
 

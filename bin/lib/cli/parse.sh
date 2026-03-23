@@ -19,6 +19,8 @@ cli_policy_workdir_set=0
 cli_policy_workdir_value=""
 cli_policy_trust_workdir_config_set=0
 cli_policy_trust_workdir_config_value=0
+cli_policy_always_trust_workdir_config=0
+cli_policy_always_trust_workdir_config_set=0
 cli_policy_append_profiles=()
 cli_policy_output_path=""
 cli_policy_output_path_set=0
@@ -46,6 +48,8 @@ cli_parse_reset() {
   cli_policy_workdir_value=""
   cli_policy_trust_workdir_config_set=0
   cli_policy_trust_workdir_config_value=0
+  cli_policy_always_trust_workdir_config=0
+  cli_policy_always_trust_workdir_config_set=0
   cli_policy_append_profiles=()
   cli_policy_output_path=""
   cli_policy_output_path_set=0
@@ -211,6 +215,14 @@ cli_finalize_post_parse_state() {
   cli_finalize_runtime_env_inputs || return 1
   cli_finalize_wrapped_command_inputs || return 1
 
+  if [[ "$cli_policy_always_trust_workdir_config" -eq 1 && \
+        "$cli_policy_trust_workdir_config_set" -eq 1 && \
+        "$cli_policy_trust_workdir_config_value" -eq 0 ]]; then
+    safehouse_fail \
+      "--trust-workdir-config=false conflicts with --always-trust-workdir-config=true"
+    return 1
+  fi
+
   if [[ "${#cli_command_exec_args[@]}" -gt 0 ]]; then
     cli_has_command=1
   else
@@ -309,6 +321,29 @@ cli_parse_policy_flag_option() {
         return 1
       fi
       cli_policy_trust_workdir_config_set=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --always-trust-workdir-config)
+      cli_policy_always_trust_workdir_config=1
+      cli_policy_always_trust_workdir_config_set=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --always-trust-workdir-config=*)
+      local always_trust_value
+      if policy_value_is_truthy "${current_arg#*=}"; then
+        always_trust_value=1
+      elif policy_value_is_falsey "${current_arg#*=}"; then
+        always_trust_value=0
+      else
+        safehouse_fail \
+          "Invalid value for --always-trust-workdir-config: ${current_arg#*=}" \
+          "Supported values: 1/0, true/false, yes/no, on/off"
+        return 1
+      fi
+      cli_policy_always_trust_workdir_config=$always_trust_value
+      cli_policy_always_trust_workdir_config_set=1
       cli_parse_consumed_args=1
       return 0
       ;;

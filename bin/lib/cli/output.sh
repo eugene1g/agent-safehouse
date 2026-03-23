@@ -99,6 +99,13 @@ Policy scope options:
   --trust-workdir-config=BOOL
       Trust and load <workdir>/.safehouse (default: disabled)
 
+  --always-trust-workdir-config
+  --always-trust-workdir-config=BOOL
+      Save workdir to ~/.config/safehouse/trusted-workdirs and trust it for this
+      invocation. Future invocations in this directory will automatically load
+      <workdir>/.safehouse without needing this flag again.
+      Conflicts with --trust-workdir-config=false/0/no/off (contradictory).
+
   --append-profile PATH
   --append-profile=PATH
       Append an additional sandbox profile file after generated rules
@@ -152,5 +159,9 @@ Config file:
       Supports keys:
         add-dirs-ro=PATHS
         add-dirs=PATHS
+
+  ~/.config/safehouse/trusted-workdirs (optional, always read)
+      One trusted directory path per line; blank lines and # comments allowed
+      Written by --always-trust-workdir-config; edit directly to remove entries
 USAGE
 }
