@@ -432,6 +432,12 @@ policy_plan_collect_runtime_env_defaults_from_scoped_profiles() {
 policy_plan_collect_runtime_env_defaults_from_appended_profiles() {
   local profile_path
 
+  if [[ "$(safehouse_array_length policy_req_workdir_config_append_profile_paths)" -gt 0 ]]; then
+    for profile_path in "${policy_req_workdir_config_append_profile_paths[@]}"; do
+      policy_plan_append_profile_runtime_env_defaults_from_profile "$profile_path" || return 1
+    done
+  fi
+
   if [[ "$(safehouse_array_length policy_req_append_profile_paths)" -gt 0 ]]; then
     for profile_path in "${policy_req_append_profile_paths[@]}"; do
       policy_plan_append_profile_runtime_env_defaults_from_profile "$profile_path" || return 1

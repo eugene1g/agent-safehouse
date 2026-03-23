@@ -655,24 +655,45 @@ policy_render_append_cli_profiles() {
 
 policy_render_emit_append_profile_protections() {
   local profile_path escaped_path
-  local cli_count
+  local -a protected_profile_paths=()
 
   if [[ "$policy_req_allow_profile_writes" -eq 1 ]]; then
     return 0
   fi
 
-  cli_count="$(safehouse_array_length policy_req_append_profile_paths)"
-  if [[ "$cli_count" -eq 0 ]]; then
+  # Both CLI --append-profile files and workdir config append-profile= files are
+  # policy files that govern the sandbox, so the agent must not be able to rewrite
+  # either of them.
+  if [[ "$(safehouse_array_length policy_req_workdir_config_append_profile_paths)" -gt 0 ]]; then
+    protected_profile_paths+=("${policy_req_workdir_config_append_profile_paths[@]}")
+  fi
+  if [[ "$(safehouse_array_length policy_req_append_profile_paths)" -gt 0 ]]; then
+    protected_profile_paths+=("${policy_req_append_profile_paths[@]}")
+  fi
+
+  if [[ "${#protected_profile_paths[@]}" -eq 0 ]]; then
     return 0
   fi
 
   policy_render_write_line ";; #safehouse-test-id:append-profile-protections# Deny agent writes to appended policy files."
   policy_render_write_line ";; Use --allow-profile-writes to skip these deny rules."
-  for profile_path in "${policy_req_append_profile_paths[@]}"; do
+  for profile_path in "${protected_profile_paths[@]}"; do
     escaped_path="$(safehouse_escape_for_sb "$profile_path")" || return 1
     policy_render_write_line "(deny file-write* (literal \"${escaped_path}\"))"
   done
   policy_render_write_blank
+}
+
+policy_render_append_workdir_config_profiles() {
+  local profile_path
+
+  if [[ "$(safehouse_array_length policy_req_workdir_config_append_profile_paths)" -gt 0 ]]; then
+    for profile_path in "${policy_req_workdir_config_append_profile_paths[@]}"; do
+      policy_render_write_line ";; #safehouse-test-id:workdir-config-append-profile# Appended profile from workdir config: ${profile_path}"
+      policy_render_write_blank
+      policy_render_append_profile "$profile_path" || return 1
+    done
+  fi
 }
 
 policy_render_reset_output_state() {
@@ -759,6 +780,7 @@ policy_render_emit_dynamic_sections() {
   policy_render_emit_extra_access_rules || return 1
   policy_render_emit_wide_read_access
   policy_render_emit_workdir_access "$policy_req_effective_workdir" || return 1
+  policy_render_append_workdir_config_profiles || return 1
   policy_render_append_cli_profiles || return 1
   policy_render_emit_append_profile_protections || return 1
   policy_render_emit_terminal_deny_rules || return 1
