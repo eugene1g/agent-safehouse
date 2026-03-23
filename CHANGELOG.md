@@ -10,6 +10,45 @@
 
 - No profiles changed.
 
+## [0.6.0] - 2026-03-23
+
+### Upgrade Notes
+
+- Claude's VS Code external-editor handoff now defaults to reuse-only mode. If you rely on `Ctrl+G` to cold-start VS Code from a plain `safehouse -- claude ...` session, add `--enable=vscode`. Existing `EDITOR` or `VISUAL` values still take precedence.
+
+### Features
+
+- Added automatic profile selection for the OpenAI Codex Desktop app, including its app bundle, app state paths, Electron runtime dependencies, preference domain, and Keychain-backed sign-in surface.
+- `safehouse --explain` now reports the invoked command, profile target command, host and execution `PATH` matches, and a ready-to-run sandbox denial log hint to make command-resolution debugging much easier.
+
+### Bug Fixes
+
+- Restored Node/npm workflows under `fnm` by allowing the metadata traversal and install roots used by `fnm_multishells` shims and the macOS `~/Library/Application Support/fnm` layout.
+- Safehouse now skips stale linked-worktree admin entries during startup and `--explain`, avoiding `realpath` failures when old worktree metadata is left behind.
+- Home-scoped path grants now resolve symlink targets for profile-owned paths, which fixes Opencode bootstrap when `~/.config/opencode` points at a dotfiles-managed directory.
+- Refined Claude's VS Code editor handoff so the default path reuses an already-running VS Code instance, while the explicit `--enable=vscode` cold-start path launches detached with an isolated Safehouse-managed profile.
+
+### Chores
+
+- Added regression coverage for Codex Desktop bundle detection, `fnm` multishell and App Support Node workflows, Opencode symlinked XDG paths, stale worktree handling, `--explain` command-resolution output, and the new Claude/VS Code editor-shim modes.
+- Updated the docs around `--enable=vscode`, Claude external-editor handoff, and the default preservation of `EDITOR` and `VISUAL` in sanitized mode.
+
+### Thanks
+
+- @Kola50011 adding the OpenAI Codex Desktop app profile in [#62](https://github.com/eugene1g/agent-safehouse/pull/62).
+- @wkirby surfacing the `fnm`-backed Node/npm resolution failures fixed in this release in [#13](https://github.com/eugene1g/agent-safehouse/issues/13).
+- @benjivm surfacing the Opencode symlinked XDG-path bootstrap failure fixed in this release in [#61](https://github.com/eugene1g/agent-safehouse/issues/61).
+- @rublev surfacing the Claude-to-VS Code handoff behavior tightened in this release in [#46](https://github.com/eugene1g/agent-safehouse/issues/46).
+
+### Changed Sandboxing Profiles
+
+- [`node.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.5.2...v0.6.0#diff-94a5c97eafdc81daa5ae1e467d55943959ac559f14c59d8c3af198e716ad311f): Added `fnm` install-root and multishell metadata access so Node child-process `PATH` resolution and npm shims work for both XDG and macOS App Support layouts.
+- [`vscode.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.5.2...v0.6.0#diff-471f0b2ad5b04157955a47cc887440730950d6b71a0e9ff5181d66a9f95bb515): Made the full VS Code desktop/editor integration explicitly opt-in so cold-start editor handoff only happens behind `--enable=vscode`.
+- [`claude-code.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.5.2...v0.6.0#diff-caf651f708e889ca1935c3c382d551ccbed8eb81f611fab631829993fca117b7): Split core Claude CLI access from a narrow metadata-only VS Code reuse surface so `Ctrl+G` can still hand off to an already-running VS Code without granting full app startup by default.
+- [`opencode.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.5.2...v0.6.0#diff-cd89eca750d855f552c01fc868cdf1400d4c482fbf93e47c50425e84f470fa5a): Added the parent XDG directory allowances Opencode needs to bootstrap its default state roots, which now also works when the config path is symlinked into a dotfiles tree.
+- [`codex-app.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.5.2...v0.6.0#diff-dfd037f71c747a82d9532750cd5ccfd3e79ffbcb83881c0acc599d6ef2072697): Added a dedicated OpenAI Codex Desktop app profile covering the app bundle, Codex state directories, preference domain, app-specific Mach services, and its Electron/keychain dependencies.
+- [`vscode-app.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.5.2...v0.6.0#diff-e36692fe5535f876b390e4776cf042e90b6c47a6fe5370200f4013d0ead65cfb): Added isolated Safehouse-managed Claude editor cache roots and `/Applications` traversal so the explicit VS Code cold-start path can launch cleanly without reusing the user's normal VS Code profile.
+
 ## [0.5.2] - 2026-03-18
 
 ### Upgrade Notes
