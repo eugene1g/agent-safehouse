@@ -379,7 +379,7 @@ policy_render_emit_integration_preamble() {
   else
     policy_render_write_line ";; Optional integrations not included: $(safehouse_join_by_space)"
   fi
-  policy_render_write_line ";; Keychain integration (auto-injected from profile requirements): ${keychain_status}"
+  policy_render_write_line ";; Keychain integration (explicitly enabled or auto-injected from profile requirements): ${keychain_status}"
   policy_render_write_line ";; Use --enable=<feature> (comma-separated) to include optional integrations explicitly."
   policy_render_write_line ";; Note: selected profiles and enabled optional integrations can inject dependencies via \$\$require=<profile-path>\$\$ metadata."
   policy_render_write_line ";; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox."

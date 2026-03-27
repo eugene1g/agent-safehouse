@@ -72,7 +72,7 @@ In this mode, it bypasses the TUI entirely and runs a spinner to stdout.
 
 ### 3.1 Credential Storage
 
-OpenCode does **NOT** use macOS Keychain, `go-keyring`, or any OS-level credential storage. It does **NOT** use OAuth flows. All authentication is via environment variables and config files.
+Core OpenCode does **NOT** use macOS Keychain, `go-keyring`, or any OS-level credential storage. It does **NOT** use OAuth flows. Its built-in authentication is via environment variables and config files. Plugin-based auth providers can still add keychain-dependent behavior on top.
 
 ### 3.2 API Key Sources and Priority Order
 
@@ -674,6 +674,6 @@ Based on this analysis, a sandbox for OpenCode should:
 
 5. **No port binding** is needed (OpenCode does not listen on any ports)
 
-6. **No keychain/keyring** access needed
+6. **No keychain/keyring** access is needed for core OpenCode itself, but plugin-based auth providers may require explicit `--enable=keychain` and any additional helper-CLI grants they shell out to
 
 7. **No browser launching** by OpenCode directly (indirect dependency only from Azure SDK)

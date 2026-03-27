@@ -1526,7 +1526,8 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_electron_sb__
 ;; Source: 55-integrations-optional/keychain.sb
 ;; ---------------------------------------------------------------------------
 
-;; Auto-injected when a selected app/agent profile declares Keychain as a dependency.
+;; Can be explicitly enabled with --enable=keychain, and is also auto-injected
+;; when a selected app/agent profile declares Keychain as a dependency.
 
 (allow file-read* file-write*
     (home-subpath "/Library/Keychains")                        ;; Keychain DB/files for CLI login sessions using macOS credentials.
@@ -3591,10 +3592,7 @@ policy_optional_integration_feature_basename_from_profile_key() {
 
 policy_optional_integration_feature_is_user_exposed() {
   local feature="$1"
-  local hidden_feature=""
-
-  hidden_feature="$(basename "${policy_keychain_requirement_token}" .sb)"
-  [[ "$feature" != "$hidden_feature" ]]
+  [[ -n "$feature" ]]
 }
 
 policy_build_supported_enable_features_csv() {
@@ -5013,7 +5011,7 @@ policy_plan_finalize_optional_integrations() {
     policy_plan_optional_integrations_not_included+=("$feature")
   done
 
-  if policy_plan_optional_profile_required_by_selected_profiles "profiles/${policy_keychain_requirement_token}" || policy_plan_optional_profile_required_by_enabled_optional_profiles "profiles/${policy_keychain_requirement_token}"; then
+  if policy_plan_optional_profile_selected "profiles/${policy_keychain_requirement_token}" || policy_plan_optional_profile_required_by_selected_profiles "profiles/${policy_keychain_requirement_token}" || policy_plan_optional_profile_required_by_enabled_optional_profiles "profiles/${policy_keychain_requirement_token}"; then
     policy_plan_keychain_included=1
     policy_plan_append_optional_profile_key "profiles/${policy_keychain_requirement_token}" || true
   fi
@@ -5476,7 +5474,7 @@ policy_render_emit_integration_preamble() {
   else
     policy_render_write_line ";; Optional integrations not included: $(safehouse_join_by_space)"
   fi
-  policy_render_write_line ";; Keychain integration (auto-injected from profile requirements): ${keychain_status}"
+  policy_render_write_line ";; Keychain integration (explicitly enabled or auto-injected from profile requirements): ${keychain_status}"
   policy_render_write_line ";; Use --enable=<feature> (comma-separated) to include optional integrations explicitly."
   policy_render_write_line ";; Note: selected profiles and enabled optional integrations can inject dependencies via \$\$require=<profile-path>\$\$ metadata."
   policy_render_write_line ";; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox."
@@ -8050,6 +8048,7 @@ policy_embedded_optional_integration_features=(
   "cloud-credentials"
   "docker"
   "electron"
+  "keychain"
   "kubectl"
   "lldb"
   "macos-gui"
@@ -8092,7 +8091,7 @@ policy_dist_preassembled_core_integration_keys=(
   "profiles/50-integrations-core/ssh-agent-default-deny.sb"
 )
 
-policy_embedded_supported_enable_features="1password, agent-browser, browser-native-messaging, chromium-full, chromium-headless, cleanshot, clipboard, cloud-credentials, docker, electron, kubectl, lldb, macos-gui, microphone, playwright-chrome, process-control, shell-init, spotlight, ssh, vscode, xcode, all-agents, all-apps, wide-read"
+policy_embedded_supported_enable_features="1password, agent-browser, browser-native-messaging, chromium-full, chromium-headless, cleanshot, clipboard, cloud-credentials, docker, electron, keychain, kubectl, lldb, macos-gui, microphone, playwright-chrome, process-control, shell-init, spotlight, ssh, vscode, xcode, all-agents, all-apps, wide-read"
 
 policy_dist_emit_embedded_profile_requirement_tokens() {
   case "$1" in

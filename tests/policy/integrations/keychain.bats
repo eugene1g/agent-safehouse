@@ -15,6 +15,19 @@ load ../../test_helper.bash
   sft_assert_omits_source "$aider_profile" "55-integrations-optional/keychain.sb"
 }
 
+@test "[POLICY-ONLY] --enable=keychain explicitly includes keychain integration for opencode" {
+  local fake_home fake_opencode profile
+
+  fake_home="$(sft_fake_home)" || return 1
+  fake_opencode="${fake_home}/.local/bin/opencode"
+  sft_make_fake_command "$fake_opencode"
+
+  profile="$(HOME="$fake_home" safehouse_profile --enable=keychain -- "$fake_opencode")"
+
+  sft_assert_includes_source "$profile" "60-agents/opencode.sb"
+  sft_assert_includes_source "$profile" "55-integrations-optional/keychain.sb"
+}
+
 @test "[EXECUTION] security tool is denied by default but allowed for a keychain-enabled agent profile" {
   local keychain_policy non_keychain_policy
 

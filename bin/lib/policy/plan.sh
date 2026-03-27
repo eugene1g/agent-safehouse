@@ -376,7 +376,7 @@ policy_plan_finalize_optional_integrations() {
     policy_plan_optional_integrations_not_included+=("$feature")
   done
 
-  if policy_plan_optional_profile_required_by_selected_profiles "profiles/${policy_keychain_requirement_token}" || policy_plan_optional_profile_required_by_enabled_optional_profiles "profiles/${policy_keychain_requirement_token}"; then
+  if policy_plan_optional_profile_selected "profiles/${policy_keychain_requirement_token}" || policy_plan_optional_profile_required_by_selected_profiles "profiles/${policy_keychain_requirement_token}" || policy_plan_optional_profile_required_by_enabled_optional_profiles "profiles/${policy_keychain_requirement_token}"; then
     policy_plan_keychain_included=1
     policy_plan_append_optional_profile_key "profiles/${policy_keychain_requirement_token}" || true
   fi

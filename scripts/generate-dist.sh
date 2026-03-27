@@ -22,7 +22,6 @@ embedded_supported_enable_synthetic_features=(
   all-apps
   wide-read
 )
-embedded_hidden_optional_integration_feature="keychain"
 generator_metadata_helpers_loaded=0
 dist_preassembled_fixed_before_home_keys=()
 dist_preassembled_fixed_after_home_keys=()
@@ -238,9 +237,6 @@ collect_embedded_feature_catalog() {
 
   for rel_path in "${profile_files[@]}"; do
     feature="$(optional_integration_feature_from_profile_path "$rel_path")" || continue
-    if [[ "$feature" == "$embedded_hidden_optional_integration_feature" ]]; then
-      continue
-    fi
     embedded_optional_integration_features+=("$feature")
   done
 

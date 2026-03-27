@@ -39,6 +39,17 @@ load ../../test_helper.bash
   sft_assert_file_contains "$profile_log" "profile env defaults: PLAYWRIGHT_MCP_SANDBOX=false"
 }
 
+@test "--explain reports explicitly enabled keychain integration as included" {
+  local explain_log
+
+  explain_log="$(sft_workspace_path "explain-keychain.log")"
+
+  safehouse_ok --enable=keychain --explain --stdout -- /usr/bin/true >/dev/null 2>"$explain_log"
+
+  sft_assert_file_contains "$explain_log" "optional integrations explicitly enabled: keychain"
+  sft_assert_file_contains "$explain_log" "keychain integration: included"
+}
+
 @test "--explain reports command resolution details and debug hints" {
   local explain_log fake_cmd fake_cmd_name
 
