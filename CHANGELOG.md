@@ -10,6 +10,24 @@
 
 - No profiles changed.
 
+## [0.8.0] - 2026-03-27
+
+### Features
+
+- Added explicit `--enable=keychain` support so plugin-backed helper flows, including `opencode-claude-auth`, can opt into macOS Keychain access even when no built-in Safehouse profile auto-detects the requirement.
+
+### Chores
+
+- Added regression coverage and `--explain`/packaging assertions for explicit keychain enablement, and documented when to use `--enable=keychain` for plugin-driven credential flows.
+
+### Thanks
+
+- @ChristianKniep surfacing the plugin-backed OpenCode keychain access gap fixed in this release in [#71](https://github.com/eugene1g/agent-safehouse/issues/71).
+
+### Changed Sandboxing Profiles
+
+- [`keychain.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.7.0...v0.8.0#diff-a2a140b0b9d2a0c8819f343d379ecafb454d0f47b8b565b18a93a0b7d7bddaae): Made the Keychain integration explicitly user-enableable while keeping auto-injection for profiles that declare it as a dependency.
+
 ## [0.7.0] - 2026-03-27
 
 ### Upgrade Notes
