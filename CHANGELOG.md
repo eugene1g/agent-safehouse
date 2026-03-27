@@ -10,6 +10,24 @@
 
 - No profiles changed.
 
+## [0.9.0] - 2026-03-27
+
+### Features
+
+- Added an opt-in `--enable=cloud-storage` integration that grants the FileProvider and FileCoordination Mach lookups needed for macOS cloud storage mounts under `~/Library/CloudStorage`, so explicit grants into Google Drive, Dropbox, iCloud Drive, OneDrive, and other FileProvider-backed paths work as expected.
+
+### Chores
+
+- Added regression coverage for the new `cloud-storage` integration and documented when to enable it for FileProvider-backed macOS cloud storage paths.
+
+### Thanks
+
+- @thegalexc adding the `cloud-storage` integration for FileProvider XPC in [#73](https://github.com/eugene1g/agent-safehouse/pull/73).
+
+### Changed Sandboxing Profiles
+
+- [`cloud-storage.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.8.0...v0.9.0#diff-af9e3f2e414fe4097cda7de9bd3a1f3868c42c7dd70ae3cbe0b77eea1e42c5c8): Added opt-in FileProvider and FileCoordination Mach lookups so `--add-dirs` and `--add-dirs-ro` grants into macOS cloud storage mounts work without broadening access beyond the paths the user already grants.
+
 ## [0.8.0] - 2026-03-27
 
 ### Features
