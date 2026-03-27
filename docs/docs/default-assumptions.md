@@ -36,6 +36,7 @@ Enable only when required for the current task:
 - `clipboard`: clipboard read/write integration.
 - `cleanshot`: read access to CleanShot media captures.
 - `cloud-credentials`: cloud CLI credential stores.
+- `cloud-storage`: macOS FileProvider XPC services for cloud-synced paths (Google Drive, Dropbox, iCloud Drive, OneDrive).
 - `chromium-headless`: headless Chromium / Playwright shell access.
 - `chromium-full`: system Google Chrome and related full Chrome allowances.
 - `docker`: Docker socket and related access.
