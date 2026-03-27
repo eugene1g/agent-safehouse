@@ -10,6 +10,34 @@
 
 - No profiles changed.
 
+## [0.7.0] - 2026-03-27
+
+### Upgrade Notes
+
+- No special notes.
+
+### Features
+
+- `chromium-headless` now supports branded Google Chrome on macOS by allowing the `com.google.Chrome.*` Mach services and scoped Crashpad state needed for headless launches.
+
+### Bug Fixes
+
+- `shell-init` can now follow Homebrew-installed completion symlinks that resolve into GUI app bundle `Contents/Resources` paths, eliminating noisy `operation not permitted` output from zsh `compinit` without granting full app-bundle reads.
+
+### Chores
+
+- Added regression coverage for Homebrew GUI-app completion symlinks and refreshed the Claude Code end-to-end startup matcher so the macOS TUI suite stays aligned with the current Claude welcome screen.
+
+### Thanks
+
+- @thegalexc adding branded Google Chrome headless support in [#70](https://github.com/eugene1g/agent-safehouse/pull/70).
+- @pingvinen surfacing the Homebrew GUI completion noise fixed in this release in [#67](https://github.com/eugene1g/agent-safehouse/issues/67).
+
+### Changed Sandboxing Profiles
+
+- [`chromium-headless.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.6.0...v0.7.0#diff-9f6dc8d781704105880e2f6841f5783b98bf8e483bc6454f3ca1b9560c3fcdc8): Added branded Google Chrome Mach port and Crashpad access so headless Chrome can launch under `chromium-headless` instead of crashing during rendezvous or crashpad initialization.
+- [`shell-init.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.6.0...v0.7.0#diff-b4e8dd0043aab271dfa6bf04dec2110baca715ff9a4d6032d22f32ea88a3dd08): Allowed shell startup flows to follow Homebrew GUI-app completion symlinks into `Contents/Resources` while keeping access scoped to completion-like files.
+
 ## [0.6.0] - 2026-03-23
 
 ### Upgrade Notes
