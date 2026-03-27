@@ -35,6 +35,7 @@
 - `cleanshot`
 - `1password`
 - `cloud-credentials`
+- `cloud-storage`
 - `browser-native-messaging`
 - `shell-init`
 - `process-control`
