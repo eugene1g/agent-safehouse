@@ -26,6 +26,10 @@
     (home-literal "/.zshrc")                                          ;; Zsh interactive startup file read by interactive zsh sessions.
     (home-literal "/.zcompdump")                                      ;; Zsh completion dump cache used by compinit.
     (home-prefix "/.zcompdump")                                       ;; Versioned variants like .zcompdump-hostname-5.9.
+    (literal "/Applications")                                         ;; Ancestor traversal for Homebrew GUI-app completion symlink targets.
+    (literal "/System/Volumes/Data/Applications")                     ;; Data-backed /Applications alias used by some bundle resolution flows.
+    (regex #"^/Applications/[^/]+\.app/Contents/Resources(/[^/]+)*/(_[^/]+|[^/]+\.(bash|fish|zsh)|[^/]+\.(bash|fish|zsh)-completion)$") ;; App bundles conventionally keep auxiliary assets under Contents/Resources, and Homebrew casks may symlink completion files from anywhere in that tree.
+    (regex #"^/System/Volumes/Data/Applications/[^/]+\.app/Contents/Resources(/[^/]+)*/(_[^/]+|[^/]+\.(bash|fish|zsh)|[^/]+\.(bash|fish|zsh)-completion)$")
 
     ;; Fish startup files and universal variables.
     (literal "/private/etc/fish/config.fish")                         ;; Fish system config read on shell startup.
