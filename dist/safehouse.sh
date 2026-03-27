@@ -1239,7 +1239,7 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_chromium_full_sb__
 ;; ---------------------------------------------------------------------------
 ;; Integration: Chromium Headless
 ;; AppKit, crashpad, GPU, and launch-service allowances needed by headless
-;; Chromium/Playwright runtimes under Safehouse.
+;; Chromium/Playwright runtimes and branded Google Chrome under Safehouse.
 ;; Source: 55-integrations-optional/chromium-headless.sb
 ;; #safehouse-test-id:chromium-headless-integration#
 ;; #safehouse-test-id:chromium-headless-gpu#
@@ -1276,6 +1276,7 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_chromium_full_sb__
     (literal "/Library/Preferences/com.apple.HIToolbox.plist")
     (home-subpath "/Library/Preferences/com.apple.LaunchServices")
     (home-subpath "/Library/Application Support/CrashReporter")
+    (home-subpath "/Library/Application Support/Google/Chrome/Crashpad")  ;; Branded Google Chrome crashpad database
     (home-subpath "/Library/Spelling")
     (home-literal "/Library/Keyboard Layouts")
     (home-literal "/Library/Input Methods")
@@ -1288,6 +1289,8 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_chromium_full_sb__
 (allow mach-register
     (global-name-regex #"^org\.chromium\.Chromium\.MachPortRendezvousServer\.")
     (global-name-regex #"^org\.chromium\.crashpad\.child_port_handshake\.")
+    (global-name-regex #"^com\.google\.Chrome\.MachPortRendezvousServer\.")     ;; Branded Google Chrome uses com.google.Chrome.* instead of org.chromium.Chromium.*
+    (global-name-regex #"^com\.google\.Chrome\.crashpad\.child_port_handshake\.") ;; Branded Google Chrome crashpad handshake
     (local-name "com.apple.axserver")
     (local-name "com.apple.tsm.portname")
     (local-name "com.apple.coredrag")
@@ -1296,6 +1299,8 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_chromium_full_sb__
 (allow mach-lookup
     (global-name-regex #"^org\.chromium\.Chromium\.MachPortRendezvousServer\.")
     (global-name-regex #"^org\.chromium\.crashpad\.child_port_handshake\.")
+    (global-name-regex #"^com\.google\.Chrome\.MachPortRendezvousServer\.")     ;; Branded Google Chrome
+    (global-name-regex #"^com\.google\.Chrome\.crashpad\.child_port_handshake\.") ;; Branded Google Chrome crashpad
     (global-name "com.apple.MTLCompilerService")
     (global-name "com.apple.SafariPlatformSupport.Helper")
     (global-name "com.apple.CARenderServer")
@@ -1346,6 +1351,16 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_chromium_full_sb__
     (global-name "com.apple.naturallanguaged")
     (global-name "com.apple.inputanalyticsd")
     (global-name-prefix "com.apple.distributed_notifications@")
+)
+
+;; Branded Google Chrome crashpad database initialization requires xattr and write access.
+;; Chromium/Playwright typically uses a temp-dir profile that lands under /tmp (already allowed).
+;; Google Chrome defaults to ~/Library/Application Support/Google/Chrome/Crashpad.
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Google/Chrome/Crashpad")
+)
+(allow file-read-xattr file-write-xattr
+    (home-subpath "/Library/Application Support/Google/Chrome/Crashpad")
 )
 
 (allow system-fsctl
