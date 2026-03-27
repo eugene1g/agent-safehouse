@@ -12,7 +12,7 @@ load agent_tui_harness.bash
   local agent_home="${AGENT_TUI_WORKDIR}/claude-code-home"
   local config_dir="${AGENT_TUI_WORKDIR}/claude-code-config"
   local auth_log_path="${AGENT_TUI_ROOT}/claude-code-login.log"
-  local input_ready_pattern='Try \".+\"|/effort'
+  local input_ready_pattern='Try \".+\"|/effort|Welcome back!|❯'
   local trust_gate_pattern=""
   local permission_gate_pattern=""
   local restart_gate_pattern=""
