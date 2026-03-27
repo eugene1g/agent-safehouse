@@ -68,10 +68,7 @@ policy_optional_integration_feature_basename_from_profile_key() {
 
 policy_optional_integration_feature_is_user_exposed() {
   local feature="$1"
-  local hidden_feature=""
-
-  hidden_feature="$(basename "${policy_keychain_requirement_token}" .sb)"
-  [[ "$feature" != "$hidden_feature" ]]
+  [[ -n "$feature" ]]
 }
 
 policy_build_supported_enable_features_csv() {

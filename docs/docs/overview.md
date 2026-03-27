@@ -27,7 +27,7 @@ Each policy rule should answer one question:
 - LLDB/debugger toolchain access only when `--enable=lldb` is selected.
 - Xcode developer roots and per-user build/simulator state only when `--enable=xcode` is selected.
 - Agent/app-specific config grants scoped to the wrapped command.
-- Keychain/security integration when selected profiles declare keychain dependency metadata.
+- Keychain/security integration when `--enable=keychain` is selected or selected profiles declare keychain dependency metadata.
 - Core SCM integration profiles and related defaults for tools such as `git`, `gh`, and `glab`.
 - Sanitized runtime environment by default, with explicit opt-in controls for env pass-through and `SDKROOT` preserved when set.
 - Network access by default for registries, APIs, remotes, and MCP servers.

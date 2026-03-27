@@ -4,13 +4,15 @@
 load ../../test_helper.bash
 
 @test "[POLICY-ONLY] separate-form --enable parses representative optional integrations" {
-  local docker_profile shell_init_profile xcode_profile
+  local docker_profile keychain_profile shell_init_profile xcode_profile
 
   docker_profile="$(safehouse_profile --enable docker)"
+  keychain_profile="$(safehouse_profile --enable keychain)"
   shell_init_profile="$(safehouse_profile --enable shell-init)"
   xcode_profile="$(safehouse_profile --enable xcode)"
 
   sft_assert_includes_source "$docker_profile" "55-integrations-optional/docker.sb"
+  sft_assert_includes_source "$keychain_profile" "55-integrations-optional/keychain.sb"
   sft_assert_includes_source "$shell_init_profile" "55-integrations-optional/shell-init.sb"
   sft_assert_includes_source "$xcode_profile" "55-integrations-optional/xcode.sb"
   sft_assert_omits_source "$xcode_profile" "55-integrations-optional/lldb.sb"

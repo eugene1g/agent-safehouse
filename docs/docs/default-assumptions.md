@@ -40,6 +40,7 @@ Enable only when required for the current task:
 - `chromium-full`: system Google Chrome and related full Chrome allowances.
 - `docker`: Docker socket and related access.
 - `1password`: 1Password CLI/app integration paths.
+- `keychain`: macOS Keychain and `security`-tool access for credential-backed helper or plugin flows that need explicit opt-in.
 - `kubectl`: kube config/cache + krew state.
 - `shell-init`: shell startup/config file reads.
 - `ssh`: extended SSH agent socket and system SSH config integration.

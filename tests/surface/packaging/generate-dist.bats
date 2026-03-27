@@ -79,6 +79,11 @@ rewrite_file_with_sed() {
   sft_assert_file_contains "$custom_dist" "SAFEHOUSE_SELF_UPDATE_VALIDATION_MARKER=standalone-release-asset-v1"
   sft_assert_file_not_contains "$custom_dist" "apple-build-tools"
   sft_assert_file_not_contains "$custom_dist" "SAFEHOUSE_CLAUDE_POLICY_URL"
+
+  run "$custom_dist" --stdout --enable=keychain -- /usr/bin/true
+
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "$(sft_source_marker "55-integrations-optional/keychain.sb")"
 }
 
 @test "generate-dist.sh supports --output-dir without recreating deprecated dist artifacts" {

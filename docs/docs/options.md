@@ -23,6 +23,7 @@
 - `clipboard`
 - `docker`
 - `kubectl`
+- `keychain`
 - `macos-gui`
 - `microphone`
 - `electron` (implies `macos-gui`)
@@ -45,6 +46,8 @@
 - `wide-read`
 
 Common Apple shimmed developer tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are available by default via `profiles/30-toolchains/apple-toolchain-core.sb`; this is not an optional `--enable` feature.
+
+`keychain` is mainly for plugin or helper flows that need macOS credential access but are not auto-detected by a built-in Safehouse profile. For example, core `opencode` does not require keychain access, but plugin-based auth flows such as `opencode-claude-auth` can opt in with `--enable=keychain`.
 
 `vscode` is explicit cold-start editor integration for Visual Studio Code. For Claude's external-editor handoff:
 
