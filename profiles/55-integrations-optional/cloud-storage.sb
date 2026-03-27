@@ -1,0 +1,22 @@
+;; ---------------------------------------------------------------------------
+;; Integration: Cloud Storage
+;; FileProvider XPC access for macOS cloud storage mounts (Google Drive,
+;; Dropbox, iCloud Drive, OneDrive, and other FileProvider-based providers).
+;; Source: 55-integrations-optional/cloud-storage.sb
+;; ---------------------------------------------------------------------------
+
+;; macOS cloud storage providers mount under ~/Library/CloudStorage via the
+;; FileProvider framework.  Directory listing and file I/O on these paths is
+;; routed through XPC to the com.apple.FileProvider service.  Without this
+;; mach-lookup, sandbox file-read*/file-write* rules that cover CloudStorage
+;; paths are insufficient — readdir() and open() return EPERM because the
+;; underlying XPC call is blocked.
+;;
+;; com.apple.FileCoordination is included because FileProvider operations use
+;; coordinated reads/writes under the hood; without it, concurrent access from
+;; the provider extension and the sandboxed process can deadlock or fail.
+
+(allow mach-lookup
+    (global-name "com.apple.FileProvider")                                 ;; FileProvider XPC — routes I/O to cloud storage provider extensions.
+    (global-name "com.apple.FileCoordination")                             ;; Coordinated I/O — required for safe concurrent access with provider extensions.
+)
