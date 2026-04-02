@@ -2081,6 +2081,14 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_vscode_sb__
 
     ;; Direct plist read path used by cfprefsd-backed preference sync.
     (home-literal "/Library/Preferences/com.apple.dt.Xcode.plist")
+
+    ;; System-level Xcode license acceptance plist. xcodebuild reads this
+    ;; directly to check IDELastGMLicenseAgreedTo before any build or CLI
+    ;; operation. Without this, xcodebuild prompts to re-accept the license
+    ;; even though it was already accepted outside the sandbox via
+    ;; `sudo xcodebuild -license accept`.
+    (literal "/Library/Preferences")
+    (literal "/Library/Preferences/com.apple.dt.Xcode.plist")
 )
 
 (allow file-read* file-write*
@@ -2091,6 +2099,7 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_vscode_sb__
     (home-subpath "/Library/Developer/XCTestDevices")
     (home-subpath "/Library/Developer/CoreDevice")
     (home-subpath "/Library/Caches/com.apple.dt.Xcode")
+    (home-subpath "/Library/Caches/org.swift.swiftpm")             ;; Swift Package Manager resolution, manifest loading, and package cache.
 )
 
 (allow file-write*
@@ -2103,6 +2112,7 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_vscode_sb__
     (home-literal "/Library/Developer/CoreDevice")
     (home-literal "/Library/Caches")
     (home-literal "/Library/Caches/com.apple.dt.Xcode")
+    (home-literal "/Library/Caches/org.swift.swiftpm")
     (home-literal "/Library/Preferences/com.apple.dt.Xcode.plist")
 )
 
