@@ -4226,6 +4226,7 @@ policy_req_workdir_config_path=""
 policy_req_workdir_config_loaded=0
 policy_req_workdir_config_found=0
 policy_req_workdir_config_ignored_untrusted=0
+policy_req_allow_profile_writes=0
 policy_req_invoked_command_path=""
 policy_req_invoked_command_basename=""
 policy_req_invoked_command_profile_path=""
@@ -4363,6 +4364,7 @@ policy_request_reset() {
   policy_req_workdir_config_loaded=0
   policy_req_workdir_config_found=0
   policy_req_workdir_config_ignored_untrusted=0
+  policy_req_allow_profile_writes=0
   policy_req_invoked_command_path=""
   policy_req_invoked_command_basename=""
   policy_req_invoked_command_profile_path=""
@@ -4622,6 +4624,10 @@ policy_request_load_effective_workdir_config() {
   fi
 }
 
+policy_request_resolve_allow_profile_writes() {
+  policy_req_allow_profile_writes="$cli_policy_allow_profile_writes"
+}
+
 policy_request_merge_add_dir_inputs() {
   local config_ro_name="$1"
   local env_ro_name="$2"
@@ -4681,6 +4687,7 @@ policy_request_build() {
   policy_request_resolve_git_linked_worktree_access || return 1
   policy_request_resolve_append_profile_paths || return 1
   policy_request_load_effective_workdir_config config_add_dirs_ro_inputs config_add_dirs_rw_inputs || return 1
+  policy_request_resolve_allow_profile_writes
   policy_request_merge_add_dir_inputs \
     config_add_dirs_ro_inputs \
     env_add_dirs_ro_inputs \
@@ -5806,6 +5813,31 @@ policy_render_append_cli_profiles() {
   fi
 }
 
+policy_render_emit_append_profile_protections() {
+  local profile_path escaped_path
+  local cli_count
+
+  if [[ "$policy_req_allow_profile_writes" -eq 1 ]]; then
+    return 0
+  fi
+
+  cli_count="$(safehouse_array_length policy_req_append_profile_paths)"
+
+  if [[ "$cli_count" -eq 0 ]]; then
+    return 0
+  fi
+
+  policy_render_write_line ";; #safehouse-test-id:append-profile-protections# Deny agent writes to appended policy files."
+  policy_render_write_line ";; Use --allow-profile-writes to skip these deny rules."
+
+  for profile_path in "${policy_req_append_profile_paths[@]}"; do
+    escaped_path="$(safehouse_escape_for_sb "$profile_path")" || return 1
+    policy_render_write_line "(deny file-write* (literal \"${escaped_path}\"))"
+  done
+
+  policy_render_write_blank
+}
+
 policy_render_reset_output_state() {
   policy_render_close_target_fd
   policy_render_output_path=""
@@ -5873,6 +5905,7 @@ policy_render_emit_dynamic_sections() {
   policy_render_emit_wide_read_access
   policy_render_emit_workdir_access "$policy_req_effective_workdir" || return 1
   policy_render_append_cli_profiles || return 1
+  policy_render_emit_append_profile_protections || return 1
 }
 
 policy_render_emit_all_sections() {
@@ -6171,6 +6204,12 @@ policy_explain_print_summary() {
         echo "  selected scoped profile: ${profile} (${reason})"
       done
     fi
+    if [[ "$(safehouse_array_length policy_req_append_profile_paths)" -gt 0 ]]; then
+      echo "  cli appended profiles: $(safehouse_join_by_space "${policy_req_append_profile_paths[@]}")"
+    else
+      echo "  cli appended profiles: $(safehouse_join_by_space)"
+    fi
+    echo "  allow profile writes: $([[ "$policy_req_allow_profile_writes" -eq 1 ]] && echo "enabled" || echo "disabled (default)")"
     echo "  sandbox denial log hint: /usr/bin/log show --last 2m --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
   } >&2
 }
@@ -7456,6 +7495,13 @@ Policy scope options:
       Append an additional sandbox profile file after generated rules
       Repeatable; files are appended in argument order
 
+  --allow-profile-writes
+      Skip automatic deny-write rules for appended profile files.
+      By default, Safehouse emits a deny file-write* rule for each
+      --append-profile path so agents cannot modify loaded policy files.
+      Use this flag if you intentionally want the sandboxed process to
+      be able to write to appended profile files.
+
   --output PATH
   --output=PATH
       Write policy to a specific file path
@@ -7529,6 +7575,7 @@ cli_policy_workdir_value=""
 cli_policy_trust_workdir_config_set=0
 cli_policy_trust_workdir_config_value=0
 cli_policy_append_profiles=()
+cli_policy_allow_profile_writes=0
 cli_policy_output_path=""
 cli_policy_output_path_set=0
 cli_command_args=()
@@ -7556,6 +7603,7 @@ cli_parse_reset() {
   cli_policy_trust_workdir_config_set=0
   cli_policy_trust_workdir_config_value=0
   cli_policy_append_profiles=()
+  cli_policy_allow_profile_writes=0
   cli_policy_output_path=""
   cli_policy_output_path_set=0
   cli_command_args=()
@@ -7803,6 +7851,11 @@ cli_parse_policy_flag_option() {
     --trust-workdir-config)
       cli_policy_trust_workdir_config_set=1
       cli_policy_trust_workdir_config_value=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --allow-profile-writes)
+      cli_policy_allow_profile_writes=1
       cli_parse_consumed_args=1
       return 0
       ;;

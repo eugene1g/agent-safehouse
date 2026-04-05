@@ -20,6 +20,7 @@ cli_policy_workdir_value=""
 cli_policy_trust_workdir_config_set=0
 cli_policy_trust_workdir_config_value=0
 cli_policy_append_profiles=()
+cli_policy_allow_profile_writes=0
 cli_policy_output_path=""
 cli_policy_output_path_set=0
 cli_command_args=()
@@ -47,6 +48,7 @@ cli_parse_reset() {
   cli_policy_trust_workdir_config_set=0
   cli_policy_trust_workdir_config_value=0
   cli_policy_append_profiles=()
+  cli_policy_allow_profile_writes=0
   cli_policy_output_path=""
   cli_policy_output_path_set=0
   cli_command_args=()
@@ -294,6 +296,11 @@ cli_parse_policy_flag_option() {
     --trust-workdir-config)
       cli_policy_trust_workdir_config_set=1
       cli_policy_trust_workdir_config_value=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --allow-profile-writes)
+      cli_policy_allow_profile_writes=1
       cli_parse_consumed_args=1
       return 0
       ;;
