@@ -14,6 +14,7 @@ PROFILE_KEYS=(
   "profiles/30-toolchains/apple-toolchain-core.sb"
   "profiles/30-toolchains/bun.sb"
   "profiles/30-toolchains/deno.sb"
+  "profiles/30-toolchains/elixir.sb"
   "profiles/30-toolchains/go.sb"
   "profiles/30-toolchains/java.sb"
   "profiles/30-toolchains/node.sb"
@@ -446,6 +447,29 @@ __SAFEHOUSE_EMBEDDED_profiles_30_toolchains_bun_sb__
     (home-subpath "/Library/Caches/deno")
 )
 __SAFEHOUSE_EMBEDDED_profiles_30_toolchains_deno_sb__
+      ;;
+    "profiles/30-toolchains/elixir.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_30_toolchains_elixir_sb__'
+;; ---------------------------------------------------------------------------
+;; Toolchain: Elixir
+;; Elixir runtime, Mix build tool, and Hex package manager paths.
+;; Source: 30-toolchains/elixir.sb
+;; ---------------------------------------------------------------------------
+
+;; Covers Mix archives (Hex, Rebar3) and the Hex package cache.
+;; Runtime binaries installed via mise/asdf are already covered by runtime-managers.sb.
+
+(allow file-read* file-write*
+    ;; Mix home: archives (hex), escripts, and Mix task cache.
+    (home-subpath "/.mix")
+
+    ;; Hex package manager: downloaded package tarballs and registry cache.
+    (home-subpath "/.hex")
+
+    ;; Mix configuration
+    (home-literal "/.mix.exs")
+)
+__SAFEHOUSE_EMBEDDED_profiles_30_toolchains_elixir_sb__
       ;;
     "profiles/30-toolchains/go.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_30_toolchains_go_sb__'
@@ -8099,6 +8123,7 @@ policy_dist_preassembled_fixed_after_home_keys=(
   "profiles/30-toolchains/apple-toolchain-core.sb"
   "profiles/30-toolchains/bun.sb"
   "profiles/30-toolchains/deno.sb"
+  "profiles/30-toolchains/elixir.sb"
   "profiles/30-toolchains/go.sb"
   "profiles/30-toolchains/java.sb"
   "profiles/30-toolchains/node.sb"
@@ -8139,6 +8164,9 @@ policy_dist_emit_embedded_profile_requirement_tokens() {
       :
       ;;
     "profiles/30-toolchains/deno.sb")
+      :
+      ;;
+    "profiles/30-toolchains/elixir.sb")
       :
       ;;
     "profiles/30-toolchains/go.sb")
@@ -8338,6 +8366,9 @@ policy_dist_emit_embedded_profile_command_alias_tokens() {
     "profiles/30-toolchains/deno.sb")
       printf '%s\n' "deno"
       ;;
+    "profiles/30-toolchains/elixir.sb")
+      printf '%s\n' "elixir"
+      ;;
     "profiles/30-toolchains/go.sb")
       printf '%s\n' "go"
       ;;
@@ -8533,6 +8564,9 @@ policy_dist_emit_embedded_profile_exec_env_defaults() {
       :
       ;;
     "profiles/30-toolchains/deno.sb")
+      :
+      ;;
+    "profiles/30-toolchains/elixir.sb")
       :
       ;;
     "profiles/30-toolchains/go.sb")
@@ -9048,6 +9082,26 @@ policy_dist_append_preassembled_fixed_after_home() {
     (home-subpath "/.deno")
     (home-subpath "/.cache/deno")
     (home-subpath "/Library/Caches/deno")
+)
+
+;; ---------------------------------------------------------------------------
+;; Toolchain: Elixir
+;; Elixir runtime, Mix build tool, and Hex package manager paths.
+;; Source: 30-toolchains/elixir.sb
+;; ---------------------------------------------------------------------------
+
+;; Covers Mix archives (Hex, Rebar3) and the Hex package cache.
+;; Runtime binaries installed via mise/asdf are already covered by runtime-managers.sb.
+
+(allow file-read* file-write*
+    ;; Mix home: archives (hex), escripts, and Mix task cache.
+    (home-subpath "/.mix")
+
+    ;; Hex package manager: downloaded package tarballs and registry cache.
+    (home-subpath "/.hex")
+
+    ;; Mix configuration
+    (home-literal "/.mix.exs")
 )
 
 ;; ---------------------------------------------------------------------------

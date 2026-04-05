@@ -15,7 +15,7 @@ load ../../test_helper.bash
 
 @test "[POLICY-ONLY] default profile includes the always-on toolchain catalog" {
   local profile toolchain
-  local -a toolchains=(apple-toolchain-core bun deno go java node perl php python ruby runtime-managers rust)
+  local -a toolchains=(apple-toolchain-core bun deno elixir go java node perl php python ruby runtime-managers rust)
 
   profile="$(safehouse_profile)"
 

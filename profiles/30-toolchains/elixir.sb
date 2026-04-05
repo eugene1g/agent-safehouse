@@ -1,0 +1,16 @@
+;; ---------------------------------------------------------------------------
+;; Toolchain: Elixir
+;; Elixir runtime, Mix build tool, and Hex package manager paths.
+;; Source: 30-toolchains/elixir.sb
+;; ---------------------------------------------------------------------------
+
+;; Covers Mix archives and the Hex package cache.
+;; Runtime binaries installed via mise/asdf are already covered by runtime-managers.sb.
+
+(allow file-read* file-write*
+    ;; Mix home: archives, escripts, and Mix task cache.
+    (home-subpath "/.mix")
+
+    ;; Hex package manager: downloaded package tarballs and registry cache.
+    (home-subpath "/.hex")
+)
