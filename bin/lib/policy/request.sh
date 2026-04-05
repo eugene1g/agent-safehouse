@@ -29,6 +29,7 @@ policy_req_workdir_config_path=""
 policy_req_workdir_config_loaded=0
 policy_req_workdir_config_found=0
 policy_req_workdir_config_ignored_untrusted=0
+policy_req_workdir_config_append_profile_paths=()
 policy_req_invoked_command_path=""
 policy_req_invoked_command_basename=""
 policy_req_invoked_command_profile_path=""
@@ -82,12 +83,19 @@ policy_request_load_workdir_config_into_arrays() {
   local config_path="$1"
   local ro_target_name="$2"
   local rw_target_name="$3"
+  local enable_target_name="$4"
+  local append_profile_target_name="$5"
   local line trimmed key raw_value value
   local line_number=0
+  local config_dir resolved_profile_path
 
   safehouse_array_clear "$ro_target_name"
   safehouse_array_clear "$rw_target_name"
+  safehouse_array_clear "$enable_target_name"
+  safehouse_array_clear "$append_profile_target_name"
   [[ -f "$config_path" ]] || return 0
+
+  config_dir="$(dirname "$config_path")"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
     line_number=$((line_number + 1))
@@ -114,10 +122,22 @@ policy_request_load_workdir_config_into_arrays() {
       add-dirs|add_dirs|SAFEHOUSE_ADD_DIRS)
         safehouse_array_append "$rw_target_name" "$value"
         ;;
+      enable)
+        safehouse_array_append "$enable_target_name" "$value"
+        ;;
+      append-profile)
+        safehouse_validate_sb_string "$value" "append-profile path in workdir config" || return 1
+        if [[ "$value" != /* ]]; then
+          resolved_profile_path="${config_dir%/}/${value}"
+        else
+          resolved_profile_path="$value"
+        fi
+        safehouse_array_append "$append_profile_target_name" "$resolved_profile_path"
+        ;;
       *)
         safehouse_fail \
-          "Invalid config key in ${config_path}:${line_number}: ${key}" \
-          "Supported keys: add-dirs-ro, add-dirs"
+          "Unknown key in workdir config: ${key}" \
+          "Supported keys: add-dirs-ro, add-dirs, enable, append-profile"
         return 1
         ;;
     esac
@@ -166,6 +186,7 @@ policy_request_reset() {
   policy_req_workdir_config_loaded=0
   policy_req_workdir_config_found=0
   policy_req_workdir_config_ignored_untrusted=0
+  safehouse_array_clear policy_req_workdir_config_append_profile_paths
   policy_req_invoked_command_path=""
   policy_req_invoked_command_basename=""
   policy_req_invoked_command_profile_path=""
@@ -393,6 +414,9 @@ policy_request_resolve_append_profile_paths() {
 policy_request_load_effective_workdir_config() {
   local ro_target_name="$1"
   local rw_target_name="$2"
+  local -a config_enable_values=()
+  local -a config_append_profile_paths=()
+  local enable_value profile_path
 
   safehouse_array_clear "$ro_target_name"
   safehouse_array_clear "$rw_target_name"
@@ -413,7 +437,21 @@ policy_request_load_effective_workdir_config() {
         safehouse_fail "Workdir config file is not readable: $policy_req_workdir_config_path"
         return 1
       fi
-      policy_request_load_workdir_config_into_arrays "$policy_req_workdir_config_path" "$ro_target_name" "$rw_target_name" || return 1
+      policy_request_load_workdir_config_into_arrays \
+        "$policy_req_workdir_config_path" \
+        "$ro_target_name" \
+        "$rw_target_name" \
+        config_enable_values \
+        config_append_profile_paths || return 1
+
+      for enable_value in "${config_enable_values[@]}"; do
+        policy_request_parse_enable_csv "$enable_value" || return 1
+      done
+
+      for profile_path in "${config_append_profile_paths[@]}"; do
+        safehouse_array_append policy_req_workdir_config_append_profile_paths "$profile_path"
+      done
+
       policy_req_workdir_config_loaded=1
     fi
     return 0
