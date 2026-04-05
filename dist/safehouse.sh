@@ -4226,6 +4226,7 @@ policy_req_workdir_config_path=""
 policy_req_workdir_config_loaded=0
 policy_req_workdir_config_found=0
 policy_req_workdir_config_ignored_untrusted=0
+policy_req_allow_workdir_config_writes=0
 policy_req_invoked_command_path=""
 policy_req_invoked_command_basename=""
 policy_req_invoked_command_profile_path=""
@@ -4363,6 +4364,7 @@ policy_request_reset() {
   policy_req_workdir_config_loaded=0
   policy_req_workdir_config_found=0
   policy_req_workdir_config_ignored_untrusted=0
+  policy_req_allow_workdir_config_writes=0
   policy_req_invoked_command_path=""
   policy_req_invoked_command_basename=""
   policy_req_invoked_command_profile_path=""
@@ -4622,6 +4624,10 @@ policy_request_load_effective_workdir_config() {
   fi
 }
 
+policy_request_resolve_allow_workdir_config_writes() {
+  policy_req_allow_workdir_config_writes="$cli_policy_allow_workdir_config_writes"
+}
+
 policy_request_merge_add_dir_inputs() {
   local config_ro_name="$1"
   local env_ro_name="$2"
@@ -4681,6 +4687,7 @@ policy_request_build() {
   policy_request_resolve_git_linked_worktree_access || return 1
   policy_request_resolve_append_profile_paths || return 1
   policy_request_load_effective_workdir_config config_add_dirs_ro_inputs config_add_dirs_rw_inputs || return 1
+  policy_request_resolve_allow_workdir_config_writes
   policy_request_merge_add_dir_inputs \
     config_add_dirs_ro_inputs \
     env_add_dirs_ro_inputs \
@@ -5868,11 +5875,26 @@ policy_render_emit_scoped_sections() {
   policy_render_append_scoped_module_dir "profiles/65-apps" || return 1
 }
 
+# Emit terminal deny rules that must survive all path grants.
+# These are always last so no (allow file-write* (subpath …)) from workdir,
+# extra-access-rules, wide-read, or appended profiles can override them.
+policy_render_emit_terminal_deny_rules() {
+  # Keep safehouse configs safe
+  if [[ "$policy_req_allow_workdir_config_writes" -eq 1 ]]; then
+    return 0
+  fi
+  policy_render_write_line ";; #safehouse-test-id:terminal-deny-safehouse# Terminal deny rules are emitted last so they override any earlier path grants."
+  policy_render_write_line ";; Agents must never modify Safehouse config files regardless of workdir grants."
+  policy_render_write_line "(deny file-write* (regex #\"/\\.safehouse\$\"))"
+  policy_render_write_blank
+}
+
 policy_render_emit_dynamic_sections() {
   policy_render_emit_extra_access_rules || return 1
   policy_render_emit_wide_read_access
   policy_render_emit_workdir_access "$policy_req_effective_workdir" || return 1
   policy_render_append_cli_profiles || return 1
+  policy_render_emit_terminal_deny_rules || return 1
 }
 
 policy_render_emit_all_sections() {
@@ -6171,6 +6193,7 @@ policy_explain_print_summary() {
         echo "  selected scoped profile: ${profile} (${reason})"
       done
     fi
+    echo "  allow workdir config writes: $([[ "$policy_req_allow_workdir_config_writes" -eq 1 ]] && echo "enabled" || echo "disabled (default)")"
     echo "  sandbox denial log hint: /usr/bin/log show --last 2m --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
   } >&2
 }
@@ -7451,6 +7474,14 @@ Policy scope options:
   --trust-workdir-config=BOOL
       Trust and load <workdir>/.safehouse (default: disabled)
 
+  --allow-workdir-config-writes
+      Skip the terminal deny-write rule for .safehouse config files.
+      By default, Safehouse always emits a deny file-write* rule for any
+      .safehouse file as the very last rule in the policy, ensuring agents
+      cannot modify workdir config regardless of path grants. Use this flag
+      only if you intentionally want the sandboxed process to be able to
+      write to .safehouse files.
+
   --append-profile PATH
   --append-profile=PATH
       Append an additional sandbox profile file after generated rules
@@ -7528,6 +7559,7 @@ cli_policy_workdir_set=0
 cli_policy_workdir_value=""
 cli_policy_trust_workdir_config_set=0
 cli_policy_trust_workdir_config_value=0
+cli_policy_allow_workdir_config_writes=0
 cli_policy_append_profiles=()
 cli_policy_output_path=""
 cli_policy_output_path_set=0
@@ -7555,6 +7587,7 @@ cli_parse_reset() {
   cli_policy_workdir_value=""
   cli_policy_trust_workdir_config_set=0
   cli_policy_trust_workdir_config_value=0
+  cli_policy_allow_workdir_config_writes=0
   cli_policy_append_profiles=()
   cli_policy_output_path=""
   cli_policy_output_path_set=0
@@ -7818,6 +7851,11 @@ cli_parse_policy_flag_option() {
         return 1
       fi
       cli_policy_trust_workdir_config_set=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --allow-workdir-config-writes)
+      cli_policy_allow_workdir_config_writes=1
       cli_parse_consumed_args=1
       return 0
       ;;

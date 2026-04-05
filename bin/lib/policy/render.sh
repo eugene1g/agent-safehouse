@@ -715,11 +715,26 @@ policy_render_emit_scoped_sections() {
   policy_render_append_scoped_module_dir "profiles/65-apps" || return 1
 }
 
+# Emit terminal deny rules that must survive all path grants.
+# These are always last so no (allow file-write* (subpath …)) from workdir,
+# extra-access-rules, wide-read, or appended profiles can override them.
+policy_render_emit_terminal_deny_rules() {
+  # Keep safehouse configs safe
+  if [[ "$policy_req_allow_workdir_config_writes" -eq 1 ]]; then
+    return 0
+  fi
+  policy_render_write_line ";; #safehouse-test-id:terminal-deny-safehouse# Terminal deny rules are emitted last so they override any earlier path grants."
+  policy_render_write_line ";; Agents must never modify Safehouse config files regardless of workdir grants."
+  policy_render_write_line "(deny file-write* (regex #\"/\\.safehouse\$\"))"
+  policy_render_write_blank
+}
+
 policy_render_emit_dynamic_sections() {
   policy_render_emit_extra_access_rules || return 1
   policy_render_emit_wide_read_access
   policy_render_emit_workdir_access "$policy_req_effective_workdir" || return 1
   policy_render_append_cli_profiles || return 1
+  policy_render_emit_terminal_deny_rules || return 1
 }
 
 policy_render_emit_all_sections() {

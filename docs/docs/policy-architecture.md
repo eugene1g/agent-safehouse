@@ -17,6 +17,7 @@ Policy assembly order:
 | `65-apps/*.sb` | Per-app bundle selection (`Claude.app`, `Visual Studio Code.app`) |
 | Config/env/CLI grants | Trusted `.safehouse` config, env grants, CLI grants, auto-detected app bundle read grant, selected workdir, launch-time active-worktree common-dir grant, and launch-time sibling worktree read grants |
 | Appended profiles | User profile overlays via `--append-profile` (loaded last) |
+| Terminal deny rules | Unconditional deny rules emitted after all path grants and appended profiles |
 
 ## Ordering Rules Matter
 
@@ -78,5 +79,11 @@ It is not a blanket grant for `$HOME`.
 Safehouse also generates a `file-read-metadata` block for `/`, the path to `$HOME`, and `$HOME` itself. That metadata-only traversal lets runtimes `stat` or walk toward explicitly allowed home-scoped paths without granting recursive reads of the whole home directory.
 
 In practice, that means `stat "$HOME"` can succeed while `ls "$HOME"` and `cat ~/secret.txt` still fail unless a more specific rule grants them.
+
+## Terminal Deny Rules
+
+To prevent accidentally granting access to some critical files Safehouse unconditionally emits a final deny block as the very last section of every generated policy. Since this block is always last, it wins over any earlier write grant regardless of how the workdir, additional profiles, etc are configured.
+
+Currently this is used to protect the `.safehouse` configuration file from being modified from inside the sandbox. To opt out pass `--allow-workdir-config-writes`.
 
 See also: [Bin Architecture](/docs/bin-architecture)

@@ -72,3 +72,24 @@ load ../../test_helper.bash
   sft_assert_contains "$output" ".safehouse:1: allow-home"
   sft_assert_contains "$output" "Supported keys: add-dirs-ro, add-dirs"
 }
+
+@test "[POLICY-ONLY] generated policy contains terminal deny sentinel for .safehouse writes" {
+  local profile
+
+  profile="$(safehouse_profile)"
+  sft_assert_contains "$profile" "#safehouse-test-id:terminal-deny-safehouse#"
+}
+
+@test "[POLICY-ONLY] terminal deny rule appears after workdir grant" {
+  local profile
+
+  profile="$(safehouse_profile)"
+  sft_assert_order "$profile" "#safehouse-test-id:workdir-grant#" "#safehouse-test-id:terminal-deny-safehouse#"
+}
+
+@test "[POLICY-ONLY] --allow-workdir-config-writes suppresses the terminal deny rule" {
+  local profile
+
+  profile="$(safehouse_profile --allow-workdir-config-writes)"
+  sft_assert_not_contains "$profile" "terminal-deny-safehouse"
+}
