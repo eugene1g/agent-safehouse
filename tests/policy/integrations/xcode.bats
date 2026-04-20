@@ -19,3 +19,13 @@ load ../../test_helper.bash
   sft_assert_omits_source "$profile" "55-integrations-optional/lldb.sb"
   sft_assert_omits_source "$profile" "55-integrations-optional/process-control.sb"
 }
+
+@test "[POLICY-ONLY] enable=xcode grants the full CoreSimulator mach namespace for simulator builds" {
+  local profile
+  profile="$(safehouse_profile --enable=xcode)"
+
+  # Simulator-targeted xcodebuild / actool / simctl enumerate runtimes via
+  # simdiskimaged in addition to CoreSimulatorService. The namespace regex
+  # covers both plus future sub-services (SimulatorTrampoline, SimDevice.*).
+  sft_assert_contains "$profile" '(global-name-regex #"^com\.apple\.CoreSimulator(\.|$)")'
+}
