@@ -81,8 +81,14 @@
 )
 
 ;; Simulator/device tooling uses these developer services when present.
+;; CoreSimulator is covered by a namespace regex because iOS/watchOS/tvOS
+;; simulator runtimes are mounted as APFS cryptex volumes managed by
+;; simdiskimaged; enumerating them (needed by xcodebuild, actool, simctl,
+;; and SwiftUI previews targeting *simulator SDKs) requires both
+;; CoreSimulatorService and simdiskimaged, plus per-device SimDevice.*
+;; endpoints once a simulator is booted.
 (allow mach-lookup
-    (global-name "com.apple.CoreSimulator.CoreSimulatorService")
+    (global-name-regex #"^com\.apple\.CoreSimulator(\.|$)")          ;; CoreSimulatorService, simdiskimaged, SimulatorTrampoline, and per-device SimDevice.* endpoints.
     (global-name "com.apple.remoted.coredevice")                     ;; CoreDevice transport used by physical-device tooling.
     (global-name "com.apple.CoreDevice.remotepairingd")              ;; Remote pairing service used by devicectl/device flows.
     (global-name-regex #"^com\.apple\.coredevice\.devicemanager(\.|$)")  ;; CoreDevice manager variants for paired-device operations.
