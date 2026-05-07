@@ -8,6 +8,7 @@
 | `--add-dirs-ro=PATHS` | Colon-separated file/directory paths to grant read-only |
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
+| `--allow-workdir-config-writes` | Skip the terminal deny-write rule for `.safehouse` config files (default: deny) |
 | `--append-profile=PATH` | Append sandbox profile file after generated rules (repeatable) |
 | `--enable=FEATURES` | Enable optional features (see list below) |
 | `--env` | Pass the full inherited host env to the wrapped command, including secrets (incompatible with `--env-pass`) |
