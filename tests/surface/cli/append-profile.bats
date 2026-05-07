@@ -63,3 +63,35 @@ load ../../test_helper.bash
     -- /bin/sh -c "printf '%s' granted > '$target_file'"
   sft_assert_file_content "$target_file" "granted"
 }
+
+@test "[POLICY-ONLY] --append-profile adds deny-write rule for the profile file" {
+  local profile_file profile
+
+  profile_file="$(sft_workspace_path "protect.sb")" || return 1
+  printf ';; custom-sentinel\n' > "$profile_file"
+
+  profile="$(safehouse_profile --append-profile="$profile_file")"
+  sft_assert_contains "$profile" "#safehouse-test-id:append-profile-protections#"
+  sft_assert_contains "$profile" "(deny file-write* (literal \"${profile_file}\"))"
+}
+
+@test "[POLICY-ONLY] --allow-profile-writes suppresses the deny-write rule" {
+  local profile_file profile
+
+  profile_file="$(sft_workspace_path "noprotect.sb")" || return 1
+  printf ';; custom-sentinel\n' > "$profile_file"
+
+  profile="$(safehouse_profile --append-profile="$profile_file" --allow-profile-writes)"
+  sft_assert_not_contains "$profile" "append-profile-protections"
+}
+
+@test "[POLICY-ONLY] --append-profile deny rule appears after the profile content" {
+  local profile_file profile sentinel
+
+  profile_file="$(sft_workspace_path "order-check.sb")" || return 1
+  sentinel=";; order-sentinel-12345"
+  printf '%s\n' "$sentinel" > "$profile_file"
+
+  profile="$(safehouse_profile --append-profile="$profile_file")"
+  sft_assert_order "$profile" "order-sentinel-12345" "#safehouse-test-id:append-profile-protections#"
+}

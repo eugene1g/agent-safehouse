@@ -229,6 +229,12 @@ policy_explain_print_summary() {
         echo "  selected scoped profile: ${profile} (${reason})"
       done
     fi
+    if [[ "$(safehouse_array_length policy_req_append_profile_paths)" -gt 0 ]]; then
+      echo "  cli appended profiles: $(safehouse_join_by_space "${policy_req_append_profile_paths[@]}")"
+    else
+      echo "  cli appended profiles: $(safehouse_join_by_space)"
+    fi
+    echo "  allow profile writes: $([[ "$policy_req_allow_profile_writes" -eq 1 ]] && echo "enabled" || echo "disabled (default)")"
     echo "  sandbox denial log hint: /usr/bin/log show --last 2m --style compact --predicate 'eventMessage CONTAINS \"Sandbox:\" AND eventMessage CONTAINS \"deny(\"'"
   } >&2
 }

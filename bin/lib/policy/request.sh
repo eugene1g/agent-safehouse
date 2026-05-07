@@ -29,6 +29,7 @@ policy_req_workdir_config_path=""
 policy_req_workdir_config_loaded=0
 policy_req_workdir_config_found=0
 policy_req_workdir_config_ignored_untrusted=0
+policy_req_allow_profile_writes=0
 policy_req_invoked_command_path=""
 policy_req_invoked_command_basename=""
 policy_req_invoked_command_profile_path=""
@@ -166,6 +167,7 @@ policy_request_reset() {
   policy_req_workdir_config_loaded=0
   policy_req_workdir_config_found=0
   policy_req_workdir_config_ignored_untrusted=0
+  policy_req_allow_profile_writes=0
   policy_req_invoked_command_path=""
   policy_req_invoked_command_basename=""
   policy_req_invoked_command_profile_path=""
@@ -425,6 +427,10 @@ policy_request_load_effective_workdir_config() {
   fi
 }
 
+policy_request_resolve_allow_profile_writes() {
+  policy_req_allow_profile_writes="$cli_policy_allow_profile_writes"
+}
+
 policy_request_merge_add_dir_inputs() {
   local config_ro_name="$1"
   local env_ro_name="$2"
@@ -484,6 +490,7 @@ policy_request_build() {
   policy_request_resolve_git_linked_worktree_access || return 1
   policy_request_resolve_append_profile_paths || return 1
   policy_request_load_effective_workdir_config config_add_dirs_ro_inputs config_add_dirs_rw_inputs || return 1
+  policy_request_resolve_allow_profile_writes
   policy_request_merge_add_dir_inputs \
     config_add_dirs_ro_inputs \
     env_add_dirs_ro_inputs \

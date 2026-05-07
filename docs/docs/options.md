@@ -9,6 +9,7 @@
 | `--workdir=DIR` | Main directory to grant read/write (`--workdir=` disables automatic workdir grants) |
 | `--trust-workdir-config` | Trust and load `<workdir>/.safehouse` (`--trust-workdir-config=BOOL` also supported) |
 | `--append-profile=PATH` | Append sandbox profile file after generated rules (repeatable) |
+| `--allow-profile-writes` | Skip automatic deny-write rules for `--append-profile` files (default: deny) |
 | `--enable=FEATURES` | Enable optional features (see list below) |
 | `--env` | Pass the full inherited host env to the wrapped command, including secrets (incompatible with `--env-pass`) |
 | `--env=FILE` | Start from sanitized env and source extra values from `FILE` |
