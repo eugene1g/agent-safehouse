@@ -70,7 +70,7 @@ policy_explain_prepare_runtime_debug_environment() {
 
 policy_explain_print_summary() {
   local workdir_status config_status keychain_status exec_env_status env_pass_names_status profile_env_defaults_status
-  local git_worktree_common_dir_status git_worktree_paths_status
+  local git_worktree_common_dir_status git_worktree_paths_status trusted_workdirs_status trust_source_display
   local idx profile reason
   local host_command_matches execution_command_matches execution_path shell_wrapper_note runtime_debug_env_available=0
 
@@ -156,6 +156,27 @@ policy_explain_print_summary() {
     execution_command_matches="$(policy_explain_path_matches "${policy_req_invoked_command_path}" "$execution_path")"
   fi
 
+  if [[ "${#policy_req_trusted_workdirs[@]}" -gt 0 ]]; then
+    trusted_workdirs_status="$(safehouse_join_by_space "${policy_req_trusted_workdirs[@]}")"
+  else
+    trusted_workdirs_status="$(safehouse_join_by_space)"
+  fi
+
+  case "${policy_req_trust_workdir_config_source:-default}" in
+    --always-trust-workdir-config)
+      trust_source_display="--always-trust-workdir-config (persisted to ${policy_req_trusted_workdirs_path})"
+      ;;
+    --trust-workdir-config)
+      trust_source_display="--trust-workdir-config (this session only)"
+      ;;
+    trusted-workdirs)
+      trust_source_display="${policy_req_trusted_workdirs_path}"
+      ;;
+    *)
+      trust_source_display="${policy_req_trust_workdir_config_source:-default}"
+      ;;
+  esac
+
   shell_wrapper_note=""
   if [[ -n "${policy_req_invoked_command_path:-}" && "${policy_req_invoked_command_path}" != */* ]]; then
     shell_wrapper_note="interactive-shell aliases/functions are not introspected; run \`type -a ${policy_req_invoked_command_path}\` in your shell if wrapper resolution may matter"
@@ -164,7 +185,8 @@ policy_explain_print_summary() {
   {
     echo "safehouse explain:"
     echo "  effective workdir: ${workdir_status} (source: ${policy_req_effective_workdir_source:-unknown})"
-    echo "  workdir config trust: $([[ "$policy_req_trust_workdir_config" -eq 1 ]] && echo "enabled" || echo "disabled") (source: ${policy_req_trust_workdir_config_source})"
+    echo "  trusted workdirs: ${trusted_workdirs_status}"
+    echo "  workdir config trust: $([[ "$policy_req_trust_workdir_config" -eq 1 ]] && echo "enabled" || echo "disabled") (source: ${trust_source_display})"
     echo "  workdir config: ${config_status}"
     echo "  git worktree common dir grant: ${git_worktree_common_dir_status}"
     echo "  git linked worktree read grants: ${git_worktree_paths_status}"
