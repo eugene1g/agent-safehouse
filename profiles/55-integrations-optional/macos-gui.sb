@@ -143,6 +143,8 @@
     (global-name "com.apple.proactive.app-client.donation")
     ;; Distributed notifications (per-user suffix varies)
     (global-name-prefix "com.apple.distributed_notifications@")
+    ;; Finder drag-and-drop coordination for GUI apps.
+    (local-name "com.apple.coredrag")
 )
 
 ;; Per-pid mach port registrations for accessibility, text input, and drag-and-drop
