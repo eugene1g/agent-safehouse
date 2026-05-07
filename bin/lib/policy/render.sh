@@ -653,6 +653,18 @@ policy_render_append_cli_profiles() {
   fi
 }
 
+policy_render_append_workdir_config_profiles() {
+  local profile_path
+
+  if [[ "$(safehouse_array_length policy_req_workdir_config_append_profile_paths)" -gt 0 ]]; then
+    for profile_path in "${policy_req_workdir_config_append_profile_paths[@]}"; do
+      policy_render_write_line ";; #safehouse-test-id:workdir-config-append-profile# Appended profile from workdir config: ${profile_path}"
+      policy_render_write_blank
+      policy_render_append_profile "$profile_path" || return 1
+    done
+  fi
+}
+
 policy_render_reset_output_state() {
   policy_render_close_target_fd
   policy_render_output_path=""
@@ -719,6 +731,7 @@ policy_render_emit_dynamic_sections() {
   policy_render_emit_extra_access_rules || return 1
   policy_render_emit_wide_read_access
   policy_render_emit_workdir_access "$policy_req_effective_workdir" || return 1
+  policy_render_append_workdir_config_profiles || return 1
   policy_render_append_cli_profiles || return 1
 }
 
