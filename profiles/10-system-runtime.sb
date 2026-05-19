@@ -84,6 +84,20 @@
 (allow mach-priv-task-port (target same-sandbox))                     ;; Required by some runtimes for same-sandbox process controls.
 (allow pseudo-tty)                                                    ;; Required for interactive terminal sessions and PTY allocation.
 
+;; TTY ioctls are a separate file-ioctl category in SBPL — `pseudo-tty`
+;; only covers /dev/ptmx allocation, not ioctls on the resulting tty fd.
+;; Without these, tcsetattr (TIOCSETAW = _IO('t',21)) and ptsname's
+;; TIOCPTYGNAME are denied, so any agent that switches the terminal to
+;; raw mode silently fails: the kernel keeps the line in cooked mode while
+;; the agent thinks it owns it, and every keypress + capability-query reply
+;; leaks into the agent's input buffer as literal escape sequences.
+(allow file-ioctl
+    (literal "/dev/tty")                                              ;; Controlling-terminal ioctls for foreground-process-group control.
+    (literal "/dev/ptmx")                                             ;; grantpt/unlockpt/ptsname ioctls on the PTY master.
+    (regex #"^/dev/ttys")                                             ;; tcsetattr/tcgetattr and window-size ioctls on macOS slave ttys.
+    (regex #"^/dev/pty")                                              ;; Legacy PTY naming used by some tools.
+)
+
 ; Broader permissions to get info of other processes for debugging
 ;(allow process-info-pidinfo)                                          ;; Process status polling for child supervision and cleanup.
 ;(allow process-info-setcontrol)                                       ;; Process control metadata updates used by CLI runtimes.
