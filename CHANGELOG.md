@@ -10,6 +10,24 @@
 
 - No profiles changed.
 
+## [0.10.1] - 2026-05-20
+
+### Bug Fixes
+
+- Allowed SysV semaphores by default so LMDB-backed tools, including Parcel's cache during pnpm/npm install and build hooks, can open their environment instead of aborting or failing with EPERM.
+
+### Chores
+
+- Added regression coverage that the default shared profile includes the SysV semaphore grant and regenerated the packaged dist artifact.
+
+### Thanks
+
+- @ptoussai surfacing and fixing LMDB/Parcel SysV semaphore failures in [#101](https://github.com/eugene1g/agent-safehouse/pull/101).
+
+### Changed Sandboxing Profiles
+
+- [`ipc-sysv-sem.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.10.0...v0.10.1#diff-a163899ef876526b94e8be2964964a1de0a11cb12b5e7bb1dc81bd9be97f6250): Added default SysV semaphore access for LMDB cross-process locking on macOS.
+
 ## [0.10.0] - 2026-05-19
 
 ### Features
