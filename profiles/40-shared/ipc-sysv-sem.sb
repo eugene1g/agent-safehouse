@@ -1,0 +1,13 @@
+;; ---------------------------------------------------------------------------
+;; Category: Shared IPC (SysV semaphores)
+;; LMDB on macOS uses System V semaphores (`ftok`/`semget`/`semop`) for
+;; cross-process locking, because macOS lacks PTHREAD_PROCESS_SHARED robust
+;; mutexes and libmdb falls back to SysV IPC (`MDB_USE_SYSV_SEM`). Any
+;; sandboxed caller that opens an LMDB env hits this, regardless of
+;; language: `@parcel/cache` (Node, via pnpm/npm + Parcel builds), `heed`
+;; (Rust), `lmdb-py` (Python), `lmdb-go` (Go). Without this allow, the
+;; first `semget` returns EPERM and the env open fails.
+;; Source: 40-shared/ipc-sysv-sem.sb
+;; ---------------------------------------------------------------------------
+
+(allow ipc-sysv-sem)
