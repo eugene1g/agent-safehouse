@@ -50,6 +50,22 @@
     (home-subpath "/Library/Application Support/Google/Chrome for Testing/Crashpad")       ;; Chrome for Testing crashpad initialization probes xattrs on its initialized marker.
 )
 
+;; Chrome's ProcessSingleton binds, listens, and connects to a UNIX socket.
+;; Without these allows, full-browser launch aborts at startup 
+;; with error "Failed to bind() ... SingletonSocket".
+(allow network-bind
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
+)
+(allow network-inbound
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
+)
+(allow network-outbound
+    (remote unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
+)
+
 (allow mach-register
     (global-name-regex #"^com\.google\.Chrome\.MachPortRendezvousServer\.")
     (global-name-regex #"^com\.google\.Chrome\.crashpad\.child_port_handshake\.")
