@@ -84,6 +84,6 @@ In practice, that means `stat "$HOME"` can succeed while `ls "$HOME"` and `cat ~
 
 To prevent accidentally granting access to some critical files Safehouse unconditionally emits a final deny block as the very last section of every generated policy. Since this block is always last, it wins over any earlier write grant regardless of how the workdir, additional profiles, etc are configured.
 
-Currently this is used to protect the `.safehouse` configuration file from being modified from inside the sandbox. To opt out pass `--allow-workdir-config-writes`.
+Currently this is used to protect the workdir config file (`<workdir>/.safehouse`) from being modified from inside the sandbox. To opt out pass `--allow-workdir-config-writes`.
 
 See also: [Bin Architecture](/docs/bin-architecture)

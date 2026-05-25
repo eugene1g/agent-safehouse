@@ -93,3 +93,29 @@ load ../../test_helper.bash
   profile="$(safehouse_profile --allow-workdir-config-writes)"
   sft_assert_not_contains "$profile" "terminal-deny-safehouse"
 }
+
+@test "[EXECUTION] terminal deny rule blocks writes to <workdir>/.safehouse" {
+  local config_path
+
+  config_path="$(sft_workspace_path ".safehouse")" || return 1
+
+  safehouse_denied -- /bin/sh -c "printf 'add-dirs=/tmp\n' > '$config_path'"
+}
+
+@test "[EXECUTION] terminal deny rule does not block writes to <workdir>/sub/.safehouse" {
+  local sub_dir sub_config_path
+
+  sub_dir="$(sft_workspace_path "sub")" || return 1
+  sub_config_path="${sub_dir}/.safehouse"
+  mkdir -p "$sub_dir" || return 1
+
+  safehouse_ok -- /bin/sh -c "printf 'add-dirs=/tmp\n' > '$sub_config_path'"
+}
+
+@test "[EXECUTION] --allow-workdir-config-writes permits writes to <workdir>/.safehouse" {
+  local config_path
+
+  config_path="$(sft_workspace_path ".safehouse")" || return 1
+
+  safehouse_ok --allow-workdir-config-writes -- /bin/sh -c "printf 'add-dirs=/tmp\n' > '$config_path'"
+}
