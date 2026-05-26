@@ -17,6 +17,10 @@
 
     ;; Bash startup files.
     (literal "/private/etc/bashrc")                                   ;; Bash startup file read by spawned bash sessions.
+    (home-literal "/.bashrc")                                         ;; Bash interactive startup file read by interactive bash sessions.
+    (home-literal "/.bash_profile")                                   ;; Bash profile file read by login bash sessions.
+    (home-literal "/.bash_login")                                     ;; Bash login file read if .bash_profile is absent.
+    (home-literal "/.bash_logout")                                    ;; Bash logout file sourced when a login shell exits.
 
     ;; Zsh startup files and completion cache.
     (literal "/private/etc/zprofile")                                 ;; Zsh startup file read by login zsh sessions.

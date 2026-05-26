@@ -26,6 +26,37 @@ load ../../test_helper.bash
   sft_assert_contains "$enabled_profile" '(regex #"^/System/Volumes/Data/Applications/[^/]+\.app/Contents/Resources(/[^/]+)*/(_[^/]+|[^/]+\.(bash|fish|zsh)|[^/]+\.(bash|fish|zsh)-completion)$")'
 }
 
+@test "[POLICY-ONLY] shell-init includes user-level bash startup files" { # https://github.com/eugene1g/agent-safehouse/issues/83
+  local default_profile enabled_profile
+
+  default_profile="$(safehouse_profile)"
+  enabled_profile="$(safehouse_profile --enable=shell-init)"
+
+  sft_assert_not_contains "$default_profile" '(home-literal "/.bashrc")'
+  sft_assert_contains "$enabled_profile" '(home-literal "/.bashrc")'
+  sft_assert_contains "$enabled_profile" '(home-literal "/.bash_profile")'
+  sft_assert_contains "$enabled_profile" '(home-literal "/.bash_login")'
+  sft_assert_contains "$enabled_profile" '(home-literal "/.bash_logout")'
+}
+
+@test "[EXECUTION] bash user startup config is only loaded when shell-init is enabled" { # https://github.com/eugene1g/agent-safehouse/issues/83
+  local fake_home workdir
+
+  [ -x /bin/bash ] || skip "bash is not installed"
+
+  fake_home="$(sft_fake_home)" || return 1
+  workdir="$(sft_workspace_path "bash-workdir")" || return 1
+  mkdir -p "$workdir"
+  printf '%s\n' 'export SAFEHOUSE_BASH_STARTUP=loaded' > "${fake_home}/.bashrc"
+
+  /usr/bin/env -i HOME="$fake_home" PATH="/bin:/usr/bin:/usr/sbin:/sbin" USER="${USER:-$(id -un)}" LOGNAME="${LOGNAME:-${USER:-$(id -un)}}" SHELL=/bin/bash TMPDIR=/tmp \
+    /bin/bash -i -c 'test "$SAFEHOUSE_BASH_STARTUP" = loaded' || skip "bash startup precheck failed outside sandbox"
+
+  HOME="$fake_home" safehouse_denied --workdir="$workdir" -- /bin/bash -i -c 'test "$SAFEHOUSE_BASH_STARTUP" = loaded'
+
+  HOME="$fake_home" safehouse_ok --workdir="$workdir" --enable=shell-init -- /bin/bash -i -c 'test "$SAFEHOUSE_BASH_STARTUP" = loaded'
+}
+
 @test "[EXECUTION] zsh user startup config is only loaded when shell-init is enabled" {
   local fake_home workdir
 
