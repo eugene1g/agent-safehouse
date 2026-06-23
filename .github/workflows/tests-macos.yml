@@ -76,7 +76,7 @@ jobs:
         run: |
           brew install rustup
           printf '%s\n' "$(brew --prefix rustup)/bin" >> "${GITHUB_PATH}"
-          "$(brew --prefix rustup)/bin/rustup-init" -y --profile minimal --default-toolchain stable --no-modify-path
+          "$(brew --prefix rustup)/bin/rustup" toolchain install stable --profile minimal --no-self-update
           printf '%s\n' "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
 
       - name: Run test suite
