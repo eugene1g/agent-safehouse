@@ -104,6 +104,35 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "custom-test-marker"
 }
 
+@test "[POLICY-ONLY] trusted .safehouse append-profile adds deny-write rule for the profile file" {
+  local config_file profile_file profile_dir profile
+
+  profile_dir="$(mktemp -d "${SAFEHOUSE_WORKSPACE}/profiles.XXXXXX")" || return 1
+  profile_file="${profile_dir}/custom.sb"
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+
+  printf ';; custom-test-marker\n' > "$profile_file"
+  printf 'append-profile=%s\n' "$profile_file" > "$config_file"
+
+  profile="$(safehouse_profile --trust-workdir-config)"
+  sft_assert_contains "$profile" "#safehouse-test-id:append-profile-protections#"
+  sft_assert_contains "$profile" "(deny file-write* (literal \"${profile_file}\"))"
+}
+
+@test "[POLICY-ONLY] --allow-profile-writes suppresses the deny-write rule for .safehouse append-profile" {
+  local config_file profile_file profile_dir profile
+
+  profile_dir="$(mktemp -d "${SAFEHOUSE_WORKSPACE}/profiles.XXXXXX")" || return 1
+  profile_file="${profile_dir}/custom.sb"
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+
+  printf ';; custom-test-marker\n' > "$profile_file"
+  printf 'append-profile=%s\n' "$profile_file" > "$config_file"
+
+  profile="$(safehouse_profile --trust-workdir-config --allow-profile-writes)"
+  sft_assert_not_contains "$profile" "(deny file-write* (literal \"${profile_file}\"))"
+}
+
 @test "[POLICY-ONLY] trusted .safehouse append-profile appears before --append-profile in policy" {
   local config_file workdir_profile_file cli_profile_file profile
 
