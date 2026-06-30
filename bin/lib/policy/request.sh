@@ -341,6 +341,7 @@ policy_request_remove_always_trust_workdir() {
   [[ -f "$trusted_file" ]] || return 0
 
   tmp_file="${trusted_file}.tmp.$$"
+  # shellcheck disable=SC2094  # input $trusted_file and output $tmp_file are always distinct files
   while IFS= read -r line || [[ -n "$line" ]]; do
     canonical="$(policy_request_canonicalize_trusted_workdir_entry "$line")" || { rm -f "$tmp_file"; return 1; }
     if [[ "$canonical" != "$policy_req_effective_workdir" ]]; then

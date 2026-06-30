@@ -70,7 +70,7 @@ policy_explain_prepare_runtime_debug_environment() {
 
 policy_explain_print_summary() {
   local workdir_status config_status keychain_status exec_env_status env_pass_names_status profile_env_defaults_status
-  local git_worktree_common_dir_status git_worktree_paths_status trusted_workdirs_status trust_source_display
+  local git_worktree_common_dir_status git_worktree_paths_status trust_source_display
   local idx profile reason
   local host_command_matches execution_command_matches execution_path shell_wrapper_note runtime_debug_env_available=0
 
@@ -154,12 +154,6 @@ policy_explain_print_summary() {
     runtime_debug_env_available=1
     execution_path="$(policy_explain_env_array_value runtime_execution_environment PATH || safehouse_join_by_space)"
     execution_command_matches="$(policy_explain_path_matches "${policy_req_invoked_command_path}" "$execution_path")"
-  fi
-
-  if [[ "${#policy_req_trusted_workdirs[@]}" -gt 0 ]]; then
-    trusted_workdirs_status="$(safehouse_join_by_space "${policy_req_trusted_workdirs[@]}")"
-  else
-    trusted_workdirs_status="$(safehouse_join_by_space)"
   fi
 
   case "${policy_req_trust_workdir_config_source:-default}" in
