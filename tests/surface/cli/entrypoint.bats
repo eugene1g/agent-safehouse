@@ -22,6 +22,15 @@ load ../../test_helper.bash
   sft_assert_contains "$output" "--output"
 }
 
+@test "--help warns shell-init users to audit env credentials" {
+  safehouse_run --help
+  [ "$status" -eq 0 ]
+
+  sft_assert_contains "$output" "shell-init reads shell startup files"
+  sft_assert_contains "$output" "audit them for credentials"
+  sft_assert_contains "$output" "exported into the environment before enabling"
+}
+
 @test "running without a command prints a generated policy path" {
   local policy_path policy_text
 
