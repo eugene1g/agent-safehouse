@@ -44,3 +44,23 @@ load ../../test_helper.bash
 
   safehouse_ok --enable=1password -- "$op_bin" --version >/dev/null
 }
+
+@test "[POLICY-ONLY] 1Password grants read access to the app bundle for op-ssh-sign" {
+  local enabled base
+
+  enabled="$(safehouse_profile --enable=1password)"
+  sft_assert_contains "$enabled" '(subpath "/Applications/1Password.app")'
+
+  base="$(safehouse_profile)"
+  sft_assert_not_contains "$base" "/Applications/1Password.app"
+}
+
+@test "[EXECUTION] 1Password app bundle (op-ssh-sign) is denied by default and readable when enabled" {
+  local signer="/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+
+  [ -f "$signer" ] || skip "1Password app / op-ssh-sign not installed"
+
+  safehouse_denied -- /usr/bin/stat "$signer"
+
+  safehouse_ok --enable=1password -- /usr/bin/stat "$signer" >/dev/null
+}
