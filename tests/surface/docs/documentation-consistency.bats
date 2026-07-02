@@ -70,3 +70,15 @@ load ../../test_helper.bash
     sft_assert_file_contains "$assumptions_path" "\`${feature}\`"
   done
 }
+
+@test "docs warn shell-init users to audit env credentials" {
+  local options_path usage_path
+
+  options_path="${SAFEHOUSE_REPO_ROOT}/docs/docs/options.md"
+  usage_path="${SAFEHOUSE_REPO_ROOT}/docs/docs/usage.md"
+
+  sft_assert_file_contains "$options_path" 'Before using `--enable=shell-init`, audit shell startup/config files'
+  sft_assert_file_contains "$options_path" 'credentials or tokens exported into the environment'
+  sft_assert_file_contains "$usage_path" 'Before using `--enable=shell-init`, audit shell startup/config files'
+  sft_assert_file_contains "$usage_path" 'credentials or tokens exported into the environment'
+}

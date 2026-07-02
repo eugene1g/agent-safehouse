@@ -60,7 +60,8 @@ Policy scope options:
       Note: chromium-full implies chromium-headless
       Note: playwright-chrome implies chromium-full and chromium-headless
       Note: agent-browser implies chromium-full and chromium-headless
-      Note: shell-init enables shell startup file reads
+      Note: shell-init reads shell startup files; audit them for credentials
+            exported into the environment before enabling
       Note: process-control enables host process enumeration/signalling
       Note: lldb enables LLDB toolchain + task-port access and implies process-control
       Note: xcode enables Xcode developer roots plus scoped build/simulator state
