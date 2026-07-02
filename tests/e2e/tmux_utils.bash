@@ -21,7 +21,12 @@ if [[ -z "${SFT_TMUX_HELPER_LOADED:-}" ]]; then
   SFT_TMUX_HELPER_LOADED=1
   SFT_TMUX_CURRENT_SESSION=""
   SFT_TMUX_CURRENT_WORKDIR=""
+  SFT_TMUX_SERVER_NAME="safehouse-tmux-$$-$RANDOM"
 fi
+
+sft_tmux() {
+  TMUX= tmux -L "${SFT_TMUX_SERVER_NAME}" "$@"
+}
 
 sft_tmux_unique_name() {
   local prefix="${1:-tmux-bg}"
@@ -39,12 +44,12 @@ sft_tmux_shell_join() {
 
 sft_tmux_capture_normal() {
   sft_tmux_require_current_session || return 1
-  tmux capture-pane -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true
+  sft_tmux capture-pane -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true
 }
 
 sft_tmux_capture_alternate() {
   sft_tmux_require_current_session || return 1
-  tmux capture-pane -a -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true
+  sft_tmux capture-pane -a -p -J -N -t "${SFT_TMUX_CURRENT_SESSION}" 2>/dev/null || true
 }
 
 sft_tmux_capture_score() {
@@ -165,12 +170,12 @@ sft_tmux_create_session_named() {
 
   workdir="$(cd -- "${workdir}" && pwd -P)" || return 1
 
-  if tmux has-session -t "${session_name}" >/dev/null 2>&1; then
-    tmux kill-session -t "${session_name}" >/dev/null 2>&1 || true
+  if sft_tmux has-session -t "${session_name}" >/dev/null 2>&1; then
+    sft_tmux kill-session -t "${session_name}" >/dev/null 2>&1 || true
   fi
 
-  tmux new-session -d -s "${session_name}" -c "${workdir}"
-  tmux set-option -t "${session_name}" remain-on-exit on >/dev/null
+  sft_tmux new-session -d -s "${session_name}" -c "${workdir}"
+  sft_tmux set-option -t "${session_name}" remain-on-exit on >/dev/null
   SFT_TMUX_CURRENT_SESSION="${session_name}"
   SFT_TMUX_CURRENT_WORKDIR="${workdir}"
 }
@@ -187,9 +192,9 @@ sft_tmux_run() {
 
   command_string="$(sft_tmux_shell_join "$@")"
   if [[ -n "${workdir}" && -d "${workdir}" ]]; then
-    tmux respawn-pane -k -c "${workdir}" -t "${SFT_TMUX_CURRENT_SESSION}:0.0" "${command_string}"
+    sft_tmux respawn-pane -k -c "${workdir}" -t "${SFT_TMUX_CURRENT_SESSION}:0.0" "${command_string}"
   else
-    tmux respawn-pane -k -t "${SFT_TMUX_CURRENT_SESSION}:0.0" "${command_string}"
+    sft_tmux respawn-pane -k -t "${SFT_TMUX_CURRENT_SESSION}:0.0" "${command_string}"
   fi
 }
 
@@ -226,7 +231,7 @@ sft_tmux_send_text() {
     return 1
   }
 
-  tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" -l -- "${input_text}"
+  sft_tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" -l -- "${input_text}"
 }
 
 sft_tmux_send_text_slow() {
@@ -243,7 +248,7 @@ sft_tmux_send_text_slow() {
 
   while (( idx < ${#input_text} )); do
     char="${input_text:idx:1}"
-    tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" -l -- "${char}"
+    sft_tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" -l -- "${char}"
     idx=$((idx + 1))
     if [[ "${char_delay_secs}" != "0" && "${char_delay_secs}" != "0.0" ]]; then
       sleep "${char_delay_secs}"
@@ -261,13 +266,13 @@ sft_tmux_send_keys() {
   }
 
   for key_name in "$@"; do
-    tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" "${key_name}"
+    sft_tmux send-keys -t "${SFT_TMUX_CURRENT_SESSION}" "${key_name}"
   done
 }
 
 sft_tmux_current_pane_dead() {
   sft_tmux_require_current_session || return 1
-  [[ "$(tmux display-message -p -t "${SFT_TMUX_CURRENT_SESSION}" '#{pane_dead}' 2>/dev/null || printf '1')" == "1" ]]
+  [[ "$(sft_tmux display-message -p -t "${SFT_TMUX_CURRENT_SESSION}" '#{pane_dead}' 2>/dev/null || printf '1')" == "1" ]]
 }
 
 _sft_tmux_wait_until_grep() {
@@ -412,7 +417,7 @@ sft_tmux_kill_process_group() {
   local wait_idx=0
 
   sft_tmux_require_current_session || return 1
-  pane_pid="$(tmux display-message -p -t "${SFT_TMUX_CURRENT_SESSION}" '#{pane_pid}' 2>/dev/null || true)"
+  pane_pid="$(sft_tmux display-message -p -t "${SFT_TMUX_CURRENT_SESSION}" '#{pane_pid}' 2>/dev/null || true)"
   [[ "${pane_pid}" =~ ^[0-9]+$ ]] || return 0
 
   pane_pgid="$(ps -o pgid= -p "${pane_pid}" 2>/dev/null | tr -d '[:space:]' || true)"
@@ -431,7 +436,8 @@ sft_tmux_stop() {
 
   [[ -n "${session_name}" ]] || return 0
   sft_tmux_kill_process_group || true
-  tmux kill-session -t "${session_name}" >/dev/null 2>&1 || true
+  sft_tmux kill-session -t "${session_name}" >/dev/null 2>&1 || true
+  sft_tmux kill-server >/dev/null 2>&1 || true
   SFT_TMUX_CURRENT_SESSION=""
   SFT_TMUX_CURRENT_WORKDIR=""
 }
