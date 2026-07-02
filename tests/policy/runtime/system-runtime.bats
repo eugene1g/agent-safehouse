@@ -149,3 +149,57 @@ load ../../test_helper.bash
 
   safehouse_denied -- /bin/cat /private/etc/zshrc
 }
+
+@test "[POLICY-ONLY] default profile grants read-only access to the Nix store and profile pointers" {
+  local profile
+  profile="$(safehouse_profile)"
+
+  sft_assert_contains "$profile" "(subpath \"/nix/store\")"
+  sft_assert_contains "$profile" "(subpath \"/nix/var/nix/profiles\")"
+  sft_assert_contains "$profile" "(literal \"/nix\")"
+  sft_assert_contains "$profile" "(home-literal \"/.nix-profile\")"
+  sft_assert_contains "$profile" "(home-literal \"/.local/state/nix/profile\")"
+  sft_assert_contains "$profile" "(home-prefix \"/.local/state/nix/profiles\")"
+
+  # The Nix store is read-only: it must not appear in any write grant.
+  sft_assert_not_contains "$profile" "file-write* (subpath \"/nix"
+}
+
+@test "[EXECUTION] Nix store is readable but not writable in the default sandbox" {
+  [ -d /nix/store ] || skip "/nix/store not present (Nix not installed)"
+
+  safehouse_ok -- /bin/ls /nix/store >/dev/null
+
+  safehouse_denied -- /usr/bin/touch "/nix/store/safehouse-write-canary.$$"
+}
+
+@test "[EXECUTION] default sandbox reads Nix profile pointers but not the rest of ~/.local/state" {
+  local fake_home nix_profiles other_state
+
+  fake_home="$(sft_fake_home)" || return 1
+  nix_profiles="${fake_home}/.local/state/nix/profiles"
+  other_state="${fake_home}/.local/state/other"
+
+  mkdir -p "$nix_profiles" "$other_state"
+  printf '%s\n' "profile-marker" > "${nix_profiles}/default"
+  printf '%s\n' "secret" > "${other_state}/secret"
+
+  # ~/.nix-profile and ~/.local/state/nix/profile are symlinks into the store in real
+  # setups; here we only need the link itself to be resolvable/readable.
+  /bin/ln -sfn "${nix_profiles}/default" "${fake_home}/.nix-profile"
+  /bin/ln -sfn "${nix_profiles}/default" "${fake_home}/.local/state/nix/profile"
+
+  # Granted: the profiles dir + its contents (home-prefix) and the pointer symlinks.
+  # NOTE: this readdir also exercises traversal through ~/.local/state and
+  # ~/.local/state/nix, which have no metadata grant of their own — if this
+  # assertion fails, the profile needs a file-read-metadata grant on those parents.
+  HOME="$fake_home" safehouse_ok -- /bin/ls "$nix_profiles" >/dev/null
+  HOME="$fake_home" safehouse_ok -- /bin/cat "${nix_profiles}/default" >/dev/null
+  HOME="$fake_home" safehouse_ok -- /usr/bin/readlink "${fake_home}/.nix-profile" >/dev/null
+  HOME="$fake_home" safehouse_ok -- /usr/bin/readlink "${fake_home}/.local/state/nix/profile" >/dev/null
+
+  # Not granted: sibling paths under ~/.local/state stay sealed. This is the scoping
+  # boundary — the Nix grants must not open the rest of ~/.local/state.
+  HOME="$fake_home" safehouse_denied -- /bin/ls "$other_state"
+  HOME="$fake_home" safehouse_denied -- /bin/cat "${other_state}/secret"
+}
