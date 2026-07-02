@@ -16,6 +16,20 @@ load agent_tui_harness.bash
   [[ "${output}" == *"${literal_prompt}"* ]]
 }
 
+@test "[E2E-TUI] tmux respawn preserves requested workdir" {
+  local session_name workdir
+
+  session_name="$(sft_tmux_unique_name tmux-cwd)"
+  workdir="${SAFEHOUSE_WORKSPACE}/tmux-respawn-workdir"
+  mkdir -p "${workdir}"
+  workdir="$(cd -- "${workdir}" && pwd -P)"
+
+  sft_tmux_create_session_named "${session_name}" "${workdir}"
+  sft_tmux_run /bin/sh -c 'pwd; sleep 3'
+
+  sft_tmux_wait_until "${workdir}" 2 0.1
+}
+
 @test "[E2E-TUI] prompt visibility regex handles normalized agent echoes" {
   local fake_agent_code=""
 

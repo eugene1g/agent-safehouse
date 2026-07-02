@@ -15,10 +15,11 @@ load agent_tui_harness.bash
   local input_ready_pattern='goose is ready|Enter to send'
   local trust_gate_pattern=""
   local permission_gate_pattern=""
+  local telemetry_gate_pattern='Share anonymous usage data'
   local restart_gate_pattern=""
   local model="gpt-5-mini"
 
-  prepare_agent_state "${agent_home}" "${config_dir}"
+  prepare_agent_state "${agent_home}" "${config_dir}" "${model}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"
   configure_agent_tui
 
@@ -41,12 +42,34 @@ load agent_tui_harness.bash
 prepare_agent_state() {
   local agent_home="$1"
   local config_dir="$2"
+  local model="$3"
 
   mkdir -p \
     "${agent_home}" \
     "${config_dir}" \
     "${agent_home}/.local/share/goose" \
     "${agent_home}/.local/state/goose"
+
+  cat >"${config_dir}/config.yaml" <<EOF
+GOOSE_TELEMETRY_ENABLED: false
+GOOSE_DISABLE_KEYRING: true
+active_provider: openai
+providers:
+  openai:
+    enabled: true
+    model: ${model}
+    configured: true
+extensions:
+  developer:
+    enabled: true
+    type: builtin
+    name: developer
+    description: default
+    display_name: Developer
+    timeout: 300
+    bundled: true
+    available_tools: []
+EOF
 }
 
 login_agent() {
@@ -68,6 +91,7 @@ handle_startup_gates() {
   local -a gate_patterns=(
     "${trust_gate_pattern:-}"
     "${permission_gate_pattern:-}"
+    "${telemetry_gate_pattern:-}"
     "${restart_gate_pattern:-}"
   )
 
@@ -104,6 +128,13 @@ handle_startup_gates() {
 
   if [[ -n "${permission_gate_pattern:-}" ]] && sft_tmux_matches_regex "${permission_gate_pattern}"; then
     sft_tmux_send_keys Enter
+    handle_startup_gates "$((pass + 1))"
+    return $?
+  fi
+
+  if [[ -n "${telemetry_gate_pattern:-}" ]] && sft_tmux_matches_regex "${telemetry_gate_pattern}"; then
+    sft_tmux_send_keys Right Enter
+    telemetry_gate_pattern=""
     handle_startup_gates "$((pass + 1))"
     return $?
   fi
