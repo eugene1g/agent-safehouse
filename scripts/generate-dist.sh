@@ -624,20 +624,29 @@ SCRIPT
 emit_preassembled_profile_chunk_function() {
   local function_name="$1"
   local marker="$2"
+  local content_function_name="${function_name}_content"
   shift 2
 
-  cat <<SCRIPT
-${function_name}() {
-  cat <<'${marker}' >&"\$policy_render_target_fd"
-SCRIPT
+  printf '%s\n' "${content_function_name}() {"
+  printf '  cat <<'\''%s'\''\n' "$marker"
 
   emit_profile_chunk_body "$@"
 
-  cat <<SCRIPT
-${marker}
-}
+  printf '%s\n' "$marker"
+  printf '%s\n' '}'
+  printf '\n'
 
-SCRIPT
+  printf '%s\n' "${function_name}() {"
+  # shellcheck disable=SC2016 # Emit literal variables for the generated dist function.
+  printf '%s\n' '  if [[ "${policy_req_offline:-0}" -eq 1 ]]; then'
+  # shellcheck disable=SC2016 # Emit literal variables for the generated dist function.
+  printf '    %s | policy_render_strip_network_allow_rules_stream >&"$policy_render_target_fd"\n' "$content_function_name"
+  printf '%s\n' '  else'
+  # shellcheck disable=SC2016 # Emit literal variables for the generated dist function.
+  printf '    %s >&"$policy_render_target_fd"\n' "$content_function_name"
+  printf '%s\n' '  fi'
+  printf '%s\n' '}'
+  printf '\n'
 }
 
 emit_safehouse_globals() {

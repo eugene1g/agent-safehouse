@@ -20,6 +20,23 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "(allow network-inbound"
 }
 
+@test "[POLICY-ONLY] --offline strips network allows and appends a terminal network deny" {
+  local append_profile profile
+
+  append_profile="$(sft_workspace_path "offline-append.sb")"
+  printf '%s\n' ';; offline-append-sentinel' '(allow network-outbound (remote ip))' > "$append_profile"
+
+  profile="$(safehouse_profile --enable=docker --append-profile="$append_profile" --offline)"
+
+  sft_assert_contains "$profile" "#safehouse-test-id:offline-network-deny#"
+  sft_assert_contains "$profile" "(deny network*)"
+  sft_assert_contains "$profile" "offline-append-sentinel"
+  sft_assert_not_contains "$profile" "(allow network-outbound"
+  sft_assert_not_contains "$profile" "(allow network-bind"
+  sft_assert_not_contains "$profile" "(allow network-inbound"
+  sft_assert_order "$profile" "$(sft_source_marker "55-integrations-optional/docker.sb")" "#safehouse-test-id:offline-network-deny#"
+}
+
 @test "[EXECUTION] default sandbox denies outbound to UNIX-domain sockets" { # https://github.com/eugene1g/agent-safehouse/issues/99
   local socket_path nc_pid
 
@@ -33,6 +50,58 @@ load ../../test_helper.bash
   kill "$nc_pid" 2>/dev/null || true  # ignore error if nc exited early
   wait "$nc_pid" 2>/dev/null || true  # ignore SIGTERM from kill
   rm -f "$socket_path"
+}
+
+@test "[EXECUTION] --offline denies outbound TCP to IP destinations" {
+  local nc_pid
+
+  sft_require_cmd_or_skip python3
+
+  nc -l 127.0.0.1 19755 &
+  nc_pid=$!
+  sleep 0.3
+
+  safehouse_ok --offline -- python3 -c "
+import errno
+import socket
+import sys
+
+with socket.socket() as s:
+  try:
+    s.connect(('127.0.0.1', 19755))
+  except OSError as exc:
+    if exc.errno in (errno.EACCES, errno.EPERM):
+      sys.exit(0)
+    raise
+  else:
+    sys.exit('outbound TCP connect unexpectedly succeeded')
+"
+
+  kill "$nc_pid" 2>/dev/null || true  # ignore error if nc exited early
+  wait "$nc_pid" 2>/dev/null || true  # ignore SIGTERM from kill
+}
+
+@test "[EXECUTION] --offline denies binding local IP ports" {
+  sft_require_cmd_or_skip python3
+
+  safehouse_ok --offline -- python3 -c "
+import errno
+import sys
+from contextlib import closing
+import socket
+
+with closing(socket.socket()) as s:
+  try:
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(('127.0.0.1', 19756))
+    s.listen(1)
+  except OSError as exc:
+    if exc.errno in (errno.EACCES, errno.EPERM):
+      sys.exit(0)
+    raise
+  else:
+    sys.exit('local IP bind unexpectedly succeeded')
+"
 }
 
 @test "[EXECUTION] default sandbox allows outbound TCP to IP destinations" { # https://github.com/eugene1g/agent-safehouse/issues/99

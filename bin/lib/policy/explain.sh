@@ -214,6 +214,7 @@ policy_explain_print_summary() {
       echo "  optional integrations not included: $(safehouse_join_by_space)"
     fi
     echo "  keychain integration: ${keychain_status}"
+    echo "  network mode: $([[ "${policy_req_offline:-0}" -eq 1 ]] && echo "offline (--offline strips network allows)" || echo "default")"
     echo "  execution environment: ${exec_env_status}"
     echo "  profile env defaults: ${profile_env_defaults_status}"
     if [[ -n "${policy_req_invoked_command_path:-}" ]]; then

@@ -12,6 +12,7 @@ cli_update_action="run"
 cli_update_channel="release"
 cli_stdout_policy=0
 cli_policy_explain=0
+cli_policy_offline=0
 cli_policy_enable_values=()
 cli_policy_add_dirs_ro_values=()
 cli_policy_add_dirs_rw_values=()
@@ -43,6 +44,7 @@ cli_parse_reset() {
   cli_update_channel="release"
   cli_stdout_policy=0
   cli_policy_explain=0
+  cli_policy_offline=0
   cli_policy_enable_values=()
   cli_policy_add_dirs_ro_values=()
   cli_policy_add_dirs_rw_values=()
@@ -304,6 +306,11 @@ cli_parse_policy_flag_option() {
       ;;
     --explain)
       cli_policy_explain=1
+      cli_parse_consumed_args=1
+      return 0
+      ;;
+    --offline)
+      cli_policy_offline=1
       cli_parse_consumed_args=1
       return 0
       ;;

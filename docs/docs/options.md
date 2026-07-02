@@ -19,6 +19,7 @@
 | `--output=PATH` | Write policy to `PATH`; still executes the wrapped command when one is provided |
 | `--stdout` | Print generated policy to stdout |
 | `--explain` | Print effective workdir/grants/profile-selection summary to stderr |
+| `--offline` | Block network operations by stripping network allow rules and adding `(deny network*)` |
 
 ## Optional `--enable` Features
 
@@ -58,6 +59,18 @@ Common Apple shimmed developer tools such as `/usr/bin/git`, `/usr/bin/make`, an
 - Without `--enable=vscode`, Safehouse can only reuse an already-running VS Code or VS Code Insiders instance.
 - With `--enable=vscode`, Safehouse may cold-start an isolated VS Code editor window for the temp Claude prompt file.
 - If `EDITOR` or `VISUAL` is already set, Safehouse leaves Claude's editor selection alone and does not inject the VS Code fallback shim.
+
+## Network Mode
+
+Network access is open by default for agent APIs, package registries, Git remotes, MCP servers, local dev servers, and common toolchain traffic.
+
+Use `--offline` when the wrapped process must not perform network operations:
+
+```bash
+safehouse --offline --workdir=/tmp/malware-lab -- ./suspicious-install.sh
+```
+
+`--offline` is useful for local analysis or containment runs where the process should not exfiltrate data while it executes. It strips network allow rules from generated and appended profiles, then emits an explicit `(deny network*)` rule. This is intentionally strict: it blocks IP networking and socket-based integrations that depend on Seatbelt network operations, so package installs, direct agent API calls, local server binds, Docker sockets, SSH agent sockets, and browser singleton sockets may stop working.
 
 ## Parsing and Separator Behavior
 

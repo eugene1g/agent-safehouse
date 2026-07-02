@@ -44,9 +44,40 @@ policy_render_append_profile() {
   fi
 
   content="$(policy_source_read_profile_content "$profile_key")" || return 1
+  if [[ "${policy_req_offline:-0}" -eq 1 ]]; then
+    content="$(policy_render_strip_network_allow_rules "$content")" || return 1
+  fi
   printf '%s\n\n' "$content" >&"$policy_render_target_fd"
   policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "file-read*" "file-write*" || return 1
   policy_render_emit_resolved_home_path_rules "$profile_key" "$content" || return 1
+}
+
+policy_render_strip_network_allow_rules() {
+  local content="$1"
+
+  policy_render_strip_network_allow_rules_stream <<< "$content"
+}
+
+policy_render_strip_network_allow_rules_stream() {
+  local line skip_network_allow=0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$skip_network_allow" -eq 1 ]]; then
+      if [[ "$line" =~ ^[[:space:]]*\)[[:space:]]*$ ]]; then
+        skip_network_allow=0
+      fi
+      continue
+    fi
+
+    if [[ "$line" =~ ^[[:space:]]*\(allow[[:space:]]+network ]]; then
+      if [[ ! "$line" =~ \)[[:space:]]*$ ]]; then
+        skip_network_allow=1
+      fi
+      continue
+    fi
+
+    printf '%s\n' "$line"
+  done
 }
 
 policy_render_list_profile_absolute_path_rules_for_operation() {
@@ -684,6 +715,17 @@ policy_render_emit_append_profile_protections() {
   policy_render_write_blank
 }
 
+policy_render_emit_offline_terminal_deny() {
+  if [[ "${policy_req_offline:-0}" -ne 1 ]]; then
+    return 0
+  fi
+
+  policy_render_write_line ";; #safehouse-test-id:offline-network-deny# Offline mode terminal deny from --offline."
+  policy_render_write_line ";; Network allow rules are stripped during render, then this explicit deny is emitted."
+  policy_render_write_line "(deny network*)"
+  policy_render_write_blank
+}
+
 policy_render_append_workdir_config_profiles() {
   local profile_path
 
@@ -783,6 +825,7 @@ policy_render_emit_dynamic_sections() {
   policy_render_append_workdir_config_profiles || return 1
   policy_render_append_cli_profiles || return 1
   policy_render_emit_append_profile_protections || return 1
+  policy_render_emit_offline_terminal_deny || return 1
   policy_render_emit_terminal_deny_rules || return 1
 }
 

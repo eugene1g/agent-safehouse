@@ -6,6 +6,14 @@
 
 - No special notes.
 
+### Features
+
+- Added `--offline`, which emits a terminal `(deny network*)` rule for strict no-network runs.
+
+### Thanks
+
+- @atombender surfacing the no-network mode request in [this Hacker News comment](https://news.ycombinator.com/item?id=48737694).
+
 ### Changed Sandboxing Profiles
 
 - No profiles changed.

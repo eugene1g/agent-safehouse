@@ -7,7 +7,7 @@ This page documents the baseline assumptions Safehouse makes so default behavior
 1. Agents should work with normal developer tooling by default.
 2. Sensitive paths and integrations should require explicit opt-in.
 3. Least privilege should be practical to maintain.
-4. Final-deny overlays should always remain possible (`--append-profile`).
+4. Explicit hardening modes should remain possible (`--append-profile` deny overlays, `--offline` network stripping).
 
 ## Allowed by Default
 
@@ -72,6 +72,8 @@ Enable only when required for the current task:
 - Full Xcode developer roots and Xcode/CoreSimulator state unless `xcode` is enabled.
 - Broad raw device access under `/dev`.
 
+`--offline` is an explicit no-network mode. It is not enabled by default, and it strips network allow rules from generated and appended profiles before adding an explicit network deny.
+
 `browser-native-messaging` is intentionally narrower: it grants NativeMessagingHosts registration paths and browser extension-manifest reads, not cookies, passwords, history, or bookmarks.
 
 ## Operational Defaults for Common Scenarios
@@ -86,6 +88,7 @@ Enable only when required for the current task:
 - **Full Xcode builds / simulator flows**: add `--enable=xcode`; reserve `--enable=lldb` for debugger sessions.
 - **Local process triage**: prefer `process-control`; reserve `lldb` for real debugger sessions.
 - **IDE app-hosted agents**: enable `electron` and add `all-agents` only if extension-hosted CLIs require it.
+- **No-network analysis**: add `--offline`, and expect direct agent API calls, package installs, Docker, SSH agent sockets, local server binds, and browser singleton sockets to fail.
 
 ## Before You Enable Anything
 
