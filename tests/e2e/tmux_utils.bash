@@ -20,6 +20,7 @@
 if [[ -z "${SFT_TMUX_HELPER_LOADED:-}" ]]; then
   SFT_TMUX_HELPER_LOADED=1
   SFT_TMUX_CURRENT_SESSION=""
+  SFT_TMUX_CURRENT_WORKDIR=""
 fi
 
 sft_tmux_unique_name() {
@@ -162,6 +163,8 @@ sft_tmux_create_session_named() {
     return 1
   }
 
+  workdir="$(cd -- "${workdir}" && pwd -P)" || return 1
+
   if tmux has-session -t "${session_name}" >/dev/null 2>&1; then
     tmux kill-session -t "${session_name}" >/dev/null 2>&1 || true
   fi
@@ -169,10 +172,12 @@ sft_tmux_create_session_named() {
   tmux new-session -d -s "${session_name}" -c "${workdir}"
   tmux set-option -t "${session_name}" remain-on-exit on >/dev/null
   SFT_TMUX_CURRENT_SESSION="${session_name}"
+  SFT_TMUX_CURRENT_WORKDIR="${workdir}"
 }
 
 sft_tmux_run() {
   local command_string=""
+  local workdir="${SFT_TMUX_CURRENT_WORKDIR:-}"
 
   sft_tmux_require_current_session || return 1
   [[ $# -gt 0 ]] || {
@@ -181,7 +186,11 @@ sft_tmux_run() {
   }
 
   command_string="$(sft_tmux_shell_join "$@")"
-  tmux respawn-pane -k -t "${SFT_TMUX_CURRENT_SESSION}:0.0" "${command_string}"
+  if [[ -n "${workdir}" && -d "${workdir}" ]]; then
+    tmux respawn-pane -k -c "${workdir}" -t "${SFT_TMUX_CURRENT_SESSION}:0.0" "${command_string}"
+  else
+    tmux respawn-pane -k -t "${SFT_TMUX_CURRENT_SESSION}:0.0" "${command_string}"
+  fi
 }
 
 sft_tmux_start_session() {
@@ -424,6 +433,7 @@ sft_tmux_stop() {
   sft_tmux_kill_process_group || true
   tmux kill-session -t "${session_name}" >/dev/null 2>&1 || true
   SFT_TMUX_CURRENT_SESSION=""
+  SFT_TMUX_CURRENT_WORKDIR=""
 }
 
 sft_tmux_cleanup() {
