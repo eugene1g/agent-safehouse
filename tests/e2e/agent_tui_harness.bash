@@ -299,9 +299,9 @@ sft_agent_tui_apply_env_pass_names() {
       [[ "${env_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
 
       if [[ "${!env_name+x}" == "x" ]]; then
-        tmux set-environment -t "${session_name}" "${env_name}" "${!env_name}"
+        sft_tmux set-environment -t "${session_name}" "${env_name}" "${!env_name}"
       else
-        tmux set-environment -t "${session_name}" -u "${env_name}" >/dev/null 2>&1 || true
+        sft_tmux set-environment -t "${session_name}" -u "${env_name}" >/dev/null 2>&1 || true
       fi
     done
   done
