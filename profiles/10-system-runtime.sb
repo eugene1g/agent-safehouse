@@ -12,6 +12,8 @@
     (subpath "/bin")                                                  ;; POSIX userland binaries used by shell/task orchestration.
     (subpath "/sbin")                                                 ;; System utilities some build/test flows invoke.
     (subpath "/opt")                                                  ;; Homebrew and other package-manager install roots.
+    (subpath "/nix/store")                                            ;; Nix package manager store / install root.
+    (subpath "/nix/var/nix/profiles")                                 ;; Nix package manager profile symlinks.
     (subpath "/System/Library")                                       ;; macOS runtime frameworks/resources; excludes broader /System/Volumes data paths.
     (subpath "/System/Volumes/Preboot")                               ;; Some dyld/framework lookups resolve through Preboot symlinks on modern macOS.
     (subpath "/Library/Apple")                                        ;; Apple private frameworks touched by Node/Bun/JVM/native toolchains.
@@ -56,6 +58,7 @@
 (allow file-read-metadata
     (literal "/home")                                                 ;; Probed during path resolution by some runtimes.
     (literal "/private/etc")                                          ;; Directory traversal for /etc path resolution.
+    (literal "/nix")                                                  ;; Directory traversal for /nix/store path resolution.
     (subpath "/dev")                                                  ;; Metadata (stat) on /dev entries; readdir() on /dev triggers this for every node.
     (home-literal "/.config")                                         ;; XDG config root traversal needed by many tools (mise, gh, git, etc.).
     (home-literal "/.cache")                                          ;; XDG cache root traversal needed by tools probing cache locations.
@@ -73,6 +76,10 @@
     (home-literal "/.config")                                         ;; XDG config root directory listing for tool discovery.
     (home-literal "/.cache")                                          ;; XDG cache root directory listing for tool discovery.
     (home-literal "/.local/bin")                                      ;; PATH probing may readdir ~/.local/bin before spawning user-installed helpers.
+    (home-literal "/.local/state/nix/profile")                        ;; Current profile symlink for Nix package manager.
+    (home-literal "/.nix-profile")                                    ;; Current profile symlink for Nix package manager (old non-XDG version).
+    (home-prefix "/.local/state/nix/profiles")                        ;; Directory of profile symlinks for Nix package manager since 2.14
+                                                                      ;; (previously /nix/var/nix/profiles/per-user/<username>).
 )
 
 ;; We intentionally do NOT block broad process primitives by default: agent workflows frequently chain many subprocesses.
