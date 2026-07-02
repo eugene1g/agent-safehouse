@@ -12,6 +12,7 @@ policy_req_output_path=""
 policy_req_output_path_set=0
 policy_req_invocation_cwd=""
 policy_req_optional_features_explicit=()
+policy_req_offline=0
 policy_req_enable_all_agents=0
 policy_req_enable_all_apps=0
 policy_req_enable_wide_read=0
@@ -174,6 +175,7 @@ policy_request_reset() {
   policy_req_output_path_set=0
   policy_req_invocation_cwd=""
   policy_req_optional_features_explicit=()
+  policy_req_offline=0
   policy_req_enable_all_agents=0
   policy_req_enable_all_apps=0
   policy_req_enable_wide_read=0
@@ -651,6 +653,7 @@ policy_request_build() {
 
   policy_request_resolve_home_and_cwd || return 1
   policy_request_resolve_output_path || return 1
+  policy_req_offline="${cli_policy_offline:-0}"
   policy_request_collect_enable_inputs || return 1
   policy_request_collect_env_add_dir_inputs env_add_dirs_ro_inputs env_add_dirs_rw_inputs || return 1
   safehouse_array_copy cli_add_dirs_ro_inputs cli_policy_add_dirs_ro_values

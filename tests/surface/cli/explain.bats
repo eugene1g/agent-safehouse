@@ -50,6 +50,16 @@ load ../../test_helper.bash
   sft_assert_file_contains "$explain_log" "keychain integration: included"
 }
 
+@test "--explain reports offline network mode" {
+  local explain_log
+
+  explain_log="$(sft_workspace_path "explain-offline.log")"
+
+  safehouse_ok --offline --explain --stdout >/dev/null 2>"$explain_log"
+
+  sft_assert_file_contains "$explain_log" "network mode: offline (--offline strips network allows)"
+}
+
 @test "--explain reports command resolution details and debug hints" {
   local explain_log fake_cmd fake_cmd_name
 

@@ -20,6 +20,7 @@ load ../../test_helper.bash
   sft_assert_contains "$output" "--version"
   sft_assert_contains "$output" "--stdout"
   sft_assert_contains "$output" "--output"
+  sft_assert_contains "$output" "--offline"
 }
 
 @test "running without a command prints a generated policy path" {

@@ -7,7 +7,7 @@
 
 ;; Threat-model note: blocking exfiltration/C2 is explicitly NOT a goal for this sandbox.
 ;; The goal here is reliable agent operation (package installs, API calls, web fetches, local servers).
-;; 
+;;
 ;; Restricting inbound to loopback-only peers is also not a goal here,
 ;; which does not appear to be possible using Seatbelt. Users who need stricter
 ;; inbound boundaries should configure macOS Application Firewall or pf.

@@ -46,6 +46,8 @@ Each policy rule should answer one question:
 
 `--enable=browser-native-messaging` opens native-messaging manifest registration paths and extension-manifest reads. It does not grant browsing data.
 
+Use `--offline` for a strict no-network run. It strips network allow rules from the rendered policy and adds an explicit `(deny network*)` rule. This blocks more than internet egress: socket-backed integrations and local server binds may stop working too.
+
 ## Important Limitations
 
 Safehouse does **not** fully protect against:

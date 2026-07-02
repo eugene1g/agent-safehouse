@@ -33,11 +33,16 @@ safehouse --add-dirs=~/src/monorepo claude --dangerously-skip-permissions
 
 # Pre-grant a stable worktree root for future cross-worktree read context without restarting
 safehouse --add-dirs-ro=~/worktrees -- claude --dangerously-skip-permissions
+
+# Run a suspicious local script without allowing network exfiltration
+safehouse --offline --workdir=/tmp/malware-lab -- ./suspicious-install.sh
 ```
 
 By default, Safehouse keeps the selected workdir at the exact directory where you launch it. If you start inside `~/src/monorepo/apps/agent`, that directory becomes the default read/write grant even when `~/src/monorepo` is a Git repo. This avoids accidentally widening access when a larger repo or home-directory Git tree lives above the folder you actually want to sandbox.
 
 If you intentionally want broader repo access from a nested launch, grant it explicitly with `--add-dirs=/path/to/repo` for read/write access or `--add-dirs-ro=/path/to/repo` for read-only context.
+
+Use `--offline` for strict no-network local analysis or containment runs. It strips network allow rules from generated and appended profile content, then adds an explicit `(deny network*)` rule, so it also blocks socket-based integrations such as Docker, SSH agent sockets, local server binds, and browser singleton sockets.
 
 ## Config via Environment Variables
 

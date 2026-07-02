@@ -68,6 +68,12 @@ Policy scope options:
       Note: all-apps loads every 65-apps profile
       Note: wide-read grants read-only visibility across / (broad; use cautiously)
 
+  --offline
+      Block network operations by stripping network allow rules and adding deny network*.
+      This removes default network access and optional integration socket grants,
+      so agent API calls, package installs, local servers, Docker, SSH agent sockets,
+      and browser singleton sockets may stop working.
+
   --env
       Execute wrapped command with full inherited environment variables
 
