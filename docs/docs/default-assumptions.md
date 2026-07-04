@@ -37,8 +37,8 @@ Enable only when required for the current task:
 - `cleanshot`: read access to CleanShot media captures.
 - `cloud-credentials`: cloud CLI credential stores.
 - `cloud-storage`: macOS FileProvider XPC services for cloud-synced paths (Google Drive, Dropbox, iCloud Drive, OneDrive).
-- `chromium-headless`: headless Chromium / Playwright shell access.
-- `chromium-full`: system Google Chrome and related full Chrome allowances.
+- `chromium-headless`: headless Chromium / Playwright shell access. Chromium must still be launched with `--no-sandbox` inside Safehouse.
+- `chromium-full`: system Google Chrome and related full Chrome allowances. Chrome/Chromium must still be launched with `--no-sandbox` inside Safehouse.
 - `docker`: Docker socket and related access.
 - `1password`: 1Password CLI/app integration paths.
 - `keychain`: macOS Keychain and `security`-tool access for credential-backed helper or plugin flows that need explicit opt-in.

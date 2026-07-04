@@ -181,15 +181,19 @@ you need Electron allowances without launching a concrete app binary.
 Use `--enable=chromium-full` when a launcher needs the system Google Chrome
 bundle or Chrome for Testing bundle under Safehouse.
 
+Use `--enable=chromium-headless` for headless Chromium shell workflows. Both
+Chromium profiles grant Safehouse policy access only; they do not disable
+Chromium's own inner Seatbelt sandbox.
+
 Use `--enable=playwright-chrome` when Playwright is launching Chrome-family
 channels and Safehouse should inject `PLAYWRIGHT_MCP_SANDBOX=false` alongside
 the full Chrome policy allowances.
 
 If browser logs still show `sandbox initialization failed: Operation not
-permitted`, Chrome is trying to re-initialize its own inner Seatbelt sandbox.
-That is not fixable with extra Safehouse allow rules; pass `--no-sandbox` to
-the browser launch layer (or configure your Playwright launcher to add
-`--no-sandbox` for Chrome channels).
+permitted`, or Chromium reports a `sandbox_exec` error, Chrome is trying to
+re-initialize its own inner Seatbelt sandbox. That is not fixable with extra
+Safehouse allow rules; pass `--no-sandbox` to the browser launch layer (or
+configure your Playwright launcher to add `--no-sandbox` for Chrome channels).
 
 ## Inspect Policy Output
 

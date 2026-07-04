@@ -51,6 +51,8 @@
 
 Common Apple shimmed developer tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are available by default via `profiles/30-toolchains/apple-toolchain-core.sb`; this is not an optional `--enable` feature.
 
+`chromium-headless` and `chromium-full` grant Safehouse allowances for Chrome-family processes, but they do not disable Chromium's own inner Seatbelt sandbox. Pass `--no-sandbox` to Chromium/Chrome launch arguments whenever a browser process runs inside Safehouse. Without it, Chromium can fail with `sandbox_exec` or sandbox initialization errors before Safehouse allow rules matter.
+
 `keychain` is mainly for plugin or helper flows that need macOS credential access but are not auto-detected by a built-in Safehouse profile. For example, core `opencode` does not require keychain access, but plugin-based auth flows such as `opencode-claude-auth` can opt in with `--enable=keychain`.
 
 Before using `--enable=shell-init`, audit shell startup/config files for credentials or tokens exported into the environment. Agents may inherit values set by files such as `.zshrc`, `.bashrc`, `.bash_profile`, and fish config.

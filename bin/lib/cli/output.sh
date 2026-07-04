@@ -58,6 +58,8 @@ Policy scope options:
       Supported values: ${policy_supported_enable_features}
       Note: electron implies macos-gui
       Note: chromium-full implies chromium-headless
+      Note: Chromium/Chrome launched inside Safehouse must be passed
+            --no-sandbox; Safehouse cannot permit Chromium's nested Seatbelt sandbox
       Note: playwright-chrome implies chromium-full and chromium-headless
       Note: agent-browser implies chromium-full and chromium-headless
       Note: shell-init reads shell startup files; audit them for credentials
