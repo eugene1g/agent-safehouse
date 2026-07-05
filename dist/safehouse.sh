@@ -589,6 +589,9 @@ __SAFEHOUSE_EMBEDDED_profiles_30_toolchains_java_sb__
     (home-subpath "/.local/share/fnm")  ;; Linux/XDG default fnm install root for managed Node runtimes and package manager payloads.
     (home-subpath "/Library/Application Support/fnm")  ;; macOS default fnm install root when XDG_DATA_HOME is unset.
 
+    ;; fnm per-shell shim directory (required for fnm execution via multishell symlinks).
+    (home-subpath "/.local/state/fnm_multishells")
+
     ;; npm
     (home-subpath "/.npm")
     (home-subpath "/.config/npm")
@@ -1573,6 +1576,22 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_cloud_storage_sb__
     (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.colima/docker\\.sock$")))
     (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.colima/[^/]+/docker\\.sock$")))
     (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.rd/docker\\.sock$")))
+)
+
+;; Docker Desktop — CLI binary and shared resources.
+;; The standard Homebrew/core dump path `/usr/local/bin/docker` on Intel Macs
+;; and `/opt/homebrew/bin/docker` on Apple Silicon are symlinks into the
+;; Docker.app bundle; the symlink itself may be readable but the target binary
+;; is not, so we grant file-read* for the entire bundle tree.
+(allow file-read*
+    (literal "/Applications")
+    (subpath "/Applications/Docker.app")                                 ;; Docker Desktop CLI binary and bundled tools.
+
+    ;; Compatibility alias on Intel Macs where /Applications lives under
+    ;; /System/Volumes/Data.
+    (literal "/System/Volumes/Data")
+    (literal "/System/Volumes/Data/Applications")
+    (subpath "/System/Volumes/Data/Applications/Docker.app")
 )
 
 ;; OrbStack (Docker Desktop alternative) — shell completions and CLI helpers.
@@ -9664,6 +9683,9 @@ policy_dist_append_preassembled_fixed_after_home() {
     (home-subpath "/.fnm")
     (home-subpath "/.local/share/fnm")  ;; Linux/XDG default fnm install root for managed Node runtimes and package manager payloads.
     (home-subpath "/Library/Application Support/fnm")  ;; macOS default fnm install root when XDG_DATA_HOME is unset.
+
+    ;; fnm per-shell shim directory (required for fnm execution via multishell symlinks).
+    (home-subpath "/.local/state/fnm_multishells")
 
     ;; npm
     (home-subpath "/.npm")

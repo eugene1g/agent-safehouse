@@ -44,8 +44,15 @@ load ../../test_helper.bash
 @test "[POLICY-ONLY] node toolchain grants npm global packages directory" {
   local profile
   profile="$(safehouse_profile)"
-
+  
   sft_assert_contains "$profile" "(home-subpath \"/.local/lib/node_modules\")"
+}
+
+@test "[POLICY-ONLY] node toolchain grants file-read* file-write* to fnm_multishells" { # issue #111
+  local profile
+  profile="$(safehouse_profile)"
+  
+  sft_assert_contains "$profile" "(home-subpath \"/.local/state/fnm_multishells\")"
 }
 
 @test "[POLICY-ONLY] apple toolchain core includes the curated CLT aliases used by common builds" { # https://github.com/eugene1g/agent-safehouse/issues/57
