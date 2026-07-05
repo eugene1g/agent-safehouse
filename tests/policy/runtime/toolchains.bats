@@ -41,6 +41,13 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "(home-subpath \"/Library/Application Support/fnm\")"
 }
 
+@test "[POLICY-ONLY] node toolchain grants file-read* file-write* to fnm_multishells" { # issue #111
+  local profile
+  profile="$(safehouse_profile)"
+
+  sft_assert_contains "$profile" "(home-subpath \"/.local/state/fnm_multishells\")"
+}
+
 @test "[POLICY-ONLY] apple toolchain core includes the curated CLT aliases used by common builds" { # https://github.com/eugene1g/agent-safehouse/issues/57
   local profile binary
   local -a binaries=(c++ cc g++ ranlib c++filt gcov lorder nm objdump otool size)

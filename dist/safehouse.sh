@@ -589,6 +589,9 @@ __SAFEHOUSE_EMBEDDED_profiles_30_toolchains_java_sb__
     (home-subpath "/.local/share/fnm")  ;; Linux/XDG default fnm install root for managed Node runtimes and package manager payloads.
     (home-subpath "/Library/Application Support/fnm")  ;; macOS default fnm install root when XDG_DATA_HOME is unset.
 
+    ;; fnm per-shell shim directory (required for fnm execution via multishell symlinks).
+    (home-subpath "/.local/state/fnm_multishells")
+
     ;; npm
     (home-subpath "/.npm")
     (home-subpath "/.config/npm")
@@ -9659,6 +9662,9 @@ policy_dist_append_preassembled_fixed_after_home() {
     (home-subpath "/.fnm")
     (home-subpath "/.local/share/fnm")  ;; Linux/XDG default fnm install root for managed Node runtimes and package manager payloads.
     (home-subpath "/Library/Application Support/fnm")  ;; macOS default fnm install root when XDG_DATA_HOME is unset.
+
+    ;; fnm per-shell shim directory (required for fnm execution via multishell symlinks).
+    (home-subpath "/.local/state/fnm_multishells")
 
     ;; npm
     (home-subpath "/.npm")
