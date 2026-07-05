@@ -81,3 +81,8 @@
     (home-subpath "/.local/state/fnm_multishells")
     (home-literal "/Library/Application Support")
 )
+
+;; npm global packages directory (used by fnm/XDG prefix setups).
+(allow file-read*
+    (home-subpath "/.local/lib/node_modules")
+)
