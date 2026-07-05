@@ -1570,6 +1570,22 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_cloud_storage_sb__
     (remote unix-socket (path-regex (string-append "^" HOME_DIR "/\\.rd/docker\\.sock$")))
 )
 
+;; Docker Desktop — CLI binary and shared resources.
+;; The standard Homebrew/core dump path `/usr/local/bin/docker` on Intel Macs
+;; and `/opt/homebrew/bin/docker` on Apple Silicon are symlinks into the
+;; Docker.app bundle; the symlink itself may be readable but the target binary
+;; is not, so we grant file-read* for the entire bundle tree.
+(allow file-read*
+    (literal "/Applications")
+    (subpath "/Applications/Docker.app")                                 ;; Docker Desktop CLI binary and bundled tools.
+
+    ;; Compatibility alias on Intel Macs where /Applications lives under
+    ;; /System/Volumes/Data.
+    (literal "/System/Volumes/Data")
+    (literal "/System/Volumes/Data/Applications")
+    (subpath "/System/Volumes/Data/Applications/Docker.app")
+)
+
 ;; OrbStack (Docker Desktop alternative) — shell completions and CLI helpers.
 (allow file-read*
     (subpath "/Applications/OrbStack.app/Contents/Resources/completions")  ;; Zsh/bash completions sourced during shell init.

@@ -30,6 +30,14 @@ load ../../test_helper.bash
   sft_assert_order "$profile" "$(sft_source_marker "50-integrations-core/container-runtime-default-deny.sb")" "$(sft_source_marker "55-integrations-optional/docker.sb")"
 }
 
+@test "[POLICY-ONLY] enable=docker grants read access to Docker.app bundle" { # https://github.com/eugene1g/agent-safehouse/issues/117
+  local profile
+  profile="$(safehouse_profile --enable=docker)"
+
+  sft_assert_contains "$profile" "(subpath \"/Applications/Docker.app\")"
+  sft_assert_contains "$profile" "/Applications/Docker.app"
+}
+
 @test "[EXECUTION] docker cli can reach the configured daemon only when enable=docker is set" { # https://github.com/eugene1g/agent-safehouse/issues/19
   local docker_bin
 
