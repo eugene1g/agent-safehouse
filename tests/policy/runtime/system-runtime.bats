@@ -161,26 +161,24 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "(home-literal \"/.local/state/nix/profile\")"
   sft_assert_contains "$profile" "(home-subpath \"/.local/state/nix/profiles\")"
 
-  # Assert on a comment-stripped rendering so ;; commentary cannot mask or fake grants.
-  local grants
-  grants="$(printf '%s\n' "$profile" | sed 's/;;.*$//')"
+  # Store read-only-ness and the sealed ~/.config/nix are asserted behaviorally
+  # by the [EXECUTION] tests below rather than by scraping the rendered policy.
+}
+
+@test "[EXECUTION] default sandbox cannot read ~/.config/nix, which may hold access-tokens" {
+  local fake_home nix_config
+
+  fake_home="$(sft_fake_home)" || return 1
+  nix_config="${fake_home}/.config/nix"
 
   # ~/.config/nix is deliberately not granted: only the nix CLI reads it (out of
-  # scope for running installed programs) and nix.conf may hold access-tokens.
-  sft_assert_not_contains "$grants" "\"/.config/nix\""
+  # scope for running installed programs), and nix.conf commonly carries
+  # credentials such as access-tokens = github.com=ghp_....
+  mkdir -p "$nix_config"
+  printf '%s\n' "access-tokens = github.com=ghp_canary" > "${nix_config}/nix.conf"
 
-  # The Nix store is read-only: no write-capable allow block may reference /nix.
-  # Grants are multi-line s-expressions, so scan whole blocks (tracking paren
-  # depth) rather than single lines.
-  local write_blocks
-  write_blocks="$(printf '%s\n' "$grants" | awk '
-    !inblock && /^\(allow [^;]*file-write/ { inblock = 1; depth = 0 }
-    inblock {
-      print
-      depth += gsub(/\(/, "(") - gsub(/\)/, ")")
-      if (depth <= 0) inblock = 0
-    }')"
-  sft_assert_not_contains "$write_blocks" "\"/nix"
+  HOME="$fake_home" safehouse_denied -- /bin/cat "${nix_config}/nix.conf"
+  HOME="$fake_home" safehouse_denied -- /bin/ls "$nix_config"
 }
 
 @test "[EXECUTION] Nix store is readable but not writable in the default sandbox" {
