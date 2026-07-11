@@ -20,6 +20,7 @@ These are baseline allowances intended to keep common workflows functional:
 - Metadata-only traversal on `/`, the path to `$HOME`, and `$HOME` itself so runtimes can reach explicitly allowed home-scoped paths without opening broad home reads.
 - Directory-root reads for `~/.config` and `~/.cache` so tools can discover XDG locations; contents under those trees still need more specific grants.
 - Core system/runtime paths required by shells, compilers, and package managers.
+- Read-only access to the Nix store (`/nix/store`) and Nix profile pointers (`/nix/var/nix/profiles`, `~/.nix-profile`, `~/.local/state/nix/profile{,s}`) so programs installed via the Nix package manager run out of the box. Running `nix` itself to install packages is not covered, and `~/.config/nix` (which may hold `access-tokens`) stays sealed.
 - Toolchain profile access under `profiles/30-toolchains/`.
 - Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
 - Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).

@@ -74,13 +74,15 @@
     (home-subpath "/Library/Preferences/ByHost")                      ;; Per-host preferences read by security CLI and system frameworks.
     (home-literal "/.CFUserTextEncoding")                             ;; User text encoding prefs; read by many processes for correct string handling.
     (home-literal "/.config")                                         ;; XDG config root directory listing for tool discovery.
-    (home-subpath "/.config/nix")                                     ;; Nix package manager configuration (~/.config/nix/nix.conf).
     (home-literal "/.cache")                                          ;; XDG cache root directory listing for tool discovery.
     (home-literal "/.local/bin")                                      ;; PATH probing may readdir ~/.local/bin before spawning user-installed helpers.
-    (home-literal "/.local/state/nix/profile")                        ;; Current profile symlink for Nix package manager.
-    (home-literal "/.nix-profile")                                    ;; Current profile symlink for Nix package manager (old non-XDG version).
+    (home-literal "/.local/state/nix/profile")                        ;; Current profile symlink for Nix package manager (use-xdg-base-directories layout).
+    (home-literal "/.nix-profile")                                    ;; Current profile symlink for Nix package manager (default layout).
     (home-subpath "/.local/state/nix/profiles")                       ;; Directory of profile symlinks for Nix package manager since 2.14
                                                                       ;; (previously /nix/var/nix/profiles/per-user/<username>).
+    ;; ~/.config/nix is intentionally NOT granted: only the nix CLI itself reads it
+    ;; (out of scope; running installed programs does not), and nix.conf may hold
+    ;; secrets such as access-tokens.
 )
 
 ;; We intentionally do NOT block broad process primitives by default: agent workflows frequently chain many subprocesses.

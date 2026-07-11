@@ -6,9 +6,17 @@
 
 - No special notes.
 
+### Features
+
+- Programs installed via the Nix package manager now run inside the sandbox out of the box: the default profile grants read-only access to the Nix store and the per-user profile pointers for the default, XDG (`use-xdg-base-directories`), and legacy `/nix/var/nix/profiles/per-user` layouts. Running `nix` itself to install packages is not in scope, and `~/.config/nix` (which may contain `access-tokens`) remains unreadable.
+
+### Thanks
+
+- @Rhys-T for contributing Nix package manager support in [#97](https://github.com/eugene1g/agent-safehouse/pull/97).
+
 ### Changed Sandboxing Profiles
 
-- No profiles changed.
+- `10-system-runtime.sb`: Added read-only grants for `/nix/store`, `/nix/var/nix/profiles`, and Nix per-user profile pointer symlinks.
 
 ## [0.11.1] - 2026-07-16
 

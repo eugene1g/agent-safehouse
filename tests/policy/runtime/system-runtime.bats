@@ -159,10 +159,28 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "(literal \"/nix\")"
   sft_assert_contains "$profile" "(home-literal \"/.nix-profile\")"
   sft_assert_contains "$profile" "(home-literal \"/.local/state/nix/profile\")"
-  sft_assert_contains "$profile" "(home-prefix \"/.local/state/nix/profiles\")"
+  sft_assert_contains "$profile" "(home-subpath \"/.local/state/nix/profiles\")"
 
-  # The Nix store is read-only: it must not appear in any write grant.
-  sft_assert_not_contains "$profile" "file-write* (subpath \"/nix"
+  # Assert on a comment-stripped rendering so ;; commentary cannot mask or fake grants.
+  local grants
+  grants="$(printf '%s\n' "$profile" | sed 's/;;.*$//')"
+
+  # ~/.config/nix is deliberately not granted: only the nix CLI reads it (out of
+  # scope for running installed programs) and nix.conf may hold access-tokens.
+  sft_assert_not_contains "$grants" "\"/.config/nix\""
+
+  # The Nix store is read-only: no write-capable allow block may reference /nix.
+  # Grants are multi-line s-expressions, so scan whole blocks (tracking paren
+  # depth) rather than single lines.
+  local write_blocks
+  write_blocks="$(printf '%s\n' "$grants" | awk '
+    !inblock && /^\(allow [^;]*file-write/ { inblock = 1; depth = 0 }
+    inblock {
+      print
+      depth += gsub(/\(/, "(") - gsub(/\)/, ")")
+      if (depth <= 0) inblock = 0
+    }')"
+  sft_assert_not_contains "$write_blocks" "\"/nix"
 }
 
 @test "[EXECUTION] Nix store is readable but not writable in the default sandbox" {
@@ -189,7 +207,7 @@ load ../../test_helper.bash
   /bin/ln -sfn "${nix_profiles}/default" "${fake_home}/.nix-profile"
   /bin/ln -sfn "${nix_profiles}/default" "${fake_home}/.local/state/nix/profile"
 
-  # Granted: the profiles dir + its contents (home-prefix) and the pointer symlinks.
+  # Granted: the profiles dir + its contents (home-subpath) and the pointer symlinks.
   # NOTE: this readdir also exercises traversal through ~/.local/state and
   # ~/.local/state/nix, which have no metadata grant of their own — if this
   # assertion fails, the profile needs a file-read-metadata grant on those parents.
