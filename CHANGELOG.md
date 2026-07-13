@@ -8,7 +8,15 @@
 
 ### Bug Fixes
 
+- `--enable=chromium-full` now unblocks sockets needed to run Chromium. Chrome was already unblocked.
+    - Known Issue: The Chrome for Testing socket still needs to be unblocked,
+      once its path has been determined.
+- `--enable=chromium-headless` now unblocks sockets, plists, and Crashpad needed to run Chrome,
+  Chrome for Testing, and Chromium.
+    - Known Issue: The Chrome for Testing socket still needs to be unblocked,
+      once its path has been determined.
 - `--enable=docker` now re-opens the Podman sockets (the system socket and the per-machine sockets) it previously left blocked, so `docker`/`podman` clients pointed at a Podman unix socket can `connect()` instead of failing with `EPERM`. Previously only the Docker sockets were re-opened even though the core deny profile blocked both Docker and Podman.
+- `--enable=ssh` now unblocks the new location of the SSH_AUTH_SOCK socket on macOS Tahoe 26+.
 
 ### Changed Sandboxing Profiles
 
