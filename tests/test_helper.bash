@@ -233,6 +233,20 @@ sft_assert_omits_source() {
   sft_assert_not_contains "$haystack" "$(sft_source_marker "$source_path")"
 }
 
+# Extract only the lines emitted for a single source section, i.e. from that
+# section's "Source:" marker up to (but excluding) the next section marker.
+# Useful for asserting a rule lives in a specific profile rather than merely
+# somewhere in the assembled output (deny and allow blocks can share strings).
+sft_profile_source_section() {
+  local haystack="$1" source_path="$2" marker
+  marker="$(sft_source_marker "$source_path")"
+
+  printf '%s\n' "$haystack" | awk -v marker="$marker" '
+    index($0, ";; Source: ") == 1 { insec = (index($0, marker) > 0) }
+    insec { print }
+  '
+}
+
 sft_assert_order() {
   local haystack="$1" first="$2" second="$3"
   local first_line second_line

@@ -30,6 +30,50 @@ load ../../test_helper.bash
   sft_assert_order "$profile" "$(sft_source_marker "50-integrations-core/container-runtime-default-deny.sb")" "$(sft_source_marker "55-integrations-optional/docker.sb")"
 }
 
+@test "[POLICY-ONLY] podman sockets are denied by default and not re-opened without enable=docker" { # https://github.com/eugene1g/agent-safehouse/issues/19
+  local profile deny
+  profile="$(safehouse_profile)"
+  deny="$(sft_profile_source_section "$profile" "50-integrations-core/container-runtime-default-deny.sb")"
+
+  # The core deny profile blocks connect() on the podman sockets — both the
+  # system API sockets and the per-machine sockets under HOME.
+  sft_assert_contains "$deny" "(remote unix-socket (path-literal \"/var/run/podman/podman.sock\"))"
+  sft_assert_contains "$deny" "(remote unix-socket (path-literal \"/private/var/run/podman/podman.sock\"))"
+  sft_assert_contains "$deny" "(remote unix-socket (path-regex (string-append \"^\" HOME_DIR \"/\\\\.local/share/containers/podman/machine/podman\\\\.sock\$\")))"
+  sft_assert_contains "$deny" "(remote unix-socket (path-regex (string-append \"^\" HOME_DIR \"/\\\\.config/containers/podman/machine/podman\\\\.sock\$\")))"
+
+  # Without enable=docker the optional profile is absent, so nothing re-opens them.
+  sft_assert_omits_source "$profile" "55-integrations-optional/docker.sb"
+}
+
+@test "[POLICY-ONLY] enable=docker re-opens the podman sockets symmetrically with the deny block" { # https://github.com/eugene1g/agent-safehouse/issues/19
+  local profile reopen
+  profile="$(safehouse_profile --enable=docker)"
+
+  # Assert the re-opens appear inside the optional docker.sb section specifically.
+  # The core deny block contains identical socket strings, so a whole-profile
+  # substring check would false-pass even if these allow rules were removed.
+  reopen="$(sft_profile_source_section "$profile" "55-integrations-optional/docker.sb")"
+
+  # File-level re-opens for the system podman API socket and machine state dirs.
+  sft_assert_contains "$reopen" "(literal \"/var/run/podman/podman.sock\")"
+  sft_assert_contains "$reopen" "(literal \"/private/var/run/podman/podman.sock\")"
+  sft_assert_contains "$reopen" "(home-subpath \"/.local/share/containers\")"
+  sft_assert_contains "$reopen" "(home-subpath \"/.config/containers\")"
+
+  # network-outbound connect() re-opens — the block that actually unblocks the
+  # client — mirroring the deny block's podman entries exactly.
+  sft_assert_contains "$reopen" "(remote unix-socket (path-literal \"/var/run/podman/podman.sock\"))"
+  sft_assert_contains "$reopen" "(remote unix-socket (path-literal \"/private/var/run/podman/podman.sock\"))"
+  sft_assert_contains "$reopen" "(remote unix-socket (path-regex (string-append \"^\" HOME_DIR \"/\\\\.local/share/containers/podman/machine/podman\\\\.sock\$\")))"
+  sft_assert_contains "$reopen" "(remote unix-socket (path-regex (string-append \"^\" HOME_DIR \"/\\\\.local/share/containers/podman/machine/[^/]+/podman\\\\.sock\$\")))"
+  sft_assert_contains "$reopen" "(remote unix-socket (path-regex (string-append \"^\" HOME_DIR \"/\\\\.config/containers/podman/machine/podman\\\\.sock\$\")))"
+  sft_assert_contains "$reopen" "(remote unix-socket (path-regex (string-append \"^\" HOME_DIR \"/\\\\.config/containers/podman/machine/[^/]+/podman\\\\.sock\$\")))"
+
+  # The re-opens must come after the core deny so allow wins (later rules win).
+  sft_assert_order "$profile" "$(sft_source_marker "50-integrations-core/container-runtime-default-deny.sb")" "$(sft_source_marker "55-integrations-optional/docker.sb")"
+}
+
 @test "[POLICY-ONLY] enable=docker grants read access to Docker.app bundle" { # https://github.com/eugene1g/agent-safehouse/issues/117
   local profile
   profile="$(safehouse_profile --enable=docker)"

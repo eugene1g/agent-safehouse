@@ -6,9 +6,13 @@
 
 - No special notes.
 
+### Bug Fixes
+
+- `--enable=docker` now re-opens the Podman sockets (the system socket and the per-machine sockets) it previously left blocked, so `docker`/`podman` clients pointed at a Podman unix socket can `connect()` instead of failing with `EPERM`. Previously only the Docker sockets were re-opened even though the core deny profile blocked both Docker and Podman.
+
 ### Changed Sandboxing Profiles
 
-- No profiles changed.
+- [`docker.sb`](https://github.com/eugene1g/agent-safehouse/blob/main/profiles/55-integrations-optional/docker.sb): Re-opened the Podman sockets (system, and `~/.local/share/containers` / `~/.config/containers` machine sockets) for both file access and `network-outbound` connect, symmetric with the deny rules in `container-runtime-default-deny.sb`.
 
 ## [0.11.0] - 2026-07-07
 
