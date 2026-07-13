@@ -38,32 +38,12 @@
     (literal "/Library")                                              ;; Headed Chrome probes the Library root during desktop app bootstrap.
     (home-literal "/Library/Preferences/com.google.Chrome.plist")
     (home-literal "/Library/Preferences/com.google.chrome.for.testing.plist")
+    (home-literal "/Library/Preferences/org.chromium.Chromium.plist")
     (home-literal "/Library/Google/Google Chrome Brand.plist")
 )
 
 (allow file-read* file-write*
-    (home-literal "/Library/Application Support/Google/Chrome/DevToolsActivePort")        ;; Full-browser Chrome launches wait on this exact DevTools handshake file.
-    (home-subpath "/Library/Application Support/Google/Chrome/Crashpad")                   ;; Chrome stable keeps Crashpad state under the regular Google Chrome app-support tree.
-    (home-subpath "/Library/Application Support/Google/Chrome for Testing/Crashpad")       ;; Crashpad keeps its database and metadata under the Chrome for Testing app-support tree.
-)
-(allow file-read-xattr file-write-xattr
-    (home-subpath "/Library/Application Support/Google/Chrome for Testing/Crashpad")       ;; Chrome for Testing crashpad initialization probes xattrs on its initialized marker.
-)
-
-;; Chrome's ProcessSingleton binds, listens, and connects to a UNIX socket.
-;; Without these allows, full-browser launch aborts at startup 
-;; with error "Failed to bind() ... SingletonSocket".
-(allow network-bind
-    (local unix-socket
-        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
-)
-(allow network-inbound
-    (local unix-socket
-        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
-)
-(allow network-outbound
-    (remote unix-socket
-        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
+    (home-literal "/Library/Application Support/Google/Chrome/DevToolsActivePort")         ;; Full-browser Chrome launches wait on this exact DevTools handshake file.
 )
 
 (allow mach-register

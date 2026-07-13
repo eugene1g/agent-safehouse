@@ -117,12 +117,28 @@
 
 ;; Branded Google Chrome crashpad database initialization requires xattr and write access.
 ;; Chromium/Playwright typically uses a temp-dir profile that lands under /tmp (already allowed).
-;; Google Chrome defaults to ~/Library/Application Support/Google/Chrome/Crashpad.
-(allow file-read* file-write*
+(allow file-read* file-write* file-read-xattr file-write-xattr
     (home-subpath "/Library/Application Support/Google/Chrome/Crashpad")
+    (home-subpath "/Library/Application Support/Google/Chrome for Testing/Crashpad")
+    (home-subpath "/Library/Application Support/Chromium/Crashpad")
 )
-(allow file-read-xattr file-write-xattr
-    (home-subpath "/Library/Application Support/Google/Chrome/Crashpad")
+
+;; Chrome's ProcessSingleton binds, listens, and connects to a UNIX socket.
+;; Without these allows, full-browser launch aborts at startup 
+;; with error "Failed to bind() ... SingletonSocket".
+(allow network-bind network-inbound
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
+    ; TODO: Add path-regex for Chrome for Testing here
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/\.org\.chromium\.Chromium\.[^/]+/SingletonSocket$"))
+)
+(allow network-outbound
+    (remote unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/com\.google\.Chrome\.[^/]+/SingletonSocket$"))
+    ; TODO: Add path-regex for Chrome for Testing here
+    (remote unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/\.org\.chromium\.Chromium\.[^/]+/SingletonSocket$"))
 )
 
 (allow system-fsctl
