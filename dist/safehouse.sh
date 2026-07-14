@@ -3383,6 +3383,20 @@ safehouse_git_command_available() {
   command -v git >/dev/null 2>&1
 }
 
+safehouse_git_read_single_line_path_file() {
+  local path="$1"
+  local label="$2"
+  local line="" extra_line=""
+
+  IFS= read -r line < "$path" || true
+  if IFS= read -r extra_line < <(sed -n '2p' "$path"); then
+    safehouse_fail "Invalid ${label}: contains control characters and cannot be emitted into SBPL."
+    return 1
+  fi
+  safehouse_validate_sb_string "$line" "$label" || return 1
+  printf '%s\n' "$line"
+}
+
 safehouse_git_normalize_discovery_cwd() {
   local cwd="$1"
 
@@ -3411,7 +3425,7 @@ safehouse_git_marker_path_is_repo_root() {
     return 1
   fi
 
-  IFS= read -r first_line < "$marker_path" || true
+  first_line="$(safehouse_git_read_single_line_path_file "$marker_path" "git metadata path")" || return 1
   [[ "$first_line" == gitdir:\ * ]] || return 1
 
   git_dir="${first_line#gitdir: }"
@@ -3439,6 +3453,7 @@ safehouse_git_find_root_from_filesystem() {
   while [[ -n "$probe_dir" ]]; do
     marker_path="${probe_dir%/}/.git"
     if safehouse_git_marker_path_is_repo_root "$marker_path"; then
+      safehouse_validate_sb_string "$probe_dir" "git root path" || return 1
       printf '%s\n' "$probe_dir"
       return 0
     fi
@@ -3462,6 +3477,7 @@ safehouse_find_git_root_via_git() {
 
   git_root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)"
   if [[ -n "$git_root" && -d "$git_root" ]]; then
+    safehouse_validate_sb_string "$git_root" "git root path" || return 1
     printf '%s\n' "$git_root"
     return 0
   fi
@@ -3501,7 +3517,7 @@ safehouse_git_resolve_worktree_gitdir_from_marker() {
 
   [[ -f "$marker_path" ]] || return 1
 
-  IFS= read -r git_dir_line < "$marker_path" || true
+  git_dir_line="$(safehouse_git_read_single_line_path_file "$marker_path" "git metadata path")" || return 1
   [[ "$git_dir_line" == gitdir:\ * ]] || return 1
 
   git_dir="${git_dir_line#gitdir: }"
@@ -3521,7 +3537,7 @@ safehouse_git_find_worktree_common_dir_from_filesystem() {
   [[ -n "$git_dir" && -d "$git_dir" ]] || return 1
   [[ -f "${git_dir}/commondir" ]] || return 1
 
-  IFS= read -r git_common_dir_rel < "${git_dir}/commondir" || true
+  git_common_dir_rel="$(safehouse_git_read_single_line_path_file "${git_dir}/commondir" "git common dir path")" || return 1
   [[ -n "$git_common_dir_rel" ]] || return 1
 
   git_common_dir="$(safehouse_git_resolve_path_from_base_dir "$git_dir" "$git_common_dir_rel" || true)"
@@ -3600,6 +3616,7 @@ safehouse_emit_git_worktree_paths_from_filesystem() {
   if [[ "$common_dir" != "${repo_root}/.git" ]]; then
     main_worktree_root="$(safehouse_git_resolve_main_worktree_root_from_common_dir "$common_dir" || true)"
     [[ -n "$main_worktree_root" ]] || return 1
+    safehouse_validate_sb_string "$main_worktree_root" "git worktree path" || return 1
     printf '%s\n' "$main_worktree_root"
   fi
 
@@ -3607,7 +3624,7 @@ safehouse_emit_git_worktree_paths_from_filesystem() {
     [[ -d "$entry_dir" ]] || continue
     [[ -f "${entry_dir}/gitdir" ]] || continue
 
-    IFS= read -r gitdir_path < "${entry_dir}/gitdir" || true
+    gitdir_path="$(safehouse_git_read_single_line_path_file "${entry_dir}/gitdir" "git worktree path")" || return 1
     [[ -n "$gitdir_path" ]] || continue
 
     if [[ "$gitdir_path" == /* ]]; then
@@ -3622,35 +3639,40 @@ safehouse_emit_git_worktree_paths_from_filesystem() {
     [[ -n "$worktree_path" && -d "$worktree_path" ]] || continue
 
     normalized_path="$(safehouse_normalize_abs_path "$worktree_path")" || return 1
+    safehouse_validate_sb_string "$normalized_path" "git worktree path" || return 1
     printf '%s\n' "$normalized_path"
   done
 }
 
 safehouse_emit_git_worktree_paths_via_git() {
   local cwd="$1"
-  local line=""
+  local field=""
   local worktree_path=""
   local normalized_path=""
 
   safehouse_git_command_available || return 1
+  git -C "$cwd" worktree list --porcelain -z >/dev/null 2>&1 || return 1
 
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    case "$line" in
-      "worktree "*) worktree_path="${line#worktree }" ;;
+  while IFS= read -r -d '' field; do
+    case "$field" in
+      "worktree "*) worktree_path="${field#worktree }" ;;
       *) continue ;;
     esac
 
     [[ -n "$worktree_path" ]] || continue
+    safehouse_validate_sb_string "$worktree_path" "git worktree path" || return 1
     if [[ "$worktree_path" != /* ]]; then
       worktree_path="${cwd%/}/${worktree_path}"
     fi
+    safehouse_validate_sb_string "$worktree_path" "git worktree path" || return 1
     if [[ ! -d "$worktree_path" ]]; then
       continue
     fi
 
     normalized_path="$(safehouse_normalize_abs_path "$worktree_path")" || continue
+    safehouse_validate_sb_string "$normalized_path" "git worktree path" || return 1
     printf '%s\n' "$normalized_path"
-  done < <(git -C "$cwd" worktree list --porcelain 2>/dev/null || true)
+  done < <(git -C "$cwd" worktree list --porcelain -z 2>/dev/null)
 }
 
 safehouse_emit_git_worktree_paths() {
@@ -4549,7 +4571,9 @@ policy_request_resolve_home_and_cwd() {
   fi
 
   policy_req_home_dir="$(safehouse_normalize_abs_path "$home_dir")" || return 1
+  safehouse_validate_sb_string "$policy_req_home_dir" "HOME path" || return 1
   policy_req_invocation_cwd="$(pwd -P)"
+  safehouse_validate_sb_string "$policy_req_invocation_cwd" "invocation CWD" || return 1
   if [[ ! -d "$policy_req_invocation_cwd" ]]; then
     safehouse_fail "Invocation CWD does not exist or is not a directory: ${policy_req_invocation_cwd}"
     return 1
@@ -4759,6 +4783,7 @@ policy_request_set_effective_workdir_from_value() {
     fi
 
     policy_req_effective_workdir="$(safehouse_normalize_abs_path "$resolved_workdir_path")" || return 1
+    safehouse_validate_sb_string "$policy_req_effective_workdir" "workdir path" || return 1
     policy_req_effective_workdir_source="$source_label"
     return 0
   fi
@@ -4823,6 +4848,7 @@ policy_request_resolve_git_worktree_common_dir_access() {
 
 policy_request_resolve_git_linked_worktree_access() {
   local worktree_path=""
+  local worktree_paths_output=""
 
   policy_req_git_linked_worktree_paths=()
 
@@ -4830,13 +4856,15 @@ policy_request_resolve_git_linked_worktree_access() {
     return 0
   fi
 
+  worktree_paths_output="$(safehouse_emit_git_worktree_paths "$policy_req_effective_workdir_git_root")" || return 1
+
   while IFS= read -r worktree_path || [[ -n "$worktree_path" ]]; do
     [[ -n "$worktree_path" ]] || continue
     if [[ "$worktree_path" == "$policy_req_effective_workdir" ]]; then
       continue
     fi
     safehouse_array_append_unique policy_req_git_linked_worktree_paths "$worktree_path"
-  done < <(safehouse_emit_git_worktree_paths "$policy_req_effective_workdir_git_root")
+  done <<< "$worktree_paths_output"
 }
 
 policy_request_resolve_append_profile_paths() {

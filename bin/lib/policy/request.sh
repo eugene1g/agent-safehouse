@@ -218,7 +218,9 @@ policy_request_resolve_home_and_cwd() {
   fi
 
   policy_req_home_dir="$(safehouse_normalize_abs_path "$home_dir")" || return 1
+  safehouse_validate_sb_string "$policy_req_home_dir" "HOME path" || return 1
   policy_req_invocation_cwd="$(pwd -P)"
+  safehouse_validate_sb_string "$policy_req_invocation_cwd" "invocation CWD" || return 1
   if [[ ! -d "$policy_req_invocation_cwd" ]]; then
     safehouse_fail "Invocation CWD does not exist or is not a directory: ${policy_req_invocation_cwd}"
     return 1
@@ -428,6 +430,7 @@ policy_request_set_effective_workdir_from_value() {
     fi
 
     policy_req_effective_workdir="$(safehouse_normalize_abs_path "$resolved_workdir_path")" || return 1
+    safehouse_validate_sb_string "$policy_req_effective_workdir" "workdir path" || return 1
     policy_req_effective_workdir_source="$source_label"
     return 0
   fi
@@ -492,6 +495,7 @@ policy_request_resolve_git_worktree_common_dir_access() {
 
 policy_request_resolve_git_linked_worktree_access() {
   local worktree_path=""
+  local worktree_paths_output=""
 
   policy_req_git_linked_worktree_paths=()
 
@@ -499,13 +503,15 @@ policy_request_resolve_git_linked_worktree_access() {
     return 0
   fi
 
+  worktree_paths_output="$(safehouse_emit_git_worktree_paths "$policy_req_effective_workdir_git_root")" || return 1
+
   while IFS= read -r worktree_path || [[ -n "$worktree_path" ]]; do
     [[ -n "$worktree_path" ]] || continue
     if [[ "$worktree_path" == "$policy_req_effective_workdir" ]]; then
       continue
     fi
     safehouse_array_append_unique policy_req_git_linked_worktree_paths "$worktree_path"
-  done < <(safehouse_emit_git_worktree_paths "$policy_req_effective_workdir_git_root")
+  done <<< "$worktree_paths_output"
 }
 
 policy_request_resolve_append_profile_paths() {
