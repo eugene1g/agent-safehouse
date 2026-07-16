@@ -13,3 +13,6 @@
 )
 
 (allow signal)                         ;; Allow signalling host processes (kill, pkill, kill -0).
+
+;; #safehouse-test-id:process-control-procargs-allow#
+(allow process-info-pidinfo)           ;; Host argv/env via kern.procargs{,2} for supervision tools

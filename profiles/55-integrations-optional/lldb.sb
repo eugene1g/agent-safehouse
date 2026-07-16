@@ -30,6 +30,7 @@
     (regex #"^/System/Volumes/Data/Applications/Xcode[^/]*\.app(/.*)?$")
 )
 
+;; #safehouse-test-id:lldb-procargs-allow#
 (allow process-info-pidinfo)           ;; Host process status/introspection used by debugger inspection flows.
 (allow process-info-setcontrol)        ;; Process control metadata operations used by LLDB/debugserver.
 (allow mach-priv-task-port)            ;; Allow task-port lookups for debuggers and advanced process inspection.

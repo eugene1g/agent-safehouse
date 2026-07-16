@@ -50,7 +50,7 @@ Enable only when required for the current task:
 - `microphone`: microphone capture via TCC/CoreAudio/CMIO without broader GUI grants.
 - `browser-native-messaging`: browser host messaging integration.
 - `playwright-chrome`: Playwright Chrome-family channels plus injected `PLAYWRIGHT_MCP_SANDBOX=false`.
-- `process-control`: host process enumeration/signalling for local supervision tools.
+- `process-control`: host process enumeration/signalling and argv/env visibility for local supervision tools.
 - `lldb`: LLDB/debugger toolchain access plus debugger-grade host process inspection.
 - `vscode`: Visual Studio Code desktop/editor integration, including cold-start Claude editor handoff support. Without `--enable=vscode`, Claude can only reuse an already-running VS Code instance for external-editor handoff. If `EDITOR` or `VISUAL` is set, Safehouse does not inject the VS Code-specific Claude fallback.
 - `xcode`: full Xcode developer roots plus Xcode/CoreSimulator user state.
@@ -68,7 +68,7 @@ Enable only when required for the current task:
 - Browser profile/cookie/session data, even when `browser-native-messaging` is enabled.
 - Shell startup files unless `shell-init` is enabled.
 - Clipboard access unless `clipboard` is enabled.
-- Host process enumeration/control unless `process-control` or `lldb` is enabled.
+- Host process enumeration/control and argv/env visibility unless `process-control` or `lldb` is enabled.
 - LLDB/debugger toolchain and task-port access unless `lldb` is enabled.
 - Full Xcode developer roots and Xcode/CoreSimulator state unless `xcode` is enabled.
 - Broad raw device access under `/dev`.

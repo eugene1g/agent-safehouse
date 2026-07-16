@@ -91,6 +91,19 @@
 (allow mach-priv-task-port (target same-sandbox))                     ;; Required by some runtimes for same-sandbox process controls.
 (allow pseudo-tty)                                                    ;; Required for interactive terminal sessions and PTY allocation.
 
+;; Block inspection of host processes' full argv and environment
+;;
+;; Empirically (tested on macOS 26), a kern.procargs{,2} sysctl to read another
+;; process's argv/env succeeds if either sysctl-read of kern.procargs{,2}.<pid>
+;; or process-info-pidinfo is allowed.
+;;
+;; Re-allow by enabling process-control or lldb.
+;;
+;; #safehouse-test-id:cross-process-procargs-deny#
+(deny sysctl-read (sysctl-name-regex #"procargs"))                    ;; Directly default deny kern.procargs/kern.procargs2 sysctls.
+(deny process-info-pidinfo)                                           ;; Also default deny pidinfo (NOT covered by `(default deny)`)
+(allow process-info-pidinfo (target same-sandbox))                    ;; In-sandbox, allow pidinfo to reenable the procargs sysctls.
+
 ;; TTY ioctls are a separate file-ioctl category in SBPL — `pseudo-tty`
 ;; only covers /dev/ptmx allocation, not ioctls on the resulting tty fd.
 ;; Without these, tcsetattr (TIOCSETAW = _IO('t',21)) and ptsname's

@@ -45,6 +45,15 @@ teardown() {
   wait "$process_debug_pid" 2>/dev/null || true
 }
 
+@test "[POLICY-ONLY] enable=process-control restores argv/env (pidinfo) reads after the base deny" {
+  local profile
+  profile="$(safehouse_profile --enable=process-control)"
+
+  sft_assert_contains "$profile" "#safehouse-test-id:process-control-procargs-allow#"
+  sft_assert_contains "$profile" '(allow process-info-pidinfo)'
+  sft_assert_order "$profile" "#safehouse-test-id:cross-process-procargs-deny#" "#safehouse-test-id:process-control-procargs-allow#"
+}
+
 @test "[EXECUTION] reading a host process's argv/env is denied by default, allowed with --enable=process-control" {
   sft_require_cmd_or_skip python3
 
