@@ -220,3 +220,21 @@ load ../../test_helper.bash
   HOME="$fake_home" safehouse_denied -- /bin/ls "$other_state"
   HOME="$fake_home" safehouse_denied -- /bin/cat "${other_state}/secret"
 }
+
+@test "[EXECUTION] default sandbox can read a same-sandbox process's argv via procargs/procargs2" {
+  sft_require_cmd_or_skip python3
+
+  local reader selector
+  reader="$(sft_procargs_reader_py)"
+  for selector in $KERN_PROCARGS $KERN_PROCARGS2; do
+    safehouse_run -- /bin/sh -c '/bin/sleep 2 & c=$!; /bin/sleep 1; exec python3 -c "$1" "$2" "$c"' _ "$reader" "$selector"
+    [ "$status" -eq 0 ]
+    sft_assert_contains "$output" "sleep"
+  done
+}
+
+@test "[EXECUTION] default sandbox keeps general sysctl reads working" {
+  local ncpu
+  ncpu="$(safehouse_ok -- /usr/sbin/sysctl -n hw.ncpu)"
+  [[ "$ncpu" =~ ^[0-9]+$ ]]
+}

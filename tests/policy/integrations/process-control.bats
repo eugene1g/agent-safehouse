@@ -3,6 +3,17 @@
 
 load ../../test_helper.bash
 
+# Overrides the shared teardown (test_helper.bash) to also reap the background target,
+# which the in-test cleanup misses when a test aborts on a failed assertion.
+teardown() {
+  if [ -n "${target_pid:-}" ]; then
+    kill "$target_pid" 2>/dev/null || true
+    wait "$target_pid" 2>/dev/null || true
+  fi
+
+  sft_teardown_test_env
+}
+
 @test "[POLICY-ONLY] enable=process-control includes its optional profile source" {
   local profile
   profile="$(safehouse_profile --enable=process-control)"
@@ -32,4 +43,31 @@ load ../../test_helper.bash
 
   /bin/kill "$process_debug_pid" >/dev/null 2>&1 || true
   wait "$process_debug_pid" 2>/dev/null || true
+}
+
+@test "[EXECUTION] reading a host process's argv/env is denied by default, allowed with --enable=process-control" {
+  sft_require_cmd_or_skip python3
+
+  local reader
+  reader="$(sft_procargs_reader_py)"
+
+  TARGET_ENV_CANARY="target-env-canary"
+  TARGET_ARGV_CANARY="target-argv-canary"
+  ENV_CANARY="$TARGET_ENV_CANARY" python3 -c 'import time; time.sleep(300)' "$TARGET_ARGV_CANARY" </dev/null >/dev/null 2>&1 &
+  target_pid=$!
+
+  local selector
+  for selector in $KERN_PROCARGS $KERN_PROCARGS2; do
+    /bin/kill -0 "$target_pid"
+
+    safehouse_run -- python3 -c "$reader" "$selector" "$target_pid"
+    [ "$status" -ne 0 ]
+    sft_assert_not_contains "$output" "$TARGET_ARGV_CANARY"
+    sft_assert_not_contains "$output" "$TARGET_ENV_CANARY"
+
+    safehouse_run --enable=process-control -- python3 -c "$reader" "$selector" "$target_pid"
+    [ "$status" -eq 0 ]
+    sft_assert_contains "$output" "$TARGET_ARGV_CANARY"
+    sft_assert_contains "$output" "$TARGET_ENV_CANARY"
+  done
 }
