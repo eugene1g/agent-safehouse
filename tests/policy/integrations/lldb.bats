@@ -42,6 +42,15 @@ teardown() {
   safehouse_ok --enable=lldb -- /usr/bin/xcrun -f lldb >/dev/null
 }
 
+@test "[POLICY-ONLY] enable=lldb restores argv/env (pidinfo) reads after the base deny" {
+  local profile
+  profile="$(safehouse_profile --enable=lldb)"
+
+  sft_assert_contains "$profile" "#safehouse-test-id:lldb-procargs-allow#"
+  sft_assert_contains "$profile" '(allow process-info-pidinfo)'
+  sft_assert_order "$profile" "#safehouse-test-id:cross-process-procargs-deny#" "#safehouse-test-id:lldb-procargs-allow#"
+}
+
 @test "[EXECUTION] reading a host process's argv/env is denied by default, allowed with --enable=lldb" {
   sft_require_cmd_or_skip python3
 
