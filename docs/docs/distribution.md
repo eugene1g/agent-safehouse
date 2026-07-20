@@ -20,14 +20,15 @@ The embedded fixed-profile chunks in `dist/safehouse.sh` still go through runtim
 ## Desktop Apps
 
 Known `.app` bundles are selected automatically when you launch their inner
-binary through Safehouse. Today that includes `Claude.app` and `Visual Studio Code.app`.
-Claude Desktop also auto-includes the shared `claude-code` profile and its
-transitive integrations.
+binary through Safehouse. Today that includes `Claude.app`, `Cursor.app`, and
+`Visual Studio Code.app`. Claude Desktop also auto-includes the shared
+`claude-code` profile and its transitive integrations.
 
 Examples:
 
 ```bash
 ./dist/safehouse.sh -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
+./dist/safehouse.sh -- /Applications/Cursor.app/Contents/MacOS/Cursor --no-sandbox
 ./dist/safehouse.sh -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
 ```
 

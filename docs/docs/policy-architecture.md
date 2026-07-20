@@ -14,7 +14,7 @@ Policy assembly order:
 | `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`) |
 | `55-integrations-optional/*.sb` | Opt-in integrations (`--enable=...`) |
 | `60-agents/*.sb` | Per-agent profile selection by command basename |
-| `65-apps/*.sb` | Per-app bundle selection (`Claude.app`, `Visual Studio Code.app`) |
+| `65-apps/*.sb` | Per-app bundle selection (`Claude.app`, `Cursor.app`, `Visual Studio Code.app`) |
 | Config/env/CLI grants | Trusted `.safehouse` config, env grants, CLI grants, auto-detected app bundle read grant, selected workdir, launch-time active-worktree common-dir grant, and launch-time sibling worktree read grants |
 | Appended profiles | User profile overlays via `--append-profile` (loaded last) |
 | Terminal deny rules | Unconditional deny rules emitted after all path grants and appended profiles |

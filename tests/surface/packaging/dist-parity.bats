@@ -13,15 +13,18 @@ load ../../test_helper.bash
 }
 
 @test "[POLICY-ONLY] bin and dist command-scoped policies match for alias-driven and app-hosted commands" {
-  local fake_copilot_bin fake_claude_app_bin fake_codex_app_bin
+  local fake_copilot_bin fake_claude_app_bin fake_codex_app_bin fake_cursor_app_bin
   local bin_copilot dist_copilot bin_claude_app dist_claude_app bin_codex_app dist_codex_app
+  local bin_cursor_app dist_cursor_app
 
   fake_copilot_bin="$(sft_workspace_path "copilot")"
   fake_claude_app_bin="$(sft_workspace_path "Claude.app/Contents/MacOS/Claude")"
   fake_codex_app_bin="$(sft_workspace_path "Codex.app/Contents/MacOS/codex")"
+  fake_cursor_app_bin="$(sft_workspace_path "Cursor.app/Contents/MacOS/Cursor")"
   sft_make_fake_command "$fake_copilot_bin"
   sft_make_fake_command "$fake_claude_app_bin"
   sft_make_fake_command "$fake_codex_app_bin"
+  sft_make_fake_command "$fake_cursor_app_bin"
 
   bin_copilot="$("${SAFEHOUSE_REPO_ROOT}/bin/safehouse.sh" --stdout -- "$fake_copilot_bin")"
   dist_copilot="$(safehouse_profile -- "$fake_copilot_bin")"
@@ -42,6 +45,14 @@ load ../../test_helper.bash
   sft_assert_includes_source "$dist_codex_app" "55-integrations-optional/electron.sb"
   sft_assert_includes_source "$dist_codex_app" "55-integrations-optional/keychain.sb"
   sft_assert_omits_source "$dist_codex_app" "60-agents/codex.sb"
+
+  bin_cursor_app="$("${SAFEHOUSE_REPO_ROOT}/bin/safehouse.sh" --stdout -- "$fake_cursor_app_bin")"
+  dist_cursor_app="$(safehouse_profile -- "$fake_cursor_app_bin")"
+  [ "$bin_cursor_app" = "$dist_cursor_app" ]
+  sft_assert_includes_source "$dist_cursor_app" "65-apps/cursor-app.sb"
+  sft_assert_includes_source "$dist_cursor_app" "55-integrations-optional/electron.sb"
+  sft_assert_includes_source "$dist_cursor_app" "55-integrations-optional/keychain.sb"
+  sft_assert_omits_source "$dist_cursor_app" "60-agents/cursor-agent.sb"
 }
 
 @test "[EXECUTION] bin and dist apply playwright-chrome exec env defaults identically" {

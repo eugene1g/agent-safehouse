@@ -72,6 +72,7 @@ PROFILE_KEYS=(
   "profiles/60-agents/pi.sb"
   "profiles/65-apps/claude-app.sb"
   "profiles/65-apps/codex-app.sb"
+  "profiles/65-apps/cursor-app.sb"
   "profiles/65-apps/vscode-app.sb"
 )
 
@@ -2846,6 +2847,86 @@ __SAFEHOUSE_EMBEDDED_profiles_65_apps_claude_app_sb__
 )
 __SAFEHOUSE_EMBEDDED_profiles_65_apps_codex_app_sb__
       ;;
+    "profiles/65-apps/cursor-app.sb")
+      cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_cursor_app_sb__'
+;; ---------------------------------------------------------------------------
+;; App: Cursor Desktop
+;; Cursor desktop app bundle, preferences, and data paths (VS Code fork via
+;; todesktop; bundle ID com.todesktop.230313mzl4w4u92).
+;; Source: 65-apps/cursor-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/electron.sb$$
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/keychain.sb     (desktop auth flows)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView; transitively pulls macos-gui)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Cursor")
+    (home-subpath "/Library/Logs/Cursor")
+    (home-subpath "/Library/HTTPStorages/com.todesktop.230313mzl4w4u92")
+    (home-subpath "/Library/Caches/com.todesktop.230313mzl4w4u92")
+    (home-subpath "/Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt")
+    (home-subpath "/Library/Saved Application State/com.todesktop.230313mzl4w4u92.savedState")
+    (home-subpath "/.cursor")
+
+    ;; Direct plist writes/unlink probes used during some Electron preference sync flows.
+    (home-literal "/Library/Preferences/com.todesktop.230313mzl4w4u92.plist")
+)
+
+(allow file-read*
+    ;; Ancestor traversal before resolving the app bundle itself.
+    (literal "/Applications")
+    (subpath "/Applications/Cursor.app")
+)
+
+;; Allow a sandboxed Cursor to receive commands (inherits VS Code IPC naming).
+(allow network-bind network-inbound
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-ipc-[0-9A-Fa-f-]+\.sock$")))
+;; Disallow sending commands to a potentially unsandboxed Cursor/VS Code,
+;; because IPC protocol gives wide capabilities like opening arbitrary URLs
+;; and opening arbitrary local directories with workspace-trust/auto-task behavior
+(deny network-outbound
+    (remote unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-ipc-[0-9A-Fa-f-]+\.sock$")))
+
+;; Disallow sharing of git credentials across a trust boundary.
+(deny network-outbound
+    (remote unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-git-[0-9a-f]+\.sock$")))
+(deny network-bind network-inbound
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-git-[0-9a-f]+\.sock$")))
+
+;; Electron single-instance socket (VSCODE_IPC_HOOK):
+;; <user-data-dir>/<version[0:4]>-main.sock, e.g. .../Cursor/3.12-main.sock.
+;; Allow bind/listen inside the sandbox; deny outbound connect to a potentially
+;; unsandboxed primary instance (would hand off arbitrary CLI args).
+(allow network-bind network-inbound
+    (local unix-socket
+        (path-regex (string-append "^" HOME_DIR "/Library/Application Support/Cursor/[0-9.]+-main\\.sock$"))))
+(deny network-outbound
+    (remote unix-socket
+        (path-regex (string-append "^" HOME_DIR "/Library/Application Support/Cursor/[0-9.]+-main\\.sock$"))))
+
+;; Cursor persists app preferences via cfprefsd under its todesktop domain.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.todesktop.230313mzl4w4u92")
+)
+
+;; Shared AppKit/Mach/fsctl allowances are provided by:
+;;   55-integrations-optional/macos-gui.sb
+;; This profile adds only app-specific MachPortRendezvousServer IPC grants.
+;; Team-ID-prefixed form is used by newer Electron/Chromium builds.
+(allow mach-lookup
+    (global-name-regex #"^(VDXQ22DGB9\.)?com\.todesktop\.230313mzl4w4u92\.MachPortRendezvousServer\.")
+)
+
+(allow mach-register
+    (global-name-regex #"^(VDXQ22DGB9\.)?com\.todesktop\.230313mzl4w4u92\.MachPortRendezvousServer\.")
+)
+__SAFEHOUSE_EMBEDDED_profiles_65_apps_cursor_app_sb__
+      ;;
     "profiles/65-apps/vscode-app.sb")
       cat <<'__SAFEHOUSE_EMBEDDED_profiles_65_apps_vscode_app_sb__'
 ;; ---------------------------------------------------------------------------
@@ -4298,6 +4379,9 @@ policy_selection_select_matching_app_bundle() {
     "visual studio code.app"|"visual studio code - insiders.app")
       policy_selection_append_scoped_profile "profiles/65-apps/vscode-app.sb" "app bundle match: ${app_bundle_base}"
       ;;
+    cursor.app)
+      policy_selection_append_scoped_profile "profiles/65-apps/cursor-app.sb" "app bundle match: ${app_bundle_base}"
+      ;;
   esac
 }
 
@@ -4362,6 +4446,12 @@ policy_selection_should_skip_command_alias_match() {
   fi
 
   if [[ "$app_bundle_base" == "codex.app" && "$profile_key" == "profiles/60-agents/codex.sb" && "$command_alias" == "codex" ]]; then
+    return 0
+  fi
+
+  # Cursor.app's MacOS binary is named "Cursor"; lowercased basename matches the
+  # cursor-agent CLI alias. Prefer the desktop app profile over the CLI agent.
+  if [[ "$app_bundle_base" == "cursor.app" && "$profile_key" == "profiles/60-agents/cursor-agent.sb" && "$command_alias" == "cursor" ]]; then
     return 0
   fi
 
@@ -8921,6 +9011,9 @@ policy_dist_emit_embedded_profile_requirement_tokens() {
     "profiles/65-apps/codex-app.sb")
       printf '%s\n' "55-integrations-optional/keychain.sb" "55-integrations-optional/electron.sb"
       ;;
+    "profiles/65-apps/cursor-app.sb")
+      printf '%s\n' "55-integrations-optional/keychain.sb" "55-integrations-optional/electron.sb"
+      ;;
     "profiles/65-apps/vscode-app.sb")
       printf '%s\n' "55-integrations-optional/keychain.sb" "55-integrations-optional/electron.sb"
       ;;
@@ -9124,6 +9217,9 @@ policy_dist_emit_embedded_profile_command_alias_tokens() {
     "profiles/65-apps/codex-app.sb")
       printf '%s\n' "codex-app"
       ;;
+    "profiles/65-apps/cursor-app.sb")
+      printf '%s\n' "cursor-app"
+      ;;
     "profiles/65-apps/vscode-app.sb")
       printf '%s\n' "vscode-app"
       ;;
@@ -9325,6 +9421,9 @@ policy_dist_emit_embedded_profile_exec_env_defaults() {
       :
       ;;
     "profiles/65-apps/codex-app.sb")
+      :
+      ;;
+    "profiles/65-apps/cursor-app.sb")
       :
       ;;
     "profiles/65-apps/vscode-app.sb")
