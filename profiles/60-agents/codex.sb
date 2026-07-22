@@ -16,6 +16,14 @@
     (home-subpath "/.cache/codex")
 )
 
+;; ChatGPT-installed Codex launches its bundled node_repl MCP server with the
+;; adjacent Node runtime/modules and passes this bundled CLI path via
+;; CODEX_CLI_PATH. Keep this narrower than the full ChatGPT app bundle.
+(allow file-read*
+    (subpath "/Applications/ChatGPT.app/Contents/Resources/cua_node")
+    (literal "/Applications/ChatGPT.app/Contents/Resources/codex")
+)
+
 (allow file-read*
     (home-literal "/Library/Preferences/com.openai.codex.plist")  ;; Codex user-level preferences plist.
     (literal "/Library/Preferences/com.openai.codex.plist")       ;; Codex system preferences plist (managed setups).
