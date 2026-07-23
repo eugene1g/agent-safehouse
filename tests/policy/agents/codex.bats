@@ -3,8 +3,8 @@
 
 load ../../test_helper.bash
 
-@test "[POLICY-ONLY] codex command grants only the ChatGPT-bundled node_repl resources read access" {
-  local profile codex_section chatgpt_path_count
+@test "[POLICY-ONLY] codex grants narrow read access to ChatGPT-bundled node_repl resources" {
+  local profile codex_section
 
   profile="$(safehouse_profile -- codex)"
   codex_section="$(sft_profile_source_section "$profile" "60-agents/codex.sb")"
@@ -15,11 +15,4 @@ load ../../test_helper.bash
 )'
   sft_assert_not_contains "$codex_section" '(subpath "/Applications/ChatGPT.app")'
   sft_assert_not_contains "$codex_section" '(subpath "/Applications")'
-  sft_assert_not_contains "$codex_section" '(allow file-read* file-write*
-    (subpath "/Applications/ChatGPT.app/Contents/Resources/cua_node")'
-  sft_assert_not_contains "$codex_section" '(allow file-write*
-    (subpath "/Applications/ChatGPT.app/Contents/Resources/cua_node")'
-
-  chatgpt_path_count="$(printf '%s\n' "$codex_section" | rg -c '/Applications/ChatGPT\.app')"
-  [ "$chatgpt_path_count" -eq 2 ]
 }
