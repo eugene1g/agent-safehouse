@@ -1,0 +1,15 @@
+;; ---------------------------------------------------------------------------
+;; Integration: herdr
+;; TUI session status and bell integration for coding agents.
+;; Auto-enabled when HERDR_ENV is set in the host environment.
+;; Source: 55-integrations-optional/herdr.sb
+;; #safehouse-test-id:herdr-integration#
+;; ---------------------------------------------------------------------------
+
+(allow file-read*
+    (home-subpath "/.config/herdr")                                  ;; herdr config directory containing socket and state files.
+)
+
+(allow network-outbound
+    (remote unix-socket (home-literal "/.config/herdr/herdr.sock"))  ;; herdr unix socket for TUI status updates and bell notifications.
+)
