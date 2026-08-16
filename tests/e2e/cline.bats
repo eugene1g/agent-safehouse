@@ -16,6 +16,9 @@ load agent_tui_harness.bash
   local trust_gate_pattern=""
   local permission_gate_pattern=""
   local restart_gate_pattern=""
+  # cline overlays a "Try ClinePass" subscription promo on the input line at startup;
+  # it closes on any key other than Enter (Enter opens the signup URL in a browser)
+  local promo_gate_pattern='Try ClinePass|any other key to close'
   local model="gpt-5.6-luna"
 
   prepare_agent_state "${agent_home}" "${config_dir}"
@@ -60,6 +63,7 @@ handle_startup_gates() {
     "${trust_gate_pattern:-}"
     "${permission_gate_pattern:-}"
     "${restart_gate_pattern:-}"
+    "${promo_gate_pattern:-}"
   )
 
   (( pass <= 5 )) || {
@@ -82,6 +86,14 @@ handle_startup_gates() {
       sft_agent_tui_write_screen_capture >&2 || true
       return 1
     }
+
+  # Dismiss the promo before checking input readiness: the overlay leaves part of the
+  # input line visible, so input_ready can match while the prompt is still covered.
+  if [[ -n "${promo_gate_pattern:-}" ]] && sft_tmux_matches_regex "${promo_gate_pattern}"; then
+    sft_tmux_send_keys Escape
+    handle_startup_gates "$((pass + 1))"
+    return $?
+  fi
 
   if sft_tmux_matches_regex "${input_ready_pattern}"; then
     return 0

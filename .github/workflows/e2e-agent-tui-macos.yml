@@ -52,7 +52,9 @@ jobs:
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
-          brew install bats-core parallel tmux node aider block-goose-cli
+          # fd/ripgrep are for pi: it downloads its own copies at first launch when they
+          # are missing from PATH, which delays the TUI past the roundtrip timeout
+          brew install bats-core parallel tmux node aider block-goose-cli fd ripgrep
           npm install --global --no-fund --no-audit \
             @anthropic-ai/claude-code \
             @earendil-works/pi-coding-agent \
