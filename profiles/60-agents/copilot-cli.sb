@@ -40,13 +40,8 @@
     (home-subpath "/Library/Application Support/Code/User/globalStorage/github.copilot-chat/copilotCli")
     (home-subpath "/Library/Application Support/Code - Insiders/User/globalStorage/github.copilot-chat/copilotCli")
 
-    ;; Frameworks directory must be readable. Ancestor literals are for traversal only.
-    (literal "/Applications")
-    (literal "/Applications/Visual Studio Code.app")
-    (literal "/Applications/Visual Studio Code.app/Contents")
+    ;; Frameworks directory must be readable.
     (subpath "/Applications/Visual Studio Code.app/Contents/Frameworks")
-    (literal "/Applications/Visual Studio Code - Insiders.app")
-    (literal "/Applications/Visual Studio Code - Insiders.app/Contents")
     (subpath "/Applications/Visual Studio Code - Insiders.app/Contents/Frameworks")
 )
 (allow file-read-metadata
@@ -60,4 +55,11 @@
     (home-literal "/Library/Application Support/Code - Insiders/User")
     (home-literal "/Library/Application Support/Code - Insiders/User/globalStorage")
     (home-literal "/Library/Application Support/Code - Insiders/User/globalStorage/github.copilot-chat")
+    
+    ;; Ancestors of Frameworks directory must be metadata-readable.
+    (literal "/Applications")
+    (literal "/Applications/Visual Studio Code.app")
+    (literal "/Applications/Visual Studio Code.app/Contents")
+    (literal "/Applications/Visual Studio Code - Insiders.app")
+    (literal "/Applications/Visual Studio Code - Insiders.app/Contents")
 )
