@@ -56,10 +56,12 @@ jobs:
           npm install --global --no-fund --no-audit \
             @anthropic-ai/claude-code \
             @earendil-works/pi-coding-agent \
+            @github/copilot \
             @google/gemini-cli \
             @kilocode/cli \
             @openai/codex \
             @sourcegraph/amp \
+            cline \
             opencode-ai
 
       - name: Run agent TUI tests
