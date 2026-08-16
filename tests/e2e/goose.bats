@@ -17,7 +17,7 @@ load agent_tui_harness.bash
   local permission_gate_pattern=""
   local telemetry_gate_pattern='Share anonymous usage data'
   local restart_gate_pattern=""
-  local model="gpt-5-mini"
+  local model="gpt-5.6-luna"
 
   prepare_agent_state "${agent_home}" "${config_dir}" "${model}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"

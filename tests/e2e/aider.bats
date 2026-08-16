@@ -18,7 +18,7 @@ load agent_tui_harness.bash
   local trust_gate_pattern=""
   local permission_gate_pattern=""
   local restart_gate_pattern=""
-  local model="gpt-5-mini"
+  local model="gpt-5.6-luna"
 
   prepare_agent_state "${agent_home}" "${config_dir}" "${input_history_path}" "${chat_history_path}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"

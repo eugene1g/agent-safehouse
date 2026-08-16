@@ -17,7 +17,7 @@ load agent_tui_harness.bash
   PI_CODING_AGENT_DIR="${agent_home}" \
   sft_tmux_start \
     safehouse --env-pass=ANTHROPIC_API_KEY,PI_CODING_AGENT_DIR -- \
-    pi --model anthropic/haiku:low
-  sft_tmux_wait_until_regex "claude-haiku"
+    pi --model anthropic/claude-sonnet-5:low
+  sft_tmux_wait_until_regex "claude-sonnet"
   sft_tmux_assert_roundtrip
 }

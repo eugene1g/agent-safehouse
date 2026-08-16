@@ -16,7 +16,7 @@ load agent_tui_harness.bash
   local trust_gate_pattern=""
   local permission_gate_pattern=""
   local restart_gate_pattern='Performing one time database migration|Database migration complete'
-  local model="openai/gpt-5-mini"
+  local model="openai/gpt-5.6-luna"
 
   prepare_agent_state "${agent_home}" "${config_dir}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"

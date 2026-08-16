@@ -12,7 +12,7 @@ load agent_tui_harness.bash
   local agent_home="${AGENT_TUI_WORKDIR}/opencode-home"
   local config_dir="${AGENT_TUI_WORKDIR}/opencode-config"
   local auth_log_path="${AGENT_TUI_ROOT}/opencode-login.log"
-  local model="anthropic/claude-haiku-4-5"
+  local model="anthropic/claude-sonnet-5"
 
   prepare_agent_state "${agent_home}" "${config_dir}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"

@@ -16,7 +16,7 @@ load agent_tui_harness.bash
   local trust_gate_pattern=""
   local permission_gate_pattern=""
   local restart_gate_pattern=""
-  local model="claude-haiku-4-5"
+  local model="claude-sonnet-5"
   local api_key="${ANTHROPIC_API_KEY}"
 
   prepare_agent_state "${agent_home}" "${config_dir}"
