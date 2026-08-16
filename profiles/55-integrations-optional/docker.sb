@@ -2,7 +2,10 @@
 ;; Integration: Docker
 ;; Docker daemon socket access for container operations. High-risk.
 ;; Source: 55-integrations-optional/docker.sb
+;; $$require=55-integrations-optional/keychain.sb$$
 ;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/keychain.sb (registry credential helpers such as docker-credential-desktop resolve credsStore entries from the macOS keychain)
 
 (allow file-read* file-write*
     (literal "/var/run/docker.sock")                                       ;; Standard Docker daemon socket path.

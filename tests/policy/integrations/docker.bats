@@ -82,6 +82,13 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "/Applications/Docker.app"
 }
 
+@test "[POLICY-ONLY] enable=docker auto-injects the keychain profile for registry credential helpers" { # https://github.com/eugene1g/agent-safehouse/issues/158
+  local profile
+  profile="$(safehouse_profile --enable=docker)"
+
+  sft_assert_includes_source "$profile" "55-integrations-optional/keychain.sb"
+}
+
 @test "[EXECUTION] docker cli can reach the configured daemon only when enable=docker is set" { # https://github.com/eugene1g/agent-safehouse/issues/19
   local docker_bin
 
