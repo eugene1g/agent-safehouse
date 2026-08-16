@@ -55,9 +55,9 @@ jobs:
           brew install bats-core parallel tmux node aider block-goose-cli
           npm install --global --no-fund --no-audit \
             @anthropic-ai/claude-code \
+            @earendil-works/pi-coding-agent \
             @google/gemini-cli \
             @kilocode/cli \
-            @mariozechner/pi-coding-agent \
             @openai/codex \
             @sourcegraph/amp \
             opencode-ai
