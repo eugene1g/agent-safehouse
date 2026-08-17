@@ -81,7 +81,7 @@ handle_startup_gates() {
     "${promo_gate_pattern:-}"
   )
 
-  (( pass <= 5 )) || {
+  (( pass <= 8 )) || {
     AGENT_TUI_FAILED=1
     printf 'too many startup gate passes\n' >&2
     sft_agent_tui_write_screen_capture >&2 || true
@@ -105,7 +105,7 @@ handle_startup_gates() {
   # Dismiss the promo before checking input readiness: the overlay leaves part of the
   # input line visible, so input_ready can match while the prompt is still covered.
   if [[ -n "${promo_gate_pattern:-}" ]] && sft_tmux_matches_regex "${promo_gate_pattern}"; then
-    sft_tmux_send_keys Escape
+    sft_agent_tui_dismiss_gate "${promo_gate_pattern}" Escape
     handle_startup_gates "$((pass + 1))"
     return $?
   fi
@@ -115,18 +115,19 @@ handle_startup_gates() {
   fi
 
   if [[ -n "${trust_gate_pattern:-}" ]] && sft_tmux_matches_regex "${trust_gate_pattern}"; then
-    sft_tmux_send_keys Enter
+    sft_agent_tui_dismiss_gate "${trust_gate_pattern}" Enter
     handle_startup_gates "$((pass + 1))"
     return $?
   fi
 
   if [[ -n "${permission_gate_pattern:-}" ]] && sft_tmux_matches_regex "${permission_gate_pattern}"; then
-    sft_tmux_send_keys Enter
+    sft_agent_tui_dismiss_gate "${permission_gate_pattern}" Enter
     handle_startup_gates "$((pass + 1))"
     return $?
   fi
 
   if [[ -n "${restart_gate_pattern:-}" ]] && sft_tmux_matches_regex "${restart_gate_pattern}"; then
+    sft_agent_tui_dismiss_gate "${restart_gate_pattern}"
     handle_startup_gates "$((pass + 1))"
     return $?
   fi

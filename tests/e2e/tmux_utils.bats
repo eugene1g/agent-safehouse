@@ -77,6 +77,33 @@ load agent_tui_harness.bash
   sft_tmux_assert_roundtrip
 }
 
+@test "[E2E-TUI] gate dismissal waits for the gate to clear" {
+  local fake_agent_code=""
+  local gate_pattern='Confirm folder trust'
+  local started_at=0
+  local elapsed=0
+
+  sft_require_cmd_or_skip "python3"
+
+  # A gate that keeps painting for a while after it accepts the keypress, the
+  # way a loaded agent TUI does.
+  fake_agent_code=$'import sys, termios, tty, time\nfd = sys.stdin.fileno()\nold = termios.tcgetattr(fd)\nprint("Confirm folder trust", flush=True)\ntry:\n    tty.setcbreak(fd)\n    while True:\n        ch = sys.stdin.read(1)\n        if not ch:\n            break\n        if ch in "\\r\\n":\n            time.sleep(1.5)\n            sys.stdout.write("\\x1b[2J\\x1b[H")\n            print("Ready", flush=True)\n            break\nfinally:\n    termios.tcsetattr(fd, termios.TCSADRAIN, old)\ntime.sleep(5)\n'
+
+  sft_tmux_start_session python3 -u -c "${fake_agent_code}"
+  sft_tmux_wait_until "${gate_pattern}" 2 0.1
+
+  started_at="$(date +%s)"
+  sft_agent_tui_dismiss_gate "${gate_pattern}" Enter
+  elapsed=$(( $(date +%s) - started_at ))
+
+  # The helper blocked until the gate stopped matching. A caller that re-checked
+  # the screen immediately after sending the key would still have seen the gate
+  # and answered it again, spending its pass budget on a single gate.
+  (( elapsed >= 1 ))
+  run sft_tmux_matches_regex "${gate_pattern}"
+  [ "${status}" -ne 0 ]
+}
+
 @test "[E2E-TUI] pre-prompt delay and slow typing tolerate late input readiness" {
   local fake_agent_code=""
 

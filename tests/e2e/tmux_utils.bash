@@ -8,6 +8,7 @@
 #   sft_tmux_send_keys key [key ...]
 #   sft_tmux_wait_until text [timeout_secs] [poll_secs]
 #   sft_tmux_wait_until_regex pattern [timeout_secs] [poll_secs]
+#   sft_tmux_wait_until_regex_gone pattern [timeout_secs] [poll_secs]
 #   sft_tmux_wait_until_compact_text text [timeout_secs] [poll_secs]
 #   sft_tmux_matches_regex pattern
 #   sft_tmux_type_and_wait_visible text [timeout_secs] [poll_secs]
@@ -338,6 +339,35 @@ sft_tmux_wait_until_regex() {
   }
 
   _sft_tmux_wait_until_grep "${timeout_secs}" "${poll_secs}" "/${pattern}/" -Eq -- "${pattern}"
+}
+
+sft_tmux_wait_until_regex_gone() {
+  local pattern="${1:-}"
+  local timeout_secs="${2:-5}"
+  local poll_secs="${3:-0.2}"
+  local deadline=0
+
+  [[ -n "${pattern}" ]] || {
+    printf 'usage: sft_tmux_wait_until_regex_gone pattern [timeout_secs] [poll_secs]\n' >&2
+    return 1
+  }
+
+  sft_tmux_require_current_session || return 1
+  deadline="$(( $(date +%s) + timeout_secs ))"
+
+  while true; do
+    sft_tmux_matches_regex "${pattern}" || return 0
+
+    if sft_tmux_current_pane_dead; then
+      return 1
+    fi
+
+    if (( $(date +%s) >= deadline )); then
+      return 1
+    fi
+
+    sleep "${poll_secs}"
+  done
 }
 
 sft_tmux_wait_until_compact_text() {
