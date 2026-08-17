@@ -20,6 +20,7 @@ load agent_tui_harness.bash
   # it closes on any key other than Enter (Enter opens the signup URL in a browser)
   local promo_gate_pattern='Try ClinePass|any other key to close'
   local model="gpt-5.6-luna"
+  local AGENT_TUI_PROMO_SETTLE_SECS=1.5
 
   prepare_agent_state "${agent_home}" "${config_dir}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"
@@ -29,6 +30,11 @@ load agent_tui_harness.bash
     safehouse -- \
     "HOME=${agent_home}" \
     cline --config "${config_dir}" --model "${model}" -a -y
+  handle_startup_gates 1
+  # input_ready matches cline's splash headline, which paints before the promo
+  # does, so the first pass can pass the gates while the promo is still pending.
+  # Let it surface, then run the gates again to dismiss it before typing.
+  sleep "${AGENT_TUI_PROMO_SETTLE_SECS}"
   handle_startup_gates 1
   sft_tmux_assert_roundtrip
 }
@@ -52,6 +58,15 @@ login_agent() {
 }
 
 configure_agent_tui() {
+  # cline paints its splash (and the input placeholder) well before the input
+  # widget accepts keys, so give it a beat before typing. Type slowly too: a
+  # bulk send arrives as a single input event, so any overlay that closes on
+  # "any other key" swallows the whole prompt rather than one character.
+  AGENT_TUI_PRE_PROMPT_DELAY_SECS=1
+  AGENT_TUI_PROMPT_SEND_MODE="slow"
+  # The input box is narrower than the prompt is long, so the echo can wrap.
+  AGENT_TUI_PROMPT_VISIBLE_MODE="compact"
+
   return 0
 }
 
