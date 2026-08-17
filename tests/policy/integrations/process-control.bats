@@ -3,13 +3,16 @@
 
 load ../../test_helper.bash
 
-# Overrides the shared teardown (test_helper.bash) to also reap the background target,
+# Overrides the shared teardown (test_helper.bash) to also reap background processes,
 # which the in-test cleanup misses when a test aborts on a failed assertion.
 teardown() {
-  if [ -n "${target_pid:-}" ]; then
-    kill "$target_pid" 2>/dev/null || true
-    wait "$target_pid" 2>/dev/null || true
-  fi
+  local pid
+
+  for pid in "${target_pid:-}" "${process_debug_pid:-}"; do
+    [ -n "$pid" ] || continue
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
 
   sft_teardown_test_env
 }
@@ -22,7 +25,7 @@ teardown() {
 }
 
 @test "[EXECUTION] host process signalling stays denied by default and is allowed with enable=process-control" {
-  local process_debug_dir process_debug_bin process_debug_pid
+  local process_debug_dir process_debug_bin  # process_debug_pid stays global for teardown
 
   process_debug_dir="$(mktemp -d "${SAFEHOUSE_WORKSPACE_ROOT}/proc-debug.XXXXXX")"
   process_debug_bin="${process_debug_dir}/safehouse-proc-test"
@@ -40,9 +43,6 @@ teardown() {
 
   safehouse_ok --enable=process-control -- /bin/kill -0 "$process_debug_pid" >/dev/null
   safehouse_ok --enable=process-control -- /usr/bin/pkill -0 -f "$process_debug_bin" >/dev/null
-
-  /bin/kill "$process_debug_pid" >/dev/null 2>&1 || true
-  wait "$process_debug_pid" 2>/dev/null || true
 }
 
 @test "[POLICY-ONLY] enable=process-control restores argv/env (pidinfo) reads after the base deny" {
