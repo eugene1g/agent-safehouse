@@ -235,10 +235,11 @@ policy_request_resolve_output_path() {
   policy_req_output_path="$(safehouse_expand_tilde "$cli_policy_output_path" "$policy_req_home_dir")"
 }
 
-
 policy_request_detect_herdr_integration() {
   # Auto-enable herdr integration when HERDR_ENV is set in the host environment.
-  [[ -n "${HERDR_ENV:-}" ]] || return 0
+  if [[ -z "${HERDR_ENV:-}" ]]; then
+    return 0
+  fi
 
   cli_policy_enable_values+=("herdr")
   safehouse_array_append_unique cli_runtime_env_pass_names "HERDR_ENV"
@@ -247,6 +248,7 @@ policy_request_detect_herdr_integration() {
   safehouse_array_append_unique cli_runtime_env_pass_names "HERDR_TAB_ID"
   safehouse_array_append_unique cli_runtime_env_pass_names "HERDR_WORKSPACE_ID"
 }
+
 policy_request_collect_enable_inputs() {
   local enable_value
 
@@ -660,7 +662,6 @@ policy_request_build() {
 
   policy_request_reset
   policy_ensure_feature_catalog_initialized || return 1
-
 
   policy_request_detect_herdr_integration
   policy_request_collect_enable_inputs || return 1
