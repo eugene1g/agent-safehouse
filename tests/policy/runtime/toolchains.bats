@@ -24,6 +24,12 @@ load ../../test_helper.bash
   done
 }
 
+@test "[EXECUTION] Python multiprocessing can create a semaphore inside the sandbox" { # https://github.com/danra/chopi/issues/8
+  sft_require_cmd_or_skip python3
+
+  safehouse_ok -- /usr/bin/python3 -c 'import multiprocessing; multiprocessing.Semaphore(); print("OK")'
+}
+
 @test "[POLICY-ONLY] node toolchain grants fnm metadata traversal" { # issue #13
   local profile
   profile="$(safehouse_profile)"

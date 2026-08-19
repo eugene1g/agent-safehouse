@@ -1,0 +1,9 @@
+;; ---------------------------------------------------------------------------
+;; Category: Shared IPC (POSIX semaphores)
+;; POSIX named semaphores back cross-process synchronization primitives used by
+;; runtimes such as Python's multiprocessing module. Without this allow,
+;; sem_open(3) returns EPERM inside the sandbox.
+;; Source: 40-shared/ipc-posix-sem.sb
+;; ---------------------------------------------------------------------------
+
+(allow ipc-posix-sem)
