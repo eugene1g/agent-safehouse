@@ -292,13 +292,17 @@ policy_render_emit_policy_origin_preamble() {
 
 policy_render_append_resolved_base_profile() {
   local profile_key="$1"
-  local escaped_home resolved_base first_line remaining_lines
+  local escaped_home escaped_work_dir resolved_base first_line remaining_lines
 
   escaped_home="$(safehouse_escape_for_sb "$policy_req_home_dir")" || return 1
-  resolved_base="$(policy_source_read_profile_content "$profile_key" | safehouse_replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home")" || {
+  escaped_work_dir="$(safehouse_escape_for_sb "$policy_req_effective_workdir")" || return 1
+  resolved_base="$(policy_source_read_profile_content "$profile_key" \
+    | safehouse_replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home" \
+    | safehouse_replace_literal_stream_required "$WORK_DIR_TEMPLATE_TOKEN" "$escaped_work_dir")" || {
     safehouse_fail \
-      "Failed to resolve HOME_DIR placeholder in base profile: ${profile_key}" \
-      "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}"
+      "Failed to resolve placeholder in base profile: ${profile_key}" \
+      "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}" \
+      "Expected WORK_DIR placeholder token: ${WORK_DIR_TEMPLATE_TOKEN}"
     return 1
   }
 
@@ -768,11 +772,9 @@ policy_render_emit_terminal_deny_rules() {
   if [[ -z "$policy_req_workdir_config_path" ]]; then
     return 0
   fi
-  local escaped_config_path
-  escaped_config_path="$(safehouse_escape_for_sb "$policy_req_workdir_config_path")" || return 1
   policy_render_write_line ";; #safehouse-test-id:terminal-deny-safehouse# Terminal deny rules are emitted last so they override any earlier path grants."
   policy_render_write_line ";; Agents must never modify the workdir Safehouse config regardless of workdir grants."
-  policy_render_write_line "(deny file-write* (literal \"${escaped_config_path}\"))"
+  policy_render_write_line "(deny file-write* (literal (string-append WORK_DIR \"/${safehouse_workdir_config_filename}\")))"
   policy_render_write_blank
 }
 

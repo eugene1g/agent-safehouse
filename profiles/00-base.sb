@@ -2,7 +2,7 @@
 
 ;; ---------------------------------------------------------------------------
 ;; Base Profile
-;; Core definitions, HOME_DIR replacement token, and helper macros shared by all modules.
+;; Core definitions, HOME_DIR/WORK_DIR replacement tokens, and helper macros shared by all modules.
 ;; Source: 00-base.sb
 ;; ---------------------------------------------------------------------------
 
@@ -18,5 +18,19 @@
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
 (define (home-literal rel) (literal (string-append HOME_DIR rel)))
 (define (home-prefix rel) (prefix (string-append HOME_DIR rel)))
+
+;; WORK_DIR is the effective working directory selected at launch.
+;; Safehouse policy assembly replaces this token with the resolved workdir path.
+;; Generated rules reference WORK_DIR (for example, the terminal deny that blocks
+;; writes to <workdir>/.safehouse).
+;;
+;; Manual policy-only example (no generator):
+;;   Replace the next line with:
+;;     (define WORK_DIR "/Users/alice/projects/example")
+(define WORK_DIR "__SAFEHOUSE_REPLACE_ME_WITH_WORK_DIR__")
+
+(define (workdir-subpath rel) (subpath (string-append WORK_DIR rel)))
+(define (workdir-literal rel) (literal (string-append WORK_DIR rel)))
+(define (workdir-prefix rel) (prefix (string-append WORK_DIR rel)))
 
 (deny default)
