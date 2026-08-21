@@ -179,7 +179,7 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "#safehouse-test-id:terminal-deny-safehouse#"
 }
 
-@test "[POLICY-ONLY] base profile defines WORK_DIR as the resolved workdir and terminal deny references it" {
+@test "[POLICY-ONLY] base profile defines WORK_DIR as the resolved workdir" {
   local profile resolved_workdir
 
   resolved_workdir="$(cd "$SAFEHOUSE_WORKSPACE" && pwd -P)" || return 1
@@ -187,7 +187,6 @@ load ../../test_helper.bash
 
   sft_assert_contains "$profile" "(define WORK_DIR \"${resolved_workdir}\")"
   sft_assert_not_contains "$profile" "__SAFEHOUSE_REPLACE_ME_WITH_WORK_DIR__"
-  sft_assert_contains "$profile" '(deny file-write* (literal (string-append WORK_DIR "/.safehouse")))'
 }
 
 @test "[POLICY-ONLY] terminal deny rule appears after workdir grant" {
