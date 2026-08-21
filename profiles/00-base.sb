@@ -2,7 +2,7 @@
 
 ;; ---------------------------------------------------------------------------
 ;; Base Profile
-;; Core definitions, HOME_DIR replacement token, and helper macros shared by all modules.
+;; Core definitions, path replacement tokens, and helper macros shared by all modules.
 ;; Source: 00-base.sb
 ;; ---------------------------------------------------------------------------
 
@@ -18,5 +18,17 @@
 (define (home-subpath rel) (subpath (string-append HOME_DIR rel)))
 (define (home-literal rel) (literal (string-append HOME_DIR rel)))
 (define (home-prefix rel) (prefix (string-append HOME_DIR rel)))
+
+;; WORK_DIR is the selected workdir for this policy. Safehouse replaces this
+;; line with an absolute string definition, or #f when --workdir= disables it.
+;; For a manual policy, replace the marker with (define WORK_DIR "/absolute/path")
+;; or (define WORK_DIR #f). Relative helper arguments must begin with "/".
+__SAFEHOUSE_REPLACE_ME_WITH_WORK_DIR_DEFINE__
+
+(define (workdir-path rel)
+  (string-append (if (string=? WORK_DIR "/") "" WORK_DIR) rel))
+(define (workdir-subpath rel) (subpath (workdir-path rel)))
+(define (workdir-literal rel) (literal (workdir-path rel)))
+(define (workdir-prefix rel) (prefix (workdir-path rel)))
 
 (deny default)

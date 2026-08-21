@@ -6,7 +6,7 @@ Policy assembly order:
 
 | Layer | Coverage |
 |-------|----------|
-| `00-base.sb` | Default deny, helper functions, HOME replacement token |
+| `00-base.sb` | Default deny, helper functions, HOME and selected-workdir definitions |
 | `10-system-runtime.sb` | macOS runtime binaries, temp dirs, IPC |
 | `20-network.sb` | Network policy |
 | `30-toolchains/*.sb` | Apple Toolchain Core, Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
@@ -79,6 +79,29 @@ It is not a blanket grant for `$HOME`.
 Safehouse also generates a `file-read-metadata` block for `/`, the path to `$HOME`, and `$HOME` itself. That metadata-only traversal lets runtimes `stat` or walk toward explicitly allowed home-scoped paths without granting recursive reads of the whole home directory.
 
 In practice, that means `stat "$HOME"` can succeed while `ls "$HOME"` and `cat ~/secret.txt` still fail unless a more specific rule grants them.
+
+## Selected Workdir Definition
+
+Safehouse renders the selected workdir into `WORK_DIR` so built-in and appended
+profiles can express reusable workdir-relative rules through:
+
+- `workdir-literal`
+- `workdir-subpath`
+- `workdir-prefix`
+
+Relative arguments must begin with `/`. The helpers also handle `/` as the
+selected workdir without producing double-slash paths.
+
+For example, a final appended policy can deny the root `.env` file after the
+normal workdir grant:
+
+```scheme
+(deny file-read* file-write* (workdir-literal "/.env"))
+```
+
+When `--workdir=` disables automatic workdir access, `WORK_DIR` is defined as
+`#f`. A policy that tries to use a `workdir-*` helper then fails to compile
+rather than deriving a path from an empty string.
 
 ## Terminal Deny Rules
 

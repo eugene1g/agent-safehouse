@@ -40,6 +40,8 @@ It is a hardening layer, not a perfect security boundary against a determined at
 
 `HOME_DIR` is used to render precise home-relative rules in the assembled policy. By itself, it does not grant recursive read access to your home directory.
 
+`WORK_DIR` similarly exposes the selected workdir to built-in and appended policy rules through `workdir-literal`, `workdir-subpath`, and `workdir-prefix`. Relative helper arguments begin with `/`, letting a reusable policy target files such as `<workdir>/.env` without hardcoding an absolute project path.
+
 Default Safehouse behavior is narrower:
 
 - metadata-only traversal on `/`, the path to `$HOME`, and `$HOME` itself so runtimes can probe explicitly allowed home-scoped paths
@@ -114,6 +116,9 @@ Example machine-local policy file:
   (home-subpath "/Library/Application Support/CleanShot/media")
   (subpath "/Volumes/Shared/Engineering")
 )
+
+;; Keep root environment files unavailable even though the workdir is writable.
+(deny file-read* file-write* (workdir-literal "/.env"))
 ```
 
 Use `--add-dirs-ro` or `--add-dirs` for normal shared-folder access, and keep `--append-profile` for machine-local policy exceptions or final deny/allow overrides. That pattern is useful when the repo is shared but each developer machine has different local mount points.

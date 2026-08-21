@@ -49,8 +49,33 @@ load ../../test_helper.bash
   sft_assert_not_contains "$policy" "__SAFEHOUSE_REPLACE_ME_WITH_ABSOLUTE_HOME_DIR__"
 }
 
-@test "paths with quotes and backslashes are escaped correctly in generated SBPL and runtime grants" {
-  local weird_dir weird_file policy escaped_weird_dir
+@test "generated policy exposes the selected workdir through WORK_DIR helpers" {
+  local workdir policy
+
+  workdir="$(sft_external_dir "workdir-policy-variable")" || return 1
+  policy="$(safehouse_profile --workdir="$workdir")"
+
+  sft_assert_contains "$policy" "(define WORK_DIR \"${workdir}\")"
+  sft_assert_contains "$policy" '(define (workdir-path rel)'
+  sft_assert_contains "$policy" '(string-append (if (string=? WORK_DIR "/") "" WORK_DIR) rel)'
+  sft_assert_contains "$policy" '(define (workdir-subpath rel) (subpath (workdir-path rel)))'
+  sft_assert_contains "$policy" '(define (workdir-literal rel) (literal (workdir-path rel)))'
+  sft_assert_contains "$policy" '(define (workdir-prefix rel) (prefix (workdir-path rel)))'
+  sft_assert_not_contains "$policy" "__SAFEHOUSE_REPLACE_ME_WITH_WORK_DIR_DEFINE__"
+}
+
+@test "disabled workdir renders WORK_DIR as false instead of an empty path" {
+  local policy
+
+  policy="$(safehouse_profile --workdir='')"
+
+  sft_assert_contains "$policy" '(define WORK_DIR #f)'
+  sft_assert_not_contains "$policy" '(define WORK_DIR "")'
+  sft_assert_not_contains "$policy" "__SAFEHOUSE_REPLACE_ME_WITH_WORK_DIR_DEFINE__"
+}
+
+@test "paths with quotes and backslashes are escaped correctly in generated definitions and runtime grants" {
+  local weird_dir weird_file policy home_policy escaped_weird_dir
 
   weird_dir="${SAFEHOUSE_EXTERNAL_ROOT}/path-with-\"quote\"-and-\\-backslash"
   weird_file="${weird_dir}/fixture.txt"
@@ -58,15 +83,17 @@ load ../../test_helper.bash
   mkdir -p "$weird_dir"
   printf '%s\n' "weird-path-ok" > "$weird_file"
 
-  policy="$(safehouse_profile --add-dirs-ro "$weird_dir")"
+  policy="$(safehouse_profile --workdir "$weird_dir")"
+  home_policy="$(HOME="$weird_dir" safehouse_profile --workdir='')"
   escaped_weird_dir="$(cd "$weird_dir" && pwd -P)"
   escaped_weird_dir="${escaped_weird_dir//\\/\\\\}"
   escaped_weird_dir="${escaped_weird_dir//\"/\\\"}"
-  sft_assert_contains "$policy" "$escaped_weird_dir"
+  sft_assert_contains "$policy" "(define WORK_DIR \"${escaped_weird_dir}\")"
+  sft_assert_contains "$home_policy" "(define HOME_DIR \"${escaped_weird_dir}\")"
 
   safehouse_denied -- /bin/cat "$weird_file"
 
-  run safehouse_ok --add-dirs-ro "$weird_dir" -- /bin/cat "$weird_file"
+  run safehouse_ok --workdir "$weird_dir" -- /bin/cat "$weird_file"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "weird-path-ok"
 }

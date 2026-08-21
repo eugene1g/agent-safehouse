@@ -292,13 +292,31 @@ policy_render_emit_policy_origin_preamble() {
 
 policy_render_append_resolved_base_profile() {
   local profile_key="$1"
-  local escaped_home resolved_base first_line remaining_lines
+  local escaped_home escaped_workdir workdir_define
+  local base_with_home resolved_base first_line remaining_lines
 
   escaped_home="$(safehouse_escape_for_sb "$policy_req_home_dir")" || return 1
-  resolved_base="$(policy_source_read_profile_content "$profile_key" | safehouse_replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home")" || {
+  base_with_home="$(policy_source_read_profile_content "$profile_key" | safehouse_replace_literal_stream_required "$HOME_DIR_TEMPLATE_TOKEN" "$escaped_home")" || {
     safehouse_fail \
       "Failed to resolve HOME_DIR placeholder in base profile: ${profile_key}" \
       "Expected HOME_DIR placeholder token: ${HOME_DIR_TEMPLATE_TOKEN}"
+    return 1
+  }
+
+  if [[ -n "$policy_req_effective_workdir" ]]; then
+    escaped_workdir="$(safehouse_escape_for_sb "$policy_req_effective_workdir")" || return 1
+    workdir_define="(define WORK_DIR \"${escaped_workdir}\")"
+  else
+    # Keep disabled workdirs fail-closed. The helpers may remain unused, but a
+    # profile that tries to build a path from WORK_DIR will fail SBPL parsing
+    # instead of accidentally matching a path rooted at /.
+    workdir_define="(define WORK_DIR #f)"
+  fi
+
+  resolved_base="$(printf '%s\n' "$base_with_home" | safehouse_replace_literal_stream_required "$WORK_DIR_DEFINE_TEMPLATE_TOKEN" "$workdir_define")" || {
+    safehouse_fail \
+      "Failed to resolve WORK_DIR definition placeholder in base profile: ${profile_key}" \
+      "Expected WORK_DIR definition placeholder token: ${WORK_DIR_DEFINE_TEMPLATE_TOKEN}"
     return 1
   }
 

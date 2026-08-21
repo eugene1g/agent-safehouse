@@ -25,8 +25,17 @@ safehouse_replace_literal_stream_required() {
   local from="$1"
   local to="$2"
 
-  awk -v from="$from" -v to="$to" '
-    BEGIN { replaced = 0 }
+  # awk -v decodes backslash escapes in assigned values. Pass replacement text
+  # through the environment so already-escaped SBPL strings stay byte-for-byte
+  # intact (for example, paths containing quotes or backslashes).
+  SAFEHOUSE_REPLACE_LITERAL_FROM="$from" \
+  SAFEHOUSE_REPLACE_LITERAL_TO="$to" \
+  awk '
+    BEGIN {
+      from = ENVIRON["SAFEHOUSE_REPLACE_LITERAL_FROM"]
+      to = ENVIRON["SAFEHOUSE_REPLACE_LITERAL_TO"]
+      replaced = 0
+    }
     {
       if (from == "") {
         print $0

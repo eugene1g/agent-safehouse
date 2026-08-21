@@ -64,6 +64,44 @@ load ../../test_helper.bash
   sft_assert_file_content "$target_file" "granted"
 }
 
+@test "[EXECUTION] appended profiles can target the selected workdir through shared helpers" { # https://github.com/eugene1g/agent-safehouse/issues/172
+  local denied_file allowed_file profile_file result
+
+  denied_file="$(sft_workspace_path ".env")" || return 1
+  allowed_file="$(sft_workspace_path "visible.txt")" || return 1
+  profile_file="$(sft_workspace_path "workdir-deny.sb")" || return 1
+
+  printf '%s' "secret" > "$denied_file"
+  printf '%s' "visible" > "$allowed_file"
+  printf '%s\n' '(deny file-read* file-write* (workdir-literal "/.env"))' > "$profile_file"
+
+  safehouse_denied --append-profile="$profile_file" -- /bin/sh -c "cat '$denied_file'"
+  safehouse_denied --append-profile="$profile_file" -- /bin/sh -c "printf '%s' changed > '$denied_file'"
+
+  result="$(safehouse_ok --append-profile="$profile_file" -- /bin/sh -c "cat '$allowed_file'")" || return 1
+  [ "$result" = "visible" ]
+}
+
+@test "[EXECUTION] workdir helpers fail closed when the workdir is disabled" { # https://github.com/eugene1g/agent-safehouse/issues/172
+  local profile_file
+  profile_file="$(sft_workspace_path "disabled-workdir.sb")" || return 1
+  printf '%s\n' '(deny file-read* (workdir-literal "/.env"))' > "$profile_file"
+
+  safehouse_run --workdir='' --append-profile="$profile_file" -- /usr/bin/true
+
+  [ "$status" -eq 65 ]
+  sft_assert_contains "$output" "argument 1 must be: string"
+}
+
+@test "[EXECUTION] workdir helpers join paths correctly when the workdir is root" { # https://github.com/eugene1g/agent-safehouse/issues/172
+  local profile_file
+  profile_file="$(sft_workspace_path "root-workdir.sb")" || return 1
+  printf '%s\n' '(deny file-read* (workdir-literal "/System/Library/CoreServices/SystemVersion.plist"))' > "$profile_file"
+
+  safehouse_denied --workdir=/ --append-profile="$profile_file" -- \
+    /bin/cat /System/Library/CoreServices/SystemVersion.plist
+}
+
 @test "[POLICY-ONLY] --append-profile adds deny-write rule for the profile file" {
   local profile_file resolved_profile_file profile
 
