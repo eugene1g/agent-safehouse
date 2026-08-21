@@ -1,0 +1,73 @@
+;; ---------------------------------------------------------------------------
+;; App: Cursor Desktop
+;; Cursor desktop app bundle, preferences, and data paths.
+;; Source: 65-apps/cursor-app.sb
+;; $$require=55-integrations-optional/keychain.sb,55-integrations-optional/electron.sb$$
+;; ---------------------------------------------------------------------------
+
+;; Requires: 55-integrations-optional/keychain.sb     (desktop auth flows)
+;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView; transitively pulls macos-gui)
+
+(allow file-read* file-write*
+    (home-subpath "/Library/Application Support/Cursor")
+    (home-subpath "/Library/Logs/Cursor")
+    (home-subpath "/Library/HTTPStorages/com.todesktop.230313mzl4w4u92")
+    (home-subpath "/Library/Caches/com.todesktop.230313mzl4w4u92")
+    (home-subpath "/Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt")
+    (home-subpath "/Library/Saved Application State/com.todesktop.230313mzl4w4u92.savedState")
+    (home-subpath "/.cursor")
+    (home-literal "/Library/Preferences/com.todesktop.230313mzl4w4u92.plist")
+)
+
+(allow file-read*
+    ;; Ancestor traversal before resolving the app bundle itself.
+    (literal "/Applications")
+    (subpath "/Applications/Cursor.app")
+)
+
+;; Allow a sandboxed Cursor to receive commands (inherits VS Code IPC naming).
+(allow network-bind network-inbound
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-ipc-[0-9A-Fa-f-]+\.sock$")))
+;; Disallow sending commands to a potentially unsandboxed Cursor/VS Code,
+;; because IPC protocol gives wide capabilities like opening arbitrary URLs
+;; and opening arbitrary local directories with workspace-trust/auto-task behavior
+(deny network-outbound
+    (remote unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-ipc-[0-9A-Fa-f-]+\.sock$")))
+
+;; Disallow sharing of git credentials across a trust boundary.
+(deny network-outbound
+    (remote unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-git-[0-9a-f]+\.sock$")))
+(deny network-bind network-inbound
+    (local unix-socket
+        (path-regex #"^(/private)?/var/folders/[^/]+/[^/]+/T/vscode-git-[0-9a-f]+\.sock$")))
+
+;; Electron single-instance socket (VSCODE_IPC_HOOK):
+;; <user-data-dir>/<version[0:4]>-main.sock, e.g. .../Cursor/3.12-main.sock.
+;; Allow bind/listen inside the sandbox; deny outbound connect to a potentially
+;; unsandboxed primary instance (would hand off arbitrary CLI args).
+(allow network-bind network-inbound
+    (local unix-socket
+        (path-regex (string-append "^" HOME_DIR "/Library/Application Support/Cursor/[0-9.]+-main\\.sock$"))))
+(deny network-outbound
+    (remote unix-socket
+        (path-regex (string-append "^" HOME_DIR "/Library/Application Support/Cursor/[0-9.]+-main\\.sock$"))))
+
+;; Cursor persists app preferences via cfprefsd under its todesktop domain.
+(allow user-preference-read user-preference-write
+    (preference-domain "com.todesktop.230313mzl4w4u92")
+)
+
+;; Shared AppKit/Mach/fsctl allowances are provided by:
+;;   55-integrations-optional/macos-gui.sb
+;; This profile adds only app-specific MachPortRendezvousServer IPC grants.
+;; Team-ID-prefixed form is used by newer Electron/Chromium builds.
+(allow mach-lookup
+    (global-name-regex #"^(VDXQ22DGB9\.)?com\.todesktop\.230313mzl4w4u92\.MachPortRendezvousServer\.")
+)
+
+(allow mach-register
+    (global-name-regex #"^(VDXQ22DGB9\.)?com\.todesktop\.230313mzl4w4u92\.MachPortRendezvousServer\.")
+)

@@ -138,11 +138,12 @@ chmod +x ~/Downloads/safehouse
 ```
 
 Known app bundles are matched to their app profile automatically, so Claude
-Desktop usually does not need extra `--enable` flags:
+Desktop, VS Code, and Cursor usually do not need extra `--enable` flags:
 
 ```bash
 ~/Downloads/safehouse -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
 ~/Downloads/safehouse -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
+~/Downloads/safehouse -- /Applications/Cursor.app/Contents/MacOS/Cursor --no-sandbox
 ```
 
 If you use Claude Desktop "Allow bypass permissions mode", launching Claude Desktop through Safehouse is intended to keep tool execution constrained by the outer Safehouse policy.

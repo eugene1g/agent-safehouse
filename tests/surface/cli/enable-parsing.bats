@@ -40,6 +40,7 @@ load ../../test_helper.bash
 
   sft_assert_includes_source "$all_apps_profile" "65-apps/claude-app.sb"
   sft_assert_includes_source "$all_apps_profile" "65-apps/codex-app.sb"
+  sft_assert_includes_source "$all_apps_profile" "65-apps/cursor-app.sb"
   sft_assert_includes_source "$all_apps_profile" "65-apps/vscode-app.sb"
   sft_assert_omits_source "$all_apps_profile" "60-agents/codex.sb"
 

@@ -53,3 +53,20 @@ load ../../test_helper.bash
   sft_assert_includes_source "$codex_profile" "55-integrations-optional/keychain.sb"
   sft_assert_omits_source "$codex_profile" "60-agents/codex.sb"
 }
+
+@test "[POLICY-ONLY] Cursor.app command paths select the desktop app profile and omit the CLI profile" {
+  local cursor_app_dir cursor_app_bin cursor_profile resolved_app_dir
+
+  cursor_app_dir="$(sft_workspace_path "Cursor.app")"
+  cursor_app_bin="${cursor_app_dir}/Contents/MacOS/Cursor"
+
+  sft_make_fake_command "$cursor_app_bin"
+  cursor_profile="$(safehouse_profile -- "$cursor_app_bin")"
+  resolved_app_dir="$(cd "$cursor_app_dir" && pwd -P)"
+
+  sft_assert_contains "$cursor_profile" "(subpath \"${resolved_app_dir}\")"
+  sft_assert_includes_source "$cursor_profile" "65-apps/cursor-app.sb"
+  sft_assert_includes_source "$cursor_profile" "55-integrations-optional/electron.sb"
+  sft_assert_includes_source "$cursor_profile" "55-integrations-optional/keychain.sb"
+  sft_assert_omits_source "$cursor_profile" "60-agents/cursor-agent.sb"
+}

@@ -156,13 +156,14 @@ safehouse -- MYVAR=123 printenv MYVAR
 ## Electron Apps
 
 Known app bundles are auto-detected from the command path. In practice, Claude
-Desktop and Visual Studio Code usually do not need `--enable=electron`.
+Desktop, Visual Studio Code, and Cursor usually do not need `--enable=electron`.
 Claude Desktop also picks up its shared `claude-code` profile transitively.
 Launch with `--no-sandbox`:
 
 ```bash
 safehouse -- /Applications/Claude.app/Contents/MacOS/Claude --no-sandbox
 safehouse -- "/Applications/Visual Studio Code.app/Contents/MacOS/Electron" --no-sandbox
+safehouse -- /Applications/Cursor.app/Contents/MacOS/Cursor --no-sandbox
 ```
 
 For VS Code as a multi-agent host:
