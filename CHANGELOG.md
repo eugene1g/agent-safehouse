@@ -22,6 +22,16 @@
 - `10-system-runtime.sb`: Added read-only grants for `/nix/store`, `/nix/var/nix/profiles`, and Nix per-user profile pointer symlinks.
 - `1password.sb`: Removed the `~/.1password` and `/Users/Shared/.1password` file grants.
 
+## [0.12.0] - 2026-08-21
+
+### Upgrade Notes
+
+- No speical notes.
+
+### Features
+
+- Added `WORK_DIR`, `workdir-subpath`, `workdir-subpath`, and `workdir-subpath` `define`s to `00-base.sb`, similar to `HOME_DIR`. This allows for profile overlays relative to the workdir.
+
 ## [0.11.1] - 2026-07-16
 
 ### Upgrade Notes
