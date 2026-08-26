@@ -8,6 +8,7 @@ output_dir="${ROOT_DIR}/dist"
 output_path="${output_dir}/safehouse.sh"
 output_path_explicit=0
 output_dir_explicit=0
+check_mode=0
 
 project_version_file="${ROOT_DIR}/VERSION"
 project_version_placeholder="__SAFEHOUSE_PROJECT_VERSION__"
@@ -30,7 +31,7 @@ dist_preassembled_core_integration_keys=()
 usage() {
   cat <<USAGE
 Usage:
-  $(basename "$0") [--output PATH] [--output-dir PATH]
+  $(basename "$0") [--output PATH] [--output-dir PATH] [--check]
 
 Description:
   Generate the committed dist executable:
@@ -42,6 +43,11 @@ Options:
 
   --output-dir PATH
       Directory for dist executable output (default: ${output_dir})
+
+  --check
+      Do not write the output file. Instead, verify that it already matches
+      a fresh regeneration. Exits 0 if up to date or 1 with a diff.
+      Useful in CI to confirm a committed dist artifact wasn't hand-edited.
 
   -h, --help
       Show this help
@@ -910,23 +916,46 @@ emit_self_update_validation_marker() {
 SCRIPT
 }
 
-write_dist_script() {
-  local target_path="$1"
+# Returns 0 if the two input files are the same or differ only in timestamp,
+# or 1 otherwise.
+dist_only_timestamp_differs() {
+  local file_a="$1"
+  local file_b="$2"
+  local line
+
+  if diff -q "$file_a" "$file_b" >/dev/null; then
+    return 0
+  fi
+
+  while IFS= read -r line; do
+    case "$line" in
+      "--- "* | "+++ "* | "@@ "* | "" | " "*)
+        continue
+        ;;
+      "+# Embedded Profiles Last Modified (UTC): "* | "-# Embedded Profiles Last Modified (UTC): "*)
+        continue
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done < <(diff -u "$file_a" "$file_b" || true)
+
+  return 0
+}
+
+render_dist_script() {
+  local target_output="$1"
   local embedded_profiles_last_modified_utc="$2"
   local project_version="$3"
-  local tmp_output
-
-  mkdir -p "$(dirname "$target_path")"
-  tmp_output="$(mktemp "${target_path}.XXXXXX")"
 
   {
     emit_dist_script_body "$embedded_profiles_last_modified_utc" "$project_version"
     echo 'safehouse_main "$@"'
     emit_self_update_validation_marker
-  } >"$tmp_output"
+  } >"$target_output"
 
-  chmod 0755 "$tmp_output"
-  mv "$tmp_output" "$target_path"
+  chmod 0755 "$target_output"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -959,6 +988,10 @@ while [[ $# -gt 0 ]]; do
       output_dir_explicit=1
       shift
       ;;
+    --check)
+      check_mode=1
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
@@ -983,7 +1016,36 @@ validate_embedded_agent_command_alias_catalog
 project_version="$(read_project_version)"
 embedded_profiles_last_modified_utc="$(resolve_embedded_profiles_last_modified_utc)"
 
-write_dist_script "$output_path" "$embedded_profiles_last_modified_utc" "$project_version"
+# Write generate-dist.sh to scratch file
+scratch_output="$(mktemp "${output_path}.XXXXXX")"
+trap 'rm -f "$scratch_output"' EXIT
+render_dist_script "$scratch_output" "$embedded_profiles_last_modified_utc" "$project_version"
+
+if [[ "$check_mode" -eq 1 ]]; then
+  if [[ ! -f "$output_path" ]]; then
+    echo "Missing dist artifact: ${output_path}" >&2
+    exit 1
+  fi
+
+  if dist_only_timestamp_differs "$output_path" "$scratch_output"; then
+    # Matches a fresh regeneration
+    exit 0
+  else
+    # Differs from a fresh regeneration
+    diff -u "$output_path" "$scratch_output" >&2 || true
+    exit 1
+  fi
+fi
+
+if [[ -f "$output_path" ]] && dist_only_timestamp_differs "$output_path" "$scratch_output"; then
+  # Already up to date
+  :
+else
+  # Move new generate-dist.sh to its final location
+  mkdir -p "$(dirname "$output_path")"
+  mv "$scratch_output" "$output_path"
+fi
+
 cleanup_committed_obsolete_dist_artifacts
 
 printf '%s\n' "$output_path"

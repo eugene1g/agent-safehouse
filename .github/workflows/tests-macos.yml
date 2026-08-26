@@ -66,6 +66,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # Refuse to run dist/safehouse.sh if it is inconsistent with a
+      # fresh regeneration, so a PR can't smuggle in arbitrary code,
+      # past a maintainer's lightweight review of whether it is safe
+      # to run CI workflows on a PR.
+      - name: Verify dist/safehouse.sh matches source
+        run: ./scripts/generate-dist.sh --check
+
       - name: Install test and browser dependencies
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
