@@ -2,6 +2,7 @@
 # bats file_tags=suite:policy
 
 load ../../test_helper.bash
+load ../procargs_utils.bash
 
 # Overrides the shared teardown (test_helper.bash) to also reap the background target,
 # which the in-test cleanup misses when a test aborts on a failed assertion.

@@ -2,6 +2,7 @@
 # bats file_tags=suite:policy
 
 load ../../test_helper.bash
+load ../procargs_utils.bash
 
 @test "[POLICY-ONLY] default profile includes the system-runtime source and generated HOME ancestor metadata" {
   local profile
