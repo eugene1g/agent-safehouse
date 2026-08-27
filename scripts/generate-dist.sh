@@ -1017,6 +1017,7 @@ project_version="$(read_project_version)"
 embedded_profiles_last_modified_utc="$(resolve_embedded_profiles_last_modified_utc)"
 
 # Write generate-dist.sh to scratch file
+mkdir -p "$(dirname "$output_path")"
 scratch_output="$(mktemp "${output_path}.XXXXXX")"
 trap 'rm -f "$scratch_output"' EXIT
 render_dist_script "$scratch_output" "$embedded_profiles_last_modified_utc" "$project_version"
@@ -1042,7 +1043,6 @@ if [[ -f "$output_path" ]] && dist_only_timestamp_differs "$output_path" "$scrat
   :
 else
   # Move new generate-dist.sh to its final location
-  mkdir -p "$(dirname "$output_path")"
   mv "$scratch_output" "$output_path"
 fi
 
