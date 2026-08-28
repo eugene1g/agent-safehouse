@@ -1,0 +1,38 @@
+;; ---------------------------------------------------------------------------
+;; Integration: GPG
+;; GPG commit signing via a host-resident gpg-agent (and keyboxd on GnuPG >= 2.4).
+;; Source: 55-integrations-optional/gpg.sb
+;; ---------------------------------------------------------------------------
+
+;; gpg-agent (and keyboxd on GnuPG >= 2.4) must ALREADY BE RUNNING on the
+;; host before entering the sandbox. Launch with:
+;;   gpgconf --launch gpg-agent && gpgconf --launch keyboxd
+;; 
+;; A sandboxed gpg cannot cold-start its own agent.
+;; With no host agent, signing fails with
+;; "can't connect to the gpg-agent: IPC connect call failed". 
+
+(allow file-read*
+    ;; Public keyring, trustdb, gpg.conf, socket paths.
+    (home-subpath "/.gnupg"))
+(allow file-read* file-write*
+    ;; Dotlock temp files (dynamic hex/host/pid names).
+    (regex (string-append "^" HOME_DIR "/\\.gnupg/(.*/)?\\.#lk"))
+    ;; Hardlinked lock targets, e.g. trustdb.gpg.lock.
+    (regex (string-append "^" HOME_DIR "/\\.gnupg/(.*/)?[^/]*\\.lock$"))
+    ;; Trust database, updated during signing.
+    (home-literal "/.gnupg/trustdb.gpg")
+    ;; RNG seed refreshed by libgcrypt.
+    (home-literal "/.gnupg/random_seed")
+)
+(deny file-read* file-write*
+    ;; Secret keys: gpg-agent's job, not the sandbox's.
+    (home-subpath "/.gnupg/private-keys-v1.d"))
+
+(allow network-outbound
+    ;; Secret-key ops (signing) delegated to gpg-agent.
+    (remote unix-socket (home-literal "/.gnupg/S.gpg-agent"))
+    ;; Public keyring daemon on GnuPG >= 2.4..
+    ;; WARNING: Allows modifications to keyring.
+    ;;          However is REQUIRED when keyboxd is enabled, which is the default for GPG >= 2.4.
+    (remote unix-socket (home-literal "/.gnupg/S.keyboxd")))

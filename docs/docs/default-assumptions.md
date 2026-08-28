@@ -46,6 +46,7 @@ Enable only when required for the current task:
 - `kubectl`: kube config/cache + krew state.
 - `shell-init`: shell startup/config file reads.
 - `ssh`: extended SSH agent socket and system SSH config integration.
+- `gpg`: GPG git commit signing. The GPG agent must already be running outside the sandbox (`gpgconf --launch gpg-agent && gpgconf --launch keyboxd`).
 - `spotlight`: Spotlight metadata queries via `mdfind` / `mdls`.
 - `microphone`: microphone capture via TCC/CoreAudio/CMIO without broader GUI grants.
 - `browser-native-messaging`: browser host messaging integration.
@@ -65,6 +66,7 @@ Enable only when required for the current task:
 - Broad recursive reads of `$HOME`, directory listing of `$HOME` itself, and arbitrary file reads under `$HOME` unless a narrower explicit rule grants that path.
 - SSH private keys under `~/.ssh`.
 - SSH agent sockets (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
+- GPG secret keys under `~/.gnupg/private-keys-v1.d`.
 - Browser profile/cookie/session data, even when `browser-native-messaging` is enabled.
 - Shell startup files unless `shell-init` is enabled.
 - Clipboard access unless `clipboard` is enabled.

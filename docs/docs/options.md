@@ -34,6 +34,7 @@
 - `chromium-full` (implies `chromium-headless`)
 - `playwright-chrome` (implies `chromium-full`, `chromium-headless`)
 - `ssh`
+- `gpg`
 - `spotlight`
 - `cleanshot`
 - `1password`
@@ -56,6 +57,8 @@ Common Apple shimmed developer tools such as `/usr/bin/git`, `/usr/bin/make`, an
 `keychain` is mainly for plugin or helper flows that need macOS credential access but are not auto-detected by a built-in Safehouse profile. For example, core `opencode` does not require keychain access, but plugin-based auth flows such as `opencode-claude-auth` can opt in with `--enable=keychain`.
 
 Before using `--enable=shell-init`, audit shell startup/config files for credentials or tokens exported into the environment. Agents may inherit values set by files such as `.zshrc`, `.bashrc`, `.bash_profile`, and fish config.
+
+`gpg` enables GPG commit signing. Start the `gpg-agent` (and `keyboxd` on GnuPG >= 2.4) outside the sandbox first, using `gpgconf --launch gpg-agent && gpgconf --launch keyboxd`. Then `git` inside the sandbox will be able to use `gpg` to sign commits.
 
 `vscode` is explicit cold-start editor integration for Visual Studio Code. For Claude's external-editor handoff:
 

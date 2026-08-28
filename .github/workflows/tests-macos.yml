@@ -89,7 +89,7 @@ jobs:
           #       (not just the formula author) before publish.
           brew install \
             bats-core parallel \
-            fnm node
+            fnm gnupg node
           # NOTE: --cask marks vendor-built items (not built by Homebrew).
           #       Integrity checking varies: temurin is currently pinned;
           #       google-chrome is currently unpinned.
