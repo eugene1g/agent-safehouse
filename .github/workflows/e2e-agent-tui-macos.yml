@@ -100,6 +100,19 @@ jobs:
             cline \
             opencode-ai
 
+          # @kilocode/cli 7.4.x hangs its TUI on GitHub's macOS runners.
+          # Skip that version.
+          KILO_MIN_VERSION=7.5.5
+          kilo_version="$(kilo --version 2>/dev/null | tr -d '[:space:]')"
+          if [ "$(printf '%s\n%s\n' "${KILO_MIN_VERSION}" "${kilo_version}" \
+              | sort --version-sort | head -1)" != "${KILO_MIN_VERSION}" ]; then
+            npm install --global --no-fund --no-audit "@kilocode/cli@${KILO_MIN_VERSION}"
+          fi
+
+          echo "Installed versions:"
+          # NOTE: Ignore non-zero exit code for extraneous or unmet peer deps
+          npm ls --global --depth=0 || true
+
       - name: Run agent TUI tests
         # NOTE: ignore[secrets-outside-env]: This workflow can only run with
         #       maintainer approval. Maintainer review of code pending merge
