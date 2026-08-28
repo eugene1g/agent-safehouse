@@ -27,7 +27,10 @@
 )
 (deny file-read* file-write*
     ;; Secret keys: gpg-agent's job, not the sandbox's.
-    (home-subpath "/.gnupg/private-keys-v1.d"))
+    (home-subpath "/.gnupg/private-keys-v1.d")
+    ;; Legacy secret keyring (GnuPG < 2.1).
+    ;; May still be present/non-empty on old or restored setups.
+    (home-literal "/.gnupg/secring.gpg"))
 
 (allow network-outbound
     ;; Secret-key ops (signing) delegated to gpg-agent.

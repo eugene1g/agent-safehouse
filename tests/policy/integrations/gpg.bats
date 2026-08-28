@@ -103,3 +103,16 @@ load ../../test_helper.bash
 
   sft_assert_contains "$profile" '/.gnupg/private-keys-v1.d'
 }
+
+@test "[EXECUTION] gpg legacy secring.gpg remains denied with and without enable=gpg" {
+  local fake_home gnupg_dir secring
+
+  fake_home="$(sft_fake_home)" || return 1
+  gnupg_dir="${fake_home}/.gnupg"
+  mkdir -m 700 -p "$gnupg_dir"
+  secring="${gnupg_dir}/secring.gpg"
+  printf 'fake legacy secret keyring\n' > "$secring"
+
+  HOME="$fake_home" GNUPGHOME="$gnupg_dir" safehouse_denied -- cat "$secring"
+  HOME="$fake_home" GNUPGHOME="$gnupg_dir" safehouse_denied --enable=gpg -- cat "$secring"
+}

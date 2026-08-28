@@ -66,7 +66,7 @@ Enable only when required for the current task:
 - Broad recursive reads of `$HOME`, directory listing of `$HOME` itself, and arbitrary file reads under `$HOME` unless a narrower explicit rule grants that path.
 - SSH private keys under `~/.ssh`.
 - SSH agent sockets (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
-- GPG secret keys under `~/.gnupg/private-keys-v1.d`.
+- GPG secret keys under `~/.gnupg/private-keys-v1.d` or the legacy `~/.gnupg/secring.gpg` keyring (GnuPG < 2.1)
 - Browser profile/cookie/session data, even when `browser-native-messaging` is enabled.
 - Shell startup files unless `shell-init` is enabled.
 - Clipboard access unless `clipboard` is enabled.
