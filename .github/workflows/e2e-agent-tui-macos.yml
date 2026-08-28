@@ -23,6 +23,12 @@ on:
       - "tests/test_helper.bash"
       - "dist/**"
       - ".github/workflows/e2e-agent-tui-macos.yml"
+  schedule:
+    # Rerun this workflow weekly (on the main branch)
+    # to detect breakage when unpinned tool versions change.
+    # 
+    # Target: Tuesdays at 1-2 AM Eastern (06:00 UTC == 02:00 EDT == 01:00 EST)
+    - cron: "0 6 * * 2"
   workflow_dispatch:
 
 # Disallow all GITHUB_TOKEN permissions by default
