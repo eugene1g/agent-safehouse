@@ -19,10 +19,11 @@ load ../../test_helper.bash
 }
 
 @test "[EXECUTION] git produces a gpg-signed commit inside the sandbox with enable=gpg" {
-  local gpg_bin git_bin fake_home gnupg_dir keyid
+  local gpg_bin git_bin gpgconf_bin fake_home gnupg_dir keyid
 
   gpg_bin="$(sft_command_path_or_skip gpg)" || return 1
   git_bin="$(sft_command_path_or_skip git)" || return 1
+  gpgconf_bin="$(sft_command_path_or_skip gpgconf)" || return 1
   fake_home="$(sft_fake_home)" || return 1
   gnupg_dir="${fake_home}/.gnupg"
   mkdir -m 700 -p "$gnupg_dir"
@@ -38,9 +39,9 @@ load ../../test_helper.bash
   # Documented prerequisite: gpg-agent (and keyboxd on GnuPG >= 2.4) must already
   # be running on the host before entering the sandbox -- a sandboxed gpg cannot
   # cold-start its own agent.
-  HOME="$fake_home" GNUPGHOME="$gnupg_dir" gpgconf --launch gpg-agent
+  HOME="$fake_home" GNUPGHOME="$gnupg_dir" "$gpgconf_bin" --launch gpg-agent
   # NOTE: OK if keyboxd fails because it is only present on GnuPG >= 2.4
-  HOME="$fake_home" GNUPGHOME="$gnupg_dir" gpgconf --launch keyboxd >/dev/null 2>&1 || true
+  HOME="$fake_home" GNUPGHOME="$gnupg_dir" "$gpgconf_bin" --launch keyboxd >/dev/null 2>&1 || true
 
   "$git_bin" init -q
   "$git_bin" config user.email sft-gpg-commit-test@example.com
