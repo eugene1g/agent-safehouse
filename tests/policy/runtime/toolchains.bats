@@ -196,6 +196,8 @@ load ../../test_helper.bash
   sft_assert_write_grant "$profile" "30-toolchains/rust.sb" "(home-literal \"/.cargo/.crates.toml\")"
   sft_assert_write_grant "$profile" "30-toolchains/rust.sb" "(home-literal \"/.cargo/.crates2.json\")"
   sft_assert_write_grant "$profile" "30-toolchains/perl.sb" "(home-literal \"/.perlbrew/init\")"
+  sft_assert_write_grant "$profile" "30-toolchains/python.sb" "(home-prefix \"/.local/share/uv/tools/.tmp\")"
+  sft_assert_write_grant "$profile" "30-toolchains/python.sb" "(home-literal \"/.local/share/uv/tools/.lock\")"
 }
 
 @test "[POLICY-ONLY] apple toolchain core includes the curated CLT aliases used by common builds" { # https://github.com/eugene1g/agent-safehouse/issues/57

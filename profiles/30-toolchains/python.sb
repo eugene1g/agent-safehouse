@@ -22,6 +22,13 @@
 )
 
 (allow file-read* file-write*
+    ;; uv writes a sibling `.tmp*` lock/staging file directly under tools/ for
+    ;; any operation that reads the tool list, even `uv tool list`. This
+    ;; prefix only matches that root-level temp file, not the per-tool
+    ;; payload directories (e.g. tools/ruff/), so `uv tool install` still
+    ;; cannot land a new tool.
+    (home-prefix "/.local/share/uv/tools/.tmp")
+    (home-literal "/.local/share/uv/tools/.lock")
     (home-subpath "/.local/state/uv")          ;; uv state/cache metadata on XDG-style setups.
     (home-subpath "/.cache/uv")                ;; uv download/build cache for fast repeated runs.
     (home-subpath "/Library/Caches/uv")        ;; macOS cache variant used by some uv installs.
