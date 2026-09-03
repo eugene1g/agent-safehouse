@@ -193,6 +193,8 @@ load ../../test_helper.bash
   done
 
   sft_assert_write_grant "$profile" "30-toolchains/rust.sb" "(home-literal \"/.cargo/.package-cache\")"
+  sft_assert_write_grant "$profile" "30-toolchains/rust.sb" "(home-literal \"/.cargo/.crates.toml\")"
+  sft_assert_write_grant "$profile" "30-toolchains/rust.sb" "(home-literal \"/.cargo/.crates2.json\")"
   sft_assert_write_grant "$profile" "30-toolchains/perl.sb" "(home-literal \"/.perlbrew/init\")"
 }
 

@@ -19,6 +19,8 @@
     (home-subpath "/.cargo/registry")        ;; Crate index/source cache written by ordinary `cargo build`.
     (home-subpath "/.cargo/git")             ;; Git dependency checkouts written by ordinary builds.
     (home-literal "/.cargo/.package-cache")  ;; Cargo's cross-process lock file.
+    (home-literal "/.cargo/.crates.toml")    ;; Install tracker: cargo opens this read-write even for `install --list`.
+    (home-literal "/.cargo/.crates2.json")   ;; Install tracker's JSON companion file; same read-write-on-list behavior.
     (home-subpath "/.config/cargo")
     (home-subpath "/.cache/cargo")
     (home-subpath "/Library/Caches/cargo")
