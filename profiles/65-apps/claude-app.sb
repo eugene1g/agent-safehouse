@@ -5,7 +5,7 @@
 ;; $$require=55-integrations-optional/electron.sb,60-agents/claude-code.sb$$
 ;; ---------------------------------------------------------------------------
 
-;; Requires: 55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView; transitively pulls macos-gui)
+;; Requires: 55-integrations-optional/electron.sb     (crashpad, WebView; transitively pulls gpu + macos-gui)
 ;;           60-agents/claude-code.sb                 (shared Claude Code state + browser bridge; transitively pulls keychain)
 
 (allow file-read* file-write*

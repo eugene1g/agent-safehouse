@@ -2,7 +2,7 @@
 ;; Integration: Electron
 ;; Chromium/Electron runtime: GPU, Metal shaders, crashpad, and WebView.
 ;; Source: 55-integrations-optional/electron.sb
-;; $$require=55-integrations-optional/macos-gui.sb$$
+;; $$require=55-integrations-optional/gpu.sb,55-integrations-optional/macos-gui.sb$$
 ;; #safehouse-test-id:electron-integration#
 ;; ---------------------------------------------------------------------------
 
@@ -19,21 +19,8 @@
 ;; Safehouse's outer sandbox still applies to the full process tree.
 
 ;; -- GPU / Metal shader compilation --------------------------------------------
-;; #safehouse-test-id:electron-gpu-metal#
-
-(allow mach-lookup
-    (global-name "com.apple.MTLCompilerService")
-    (global-name "com.apple.SafariPlatformSupport.Helper")
-)
-
-(allow iokit-open
-    (iokit-user-client-class "IOSurfaceRootUserClient")
-    (iokit-user-client-class "AGXDeviceUserClient")
-)
-
-(allow file-read-metadata
-    (literal "/private/var/db/.AppleSetupDone")
-)
+;; Shared with --enable=gpu and chromium-headless via
+;; profiles/55-integrations-optional/gpu.sb (injected via $$require above).
 
 ;; -- Chromium crashpad crash reporting -----------------------------------------
 ;; #safehouse-test-id:electron-crashpad#

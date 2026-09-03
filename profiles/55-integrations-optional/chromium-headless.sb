@@ -3,6 +3,7 @@
 ;; AppKit, crashpad, GPU, and launch-service allowances needed by headless
 ;; Chromium/Playwright runtimes and branded Google Chrome under Safehouse.
 ;; Source: 55-integrations-optional/chromium-headless.sb
+;; $$require=55-integrations-optional/gpu.sb$$
 ;; #safehouse-test-id:chromium-headless-integration#
 ;; #safehouse-test-id:chromium-headless-gpu#
 ;; #safehouse-test-id:chromium-headless-crashpad#
@@ -155,10 +156,10 @@
     (fsctl-command (_IO "h" 47))
 )
 
+;; GPU IOKit user clients (IOSurfaceRootUserClient, AGXDeviceUserClient) are
+;; provided by profiles/55-integrations-optional/gpu.sb via $$require above.
 (allow iokit-open
     (iokit-user-client-class "RootDomainUserClient")
     (iokit-user-client-class "IOHIDParamUserClient")
     (iokit-user-client-class "AppleNVMeEANUC")
-    (iokit-user-client-class "IOSurfaceRootUserClient")
-    (iokit-user-client-class "AGXDeviceUserClient")
 )
