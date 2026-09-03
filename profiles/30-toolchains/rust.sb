@@ -6,10 +6,20 @@
 
 ;; Includes common cargo config/cache locations and optional sccache.
 
-(allow file-read* file-write*
+;; ~/.cargo/bin holds rustup proxies and `cargo install` binaries, and
+;; ~/.rustup holds the managed toolchains behind them, so both roots are
+;; read-only. The registry/git caches that ordinary builds write are re-granted
+;; below.
+(allow file-read*
     (home-subpath "/.cargo")
-    (home-subpath "/.config/cargo")
     (home-subpath "/.rustup")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/.cargo/registry")        ;; Crate index/source cache written by ordinary `cargo build`.
+    (home-subpath "/.cargo/git")             ;; Git dependency checkouts written by ordinary builds.
+    (home-literal "/.cargo/.package-cache")  ;; Cargo's cross-process lock file.
+    (home-subpath "/.config/cargo")
     (home-subpath "/.cache/cargo")
     (home-subpath "/Library/Caches/cargo")
     (home-subpath "/.cache/sccache")

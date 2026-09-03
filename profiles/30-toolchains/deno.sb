@@ -4,8 +4,14 @@
 ;; Source: 30-toolchains/deno.sb
 ;; ---------------------------------------------------------------------------
 
-(allow file-read* file-write*
+;; The Deno install root holds the runtime and `deno install` binaries, so it is
+;; read-only. DENO_DIR (the module/build cache used by ordinary project work)
+;; lives under the cache paths below and stays writable.
+(allow file-read*
     (home-subpath "/.deno")
+)
+
+(allow file-read* file-write*
     (home-subpath "/.cache/deno")
     (home-subpath "/Library/Caches/deno")
 )

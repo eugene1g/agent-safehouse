@@ -7,12 +7,22 @@
 ;; Covers common Python package/cache/config paths, plus uv binaries/state.
 ;; Do not grant blanket writes to ~/.local/bin; per-agent modules grant entrypoint-specific binary writes.
 
+;; Interpreter install roots and globally installed tool binaries are read-only:
+;; agents run already-installed interpreters and CLIs but cannot modify one that
+;; the user later invokes from an unsandboxed shell. Per-project virtualenvs live
+;; in the workdir and are unaffected.
+(allow file-read*
+    (home-literal "/.local/bin/uv")     ;; uv binary observed in ~/.local/bin on this machine.
+    (home-literal "/.local/bin/uvx")    ;; uvx companion binary observed in ~/.local/bin.
+    (home-subpath "/.local/share/uv")   ;; uv-managed interpreters (`uv python install`) and tool venvs (`uv tool install`).
+    (home-subpath "/.local/pipx")       ;; pipx-managed virtualenvs and their entrypoint binaries.
+    (home-subpath "/.pyenv")            ;; pyenv interpreter shims/versions used by many repos.
+    (home-subpath "/miniconda3")
+    (home-subpath "/miniforge3")
+)
+
 (allow file-read* file-write*
-    (home-literal "/.local/bin/uv")            ;; uv binary observed in ~/.local/bin on this machine.
-    (home-literal "/.local/bin/uvx")           ;; uvx companion binary observed in ~/.local/bin.
-    (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state.
     (home-subpath "/.local/state/uv")          ;; uv state/cache metadata on XDG-style setups.
-    (home-subpath "/.local/pipx")              ;; pipx-managed virtualenvs and shared python runtime.
     (home-subpath "/.cache/uv")                ;; uv download/build cache for fast repeated runs.
     (home-subpath "/Library/Caches/uv")        ;; macOS cache variant used by some uv installs.
     (home-subpath "/.config/uv")               ;; uv config reads/writes during tool resolution.
@@ -32,13 +42,10 @@
     (home-subpath "/.virtualenvs")             ;; virtualenvwrapper default location.
     (home-subpath "/.ipython")                 ;; IPython history/profile data.
     (home-subpath "/.jupyter")                 ;; Jupyter runtime/config paths in home.
-    (home-subpath "/.pyenv")                   ;; pyenv interpreter shims/versions used by many repos.
     (home-literal "/.pypirc")                  ;; Python package index credentials/config file path.
     (home-literal "/.python_history")          ;; REPL history file touched by Python subprocess sessions.
     ;; conda / miniconda / miniforge
     (home-subpath "/.conda")
-    (home-subpath "/miniconda3")
-    (home-subpath "/miniforge3")
     (home-literal "/.condarc")
     ;; hatch
     (home-subpath "/.cache/hatch")

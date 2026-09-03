@@ -6,13 +6,22 @@
 
 ;; Includes common Composer + PHP env/cache locations.
 
-(allow file-read* file-write*
+;; The Composer home directories hold `composer global require` packages and
+;; their vendor/bin entrypoints, and phpenv holds managed PHP builds plus shims,
+;; so these roots are read-only. Composer's download cache is re-granted below.
+(allow file-read*
     (home-subpath "/.composer")
     (home-subpath "/.config/composer")
-    (home-subpath "/.cache/composer")
-    (home-subpath "/Library/Caches/composer")
     (home-subpath "/.local/share/composer")
     (home-subpath "/.phpenv")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/.composer/cache")             ;; Composer package cache written by ordinary project installs.
+    (home-subpath "/.config/composer/cache")      ;; XDG Composer cache variant.
+    (home-subpath "/.local/share/composer/cache") ;; XDG data-dir Composer cache variant.
+    (home-subpath "/.cache/composer")
+    (home-subpath "/Library/Caches/composer")
     (home-subpath "/.config/php")
     (home-subpath "/.cache/php")
     (home-literal "/.pearrc")

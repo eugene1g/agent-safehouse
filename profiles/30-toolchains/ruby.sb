@@ -15,12 +15,20 @@
     (subpath "/Library/Ruby/Gems")
 )
 
-(allow file-read* file-write*
+;; Ruby interpreter roots and user gem homes are read-only. Gem trees mix
+;; installed executables (shims, binstubs) with package payloads, so a writable
+;; gem home lets a sandboxed agent backdoor any gem-provided CLI the user later
+;; runs outside the sandbox. Project-scoped installs still work via
+;; `bundle config set --local path vendor/bundle`, which keeps gems in the workdir.
+(allow file-read*
     (home-subpath "/.rbenv")
     (home-subpath "/.rvm")
     (home-subpath "/.rubies")
-    (home-subpath "/.bundle")
     (home-subpath "/.gem")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/.bundle")
     (home-subpath "/.cache/bundler")
     (home-subpath "/.cache/rubygems")
     (home-subpath "/Library/Caches/bundle")

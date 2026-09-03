@@ -7,10 +7,14 @@
 ;; Covers Mix archives and the Hex package cache.
 ;; Runtime binaries installed via mise/asdf are already covered by runtime-managers.sb.
 
-(allow file-read* file-write*
-    ;; Mix home: archives, escripts, and Mix task cache.
+;; Mix home is read-only: archives and escripts under it are executable code that
+;; `mix` loads and that the user may invoke directly outside the sandbox.
+;; Installing an archive or escript is a host-side action.
+(allow file-read*
     (home-subpath "/.mix")
+)
 
+(allow file-read* file-write*
     ;; Hex package manager: downloaded package tarballs and registry cache.
     (home-subpath "/.hex")
 )

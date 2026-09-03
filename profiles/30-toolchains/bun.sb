@@ -12,8 +12,15 @@
 ;; - global bunfig path is ~/.bunfig.toml (or $XDG_CONFIG_HOME/.bunfig.toml)
 ;; Also include common cache/state variants seen on macOS.
 
-(allow file-read* file-write*
+;; The Bun install root holds the runtime plus `bun install --global` binaries
+;; and packages, so it is read-only: agents run installed tools but cannot
+;; backdoor a binary the user later invokes outside the sandbox.
+(allow file-read*
     (home-subpath "/.bun")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/.bun/install/cache")  ;; Global module cache written by ordinary project installs.
     (home-subpath "/.cache/bun")
     (home-subpath "/.local/state/bun")
     (home-subpath "/.local/share/bun")

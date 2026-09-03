@@ -6,22 +6,34 @@
 
 ;; Keep these separate from node.sb so Node toolchain policy stays focused.
 
+;; Every manager below installs runtimes and shims that end up on the user's
+;; PATH, so the install roots are read-only: agents select and run an installed
+;; version but cannot modify one. Installing a new runtime is a host-side action.
+(allow file-read*
+    (home-subpath "/.local/share/mise")   ;; mise-managed runtime installs and shims.
+    (home-subpath "/.volta")              ;; Volta tool images and generated shims.
+    (home-subpath "/.asdf")               ;; asdf installs, plugins, downloads, and shims.
+    (home-subpath "/.local/share/asdf")   ;; XDG asdf data dir variant of the same tree.
+    (home-subpath "/.proto")              ;; proto tool installs and shim bin dir.
+    (home-subpath "/.pkgx")               ;; pkgx package installs.
+    (home-subpath "/.local/share/pkgx")   ;; XDG pkgx data dir variant.
+    (home-subpath "/Library/Packages")    ;; macOS pkgx install root.
+)
+
 (allow file-read* file-write*
     ;; mise
     (home-subpath "/.config/mise")
-    (home-subpath "/.local/share/mise")
     (home-subpath "/.local/state/mise")
     (home-subpath "/.cache/mise")
     (home-subpath "/Library/Caches/mise")
     (home-literal "/.mise.toml")
 
     ;; volta
-    (home-subpath "/.volta")
+    (home-subpath "/.volta/tmp")  ;; Volta scratch space used while resolving tools.
+    (home-subpath "/.volta/log")  ;; Volta diagnostic logs.
 
     ;; asdf
-    (home-subpath "/.asdf")
     (home-subpath "/.config/asdf")
-    (home-subpath "/.local/share/asdf")
     (home-subpath "/.local/state/asdf")
     (home-subpath "/.cache/asdf")
     (home-subpath "/Library/Caches/asdf")
@@ -29,13 +41,10 @@
     (home-literal "/.tool-versions")
 
     ;; proto
-    (home-subpath "/.proto")
+    (home-subpath "/.proto/temp")  ;; proto download/extract scratch space.
     (home-literal "/.prototools")
 
     ;; pkgx
-    (home-subpath "/.pkgx")
-    (home-subpath "/.local/share/pkgx")
     (home-subpath "/.cache/pkgx")
     (home-subpath "/Library/Caches/pkgx")
-    (home-subpath "/Library/Packages")
 )

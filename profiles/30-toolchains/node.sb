@@ -8,13 +8,33 @@
 ;; Intentionally avoid broad RW grants like ~/.cache, ~/Library/Caches, ~/.local/share, ~/.local/state.
 ;; This list includes common + observed-on-machine Node ecosystem caches.
 
-(allow file-read* file-write*
-    ;; Node version managers.
+;; Installed runtimes and globally installed packages are read-only: agents may
+;; execute already-installed Node versions and global CLIs, but must not modify
+;; them. A writable global package tree lets a sandboxed agent backdoor a binary
+;; the user later runs from an unsandboxed shell.
+;; Rules below only match the operations they name, so every writable path
+;; nested inside these roots must be re-granted in the read-write block that
+;; follows.
+(allow file-read*
+    ;; Node version managers: managed runtime installs and their bundled global packages.
     (home-subpath "/.nvm")
     (home-subpath "/.fnm")
     (home-subpath "/.local/share/fnm")  ;; Linux/XDG default fnm install root for managed Node runtimes and package manager payloads.
     (home-subpath "/Library/Application Support/fnm")  ;; macOS default fnm install root when XDG_DATA_HOME is unset.
 
+    ;; pnpm global bin/package roots (PNPM_HOME).
+    (home-subpath "/.local/share/pnpm")
+    (home-subpath "/Library/pnpm")
+
+    ;; yarn global bin plus classic `yarn global add` package root.
+    (home-subpath "/.yarn")
+    (home-subpath "/.config/yarn")
+
+    ;; npm global packages directory (used by fnm/XDG prefix setups).
+    (home-subpath "/.local/lib/node_modules")
+)
+
+(allow file-read* file-write*
     ;; fnm per-shell shim directory (required for fnm execution via multishell symlinks).
     (home-subpath "/.local/state/fnm_multishells")
 
@@ -38,21 +58,24 @@
     (home-subpath "/.config/pnpm")
     (home-subpath "/.pnpm-state")
     (home-subpath "/.pnpm-store")
-    (home-subpath "/.local/share/pnpm")
     (home-subpath "/.local/state/pnpm")
-    (home-subpath "/Library/pnpm")
     (home-subpath "/Library/Caches/pnpm")
     (home-subpath "/Library/Preferences/pnpm")  ;; pnpm-managed global npmrc lives here.
+    (home-subpath "/.local/share/pnpm/store")   ;; Content-addressable store written by ordinary project installs.
+    (home-subpath "/Library/pnpm/store")        ;; macOS PNPM_HOME store variant.
 
     ;; yarn (classic + modern)
-    (home-subpath "/.yarn")
     (home-literal "/.yarnrc")
     (home-literal "/.yarnrc.yml")
-    (home-subpath "/.config/yarn")
     (home-subpath "/.cache/yarn")
     (home-subpath "/Library/Caches/Yarn")
+    (home-subpath "/.yarn/berry/cache")     ;; Yarn 4 global download cache, written by ordinary project installs.
+    (home-subpath "/.yarn/berry/index")     ;; Yarn Berry install-state index kept alongside the global cache.
+    (home-subpath "/.yarn/berry/metadata")  ;; Yarn Berry registry metadata cache.
 
     ;; corepack
+    ;; Package manager payloads here are fetched on demand when a project pins a
+    ;; `packageManager` version, so this stays writable for ordinary project work.
     (home-subpath "/.cache/node/corepack")
     (home-subpath "/Library/Caches/node/corepack")
 
@@ -83,9 +106,4 @@
     (home-literal "/.local/state")
     (home-subpath "/.local/state/fnm_multishells")
     (home-literal "/Library/Application Support")
-)
-
-;; npm global packages directory (used by fnm/XDG prefix setups).
-(allow file-read*
-    (home-subpath "/.local/lib/node_modules")
 )

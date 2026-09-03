@@ -9,15 +9,24 @@
 ;; - GOPATH: ~/go
 ;; - GOCACHE: ~/.cache/go-build or ~/Library/Caches/go-build
 
-(allow file-read* file-write*
+;; GOPATH roots are read-only because `go install` drops host-invoked binaries
+;; into GOPATH/bin, and goenv keeps managed toolchains and shims under its own
+;; root. The module cache under GOPATH/pkg is re-granted below since ordinary
+;; builds write there.
+(allow file-read*
     (home-subpath "/go")
+    (home-subpath "/.local/share/go")
+    (home-subpath "/.goenv")
+)
+
+(allow file-read* file-write*
+    (home-subpath "/go/pkg")                    ;; GOMODCACHE plus build artifacts written by ordinary `go build`/`go test`.
+    (home-subpath "/.local/share/go/pkg")       ;; XDG GOPATH variant of the module cache.
     (home-subpath "/.cache/go-build")
     (home-subpath "/Library/Caches/go-build")
     (home-subpath "/.config/go")
     (home-subpath "/.cache/golangci-lint")
     (home-subpath "/Library/Caches/golangci-lint")
     (home-subpath "/.config/golangci-lint")
-    (home-subpath "/.local/share/go")
-    (home-subpath "/.goenv")
     (home-subpath "/.cache/gopls")
 )

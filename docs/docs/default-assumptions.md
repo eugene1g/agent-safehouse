@@ -21,7 +21,7 @@ These are baseline allowances intended to keep common workflows functional:
 - Directory-root reads for `~/.config` and `~/.cache` so tools can discover XDG locations; contents under those trees still need more specific grants.
 - Core system/runtime paths required by shells, compilers, and package managers.
 - Binaries already installed by package managers like Nix are read-only and can be run.
-- Toolchain profile access under `profiles/30-toolchains/`.
+- Toolchain profile access under `profiles/30-toolchains/`. Toolchain install roots (`~/.nvm`, `~/.bun`, `~/.cargo`, `~/go`, `~/.pyenv`, `~/.asdf`, and the rest) are read-only; the download, module, and build caches that ordinary project work writes stay read/write.
 - Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
 - Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
 - Agent-specific profile selection for the wrapped command.
@@ -76,6 +76,7 @@ Enable only when required for the current task:
 - Full Xcode developer roots and Xcode/CoreSimulator state unless `xcode` is enabled.
 - Broad raw device access under `/dev`.
 - Installing new user/machine-level binaries using package managers like Nix.
+- Installing or modifying globally installed toolchain binaries and packages (`npm install -g`, `cargo install`, `go install`, `gem install`, `uv tool install`, `asdf install`, and equivalents). A writable global package tree would let a sandboxed agent backdoor a CLI that the user later runs from an unsandboxed shell, so those installs are host-side actions. Run them outside Safehouse, or grant the specific path back for one run with `--append-profile`.
 
 `browser-native-messaging` is intentionally narrower: it grants NativeMessagingHosts registration paths and browser extension-manifest reads, not cookies, passwords, history, or bookmarks.
 
@@ -87,6 +88,8 @@ Enable only when required for the current task:
 - **Cross-repo read context**: add `--add-dirs-ro` for specific sibling paths or files.
 - **Cloud task burst**: enable `cloud-credentials` only for that run/session.
 - **Docker/k8s workflow**: enable `docker` and/or `kubectl` only while needed.
+- **Global tool install inside a sandbox**: not supported by default. Install on the host, or pass `--append-profile` with an `(allow file-read* file-write* (subpath "..."))` overlay for the one install root you need.
+- **Ruby gem installs**: the user gem homes (`~/.gem`, `~/.rbenv`, `~/.rvm`) are read-only, so use a project-scoped bundle path (`bundle config set --local path vendor/bundle`) to keep gems in the workdir.
 - **Native builds via Apple shims**: common `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` flows work by default via the Apple toolchain core profile.
 - **Full Xcode builds / simulator flows**: add `--enable=xcode`; reserve `--enable=lldb` for debugger sessions.
 - **Local process triage**: prefer `process-control`; reserve `lldb` for real debugger sessions.

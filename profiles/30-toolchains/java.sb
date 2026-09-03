@@ -14,17 +14,26 @@
 
 ;; User-local Java state remains read-write for runtime managers, caches, and
 ;; per-user JDK installs under ~/Library/Java.
+;; JDK install roots and the tools installed alongside them are read-only:
+;; SDKMAN/jenv-managed JDKs and Coursier-installed application binaries all end
+;; up on the user's PATH, so a sandboxed agent must not be able to modify them.
+;; Writable SDKMAN scratch/state paths are re-granted below.
+(allow file-read*
+    (home-subpath "/.sdkman")                                         ;; SDKMAN-managed JDK/tool installs plus its generated `current` symlinks.
+    (home-subpath "/.jenv")                                           ;; jenv shims and registered JDK versions.
+    (home-subpath "/Library/Java")                                    ;; User-local JDK bundles under ~/Library/Java let /usr/bin/java resolve a runtime without system installs.
+    (home-subpath "/Library/Application Support/Coursier")            ;; `cs install` application binaries.
+)
+
 (allow file-read* file-write*
+    (home-subpath "/.sdkman/tmp")                                     ;; SDKMAN download/extract scratch space.
+    (home-subpath "/.sdkman/var")                                     ;; SDKMAN broadcast/version metadata refreshed on ordinary invocations.
     (home-subpath "/.m2")
     (home-subpath "/.gradle")
     (home-subpath "/.ivy2")
     (home-subpath "/.sbt")
-    (home-subpath "/.jenv")
-    (home-subpath "/.sdkman")
     (home-subpath "/.cache/coursier")
     (home-subpath "/.coursier")
-    (home-subpath "/Library/Java")                                    ;; User-local JDK bundles under ~/Library/Java let /usr/bin/java resolve a runtime without system installs.
-    (home-subpath "/Library/Application Support/Coursier")
     (home-subpath "/Library/Caches/Coursier")
     (home-subpath "/.java")
     (home-literal "/.mavenrc")

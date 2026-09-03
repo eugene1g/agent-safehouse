@@ -247,6 +247,37 @@ sft_profile_source_section() {
   '
 }
 
+# Extract only the paths granted `file-write*` by a single source section.
+# Rules match only the operations they name, so a read-only block cannot revoke
+# a write granted earlier; these helpers let tests assert that an install root
+# never appears in a write-granting block in the first place.
+sft_profile_write_grants() {
+  local haystack="$1" source_path="$2" section
+  section="$(sft_profile_source_section "$haystack" "$source_path")"
+
+  printf '%s\n' "$section" | awk '
+    /^\(allow / { inblock = (index($0, "file-write*") > 0) }
+    inblock { print }
+    /^\)/ { inblock = 0 }
+  '
+}
+
+# Assert that a source section grants read access to a path but never write.
+sft_assert_read_only_grant() {
+  local haystack="$1" source_path="$2" needle="$3" section
+
+  section="$(sft_profile_source_section "$haystack" "$source_path")"
+  sft_assert_contains "$section" "$needle" || return 1
+  sft_assert_not_contains "$(sft_profile_write_grants "$haystack" "$source_path")" "$needle"
+}
+
+# Assert that a source section grants write access to a path.
+sft_assert_write_grant() {
+  local haystack="$1" source_path="$2" needle="$3"
+
+  sft_assert_contains "$(sft_profile_write_grants "$haystack" "$source_path")" "$needle"
+}
+
 sft_assert_order() {
   local haystack="$1" first="$2" second="$3"
   local first_line second_line

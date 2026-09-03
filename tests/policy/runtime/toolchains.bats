@@ -61,6 +61,141 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "(home-subpath \"/.local/state/fnm_multishells\")"
 }
 
+@test "[POLICY-ONLY] node toolchain keeps installed runtimes and global packages read-only" { # https://github.com/eugene1g/agent-safehouse/issues/102
+  local profile root
+  local -a roots=(
+    "/.nvm"
+    "/.fnm"
+    "/.local/share/fnm"
+    "/Library/Application Support/fnm"
+    "/.local/share/pnpm"
+    "/Library/pnpm"
+    "/.yarn"
+    "/.config/yarn"
+    "/.local/lib/node_modules"
+  )
+
+  profile="$(safehouse_profile)"
+
+  for root in "${roots[@]}"; do
+    sft_assert_read_only_grant "$profile" "30-toolchains/node.sb" "(home-subpath \"${root}\")"
+  done
+}
+
+@test "[POLICY-ONLY] node toolchain keeps project-install caches writable" { # https://github.com/eugene1g/agent-safehouse/issues/102
+  local profile path
+  local -a paths=(
+    "/.npm"
+    "/.cache/npm"
+    "/.local/state/fnm_multishells"
+    "/.local/share/pnpm/store"
+    "/Library/pnpm/store"
+    "/.yarn/berry/cache"
+    "/.cache/node/corepack"
+  )
+
+  profile="$(safehouse_profile)"
+
+  for path in "${paths[@]}"; do
+    sft_assert_write_grant "$profile" "30-toolchains/node.sb" "(home-subpath \"${path}\")"
+  done
+}
+
+@test "[POLICY-ONLY] toolchain install roots are never granted write access" { # https://github.com/eugene1g/agent-safehouse/issues/102
+  local profile entry source root
+  # "<profile source>|<install root>" -- roots holding binaries or package
+  # payloads that the user can invoke from an unsandboxed shell.
+  local -a entries=(
+    "bun.sb|/.bun"
+    "deno.sb|/.deno"
+    "go.sb|/go"
+    "go.sb|/.local/share/go"
+    "go.sb|/.goenv"
+    "rust.sb|/.cargo"
+    "rust.sb|/.rustup"
+    "python.sb|/.local/share/uv"
+    "python.sb|/.local/pipx"
+    "python.sb|/.pyenv"
+    "python.sb|/miniconda3"
+    "python.sb|/miniforge3"
+    "ruby.sb|/.rbenv"
+    "ruby.sb|/.rvm"
+    "ruby.sb|/.rubies"
+    "ruby.sb|/.gem"
+    "runtime-managers.sb|/.local/share/mise"
+    "runtime-managers.sb|/.volta"
+    "runtime-managers.sb|/.asdf"
+    "runtime-managers.sb|/.local/share/asdf"
+    "runtime-managers.sb|/.proto"
+    "runtime-managers.sb|/.pkgx"
+    "runtime-managers.sb|/.local/share/pkgx"
+    "runtime-managers.sb|/Library/Packages"
+    "java.sb|/.sdkman"
+    "java.sb|/.jenv"
+    "java.sb|/Library/Java"
+    "java.sb|/Library/Application Support/Coursier"
+    "php.sb|/.composer"
+    "php.sb|/.config/composer"
+    "php.sb|/.local/share/composer"
+    "php.sb|/.phpenv"
+    "perl.sb|/.perlbrew"
+    "perl.sb|/.plenv"
+    "perl.sb|/perl5"
+    "perl.sb|/.local/lib/perl5"
+    "elixir.sb|/.mix"
+  )
+
+  profile="$(safehouse_profile)"
+
+  for entry in "${entries[@]}"; do
+    source="30-toolchains/${entry%%|*}"
+    root="${entry#*|}"
+    sft_assert_read_only_grant "$profile" "$source" "(home-subpath \"${root}\")"
+  done
+}
+
+@test "[POLICY-ONLY] python toolchain keeps globally installed uv binaries read-only" { # https://github.com/eugene1g/agent-safehouse/issues/102
+  local profile binary
+
+  profile="$(safehouse_profile)"
+
+  for binary in uv uvx; do
+    sft_assert_read_only_grant "$profile" "30-toolchains/python.sb" "(home-literal \"/.local/bin/${binary}\")"
+  done
+}
+
+@test "[POLICY-ONLY] toolchains keep project-install caches writable inside read-only roots" { # https://github.com/eugene1g/agent-safehouse/issues/102
+  local profile entry source path
+  # Caches written during ordinary project work, nested inside the read-only
+  # install roots above. Rules match only the operations they name, so these
+  # must be re-granted explicitly or normal builds break.
+  local -a entries=(
+    "bun.sb|/.bun/install/cache"
+    "go.sb|/go/pkg"
+    "go.sb|/.local/share/go/pkg"
+    "rust.sb|/.cargo/registry"
+    "rust.sb|/.cargo/git"
+    "runtime-managers.sb|/.volta/tmp"
+    "runtime-managers.sb|/.proto/temp"
+    "java.sb|/.sdkman/tmp"
+    "java.sb|/.sdkman/var"
+    "php.sb|/.composer/cache"
+    "php.sb|/.config/composer/cache"
+    "php.sb|/.local/share/composer/cache"
+  )
+
+  profile="$(safehouse_profile)"
+
+  for entry in "${entries[@]}"; do
+    source="30-toolchains/${entry%%|*}"
+    path="${entry#*|}"
+    sft_assert_write_grant "$profile" "$source" "(home-subpath \"${path}\")"
+  done
+
+  sft_assert_write_grant "$profile" "30-toolchains/rust.sb" "(home-literal \"/.cargo/.package-cache\")"
+  sft_assert_write_grant "$profile" "30-toolchains/perl.sb" "(home-literal \"/.perlbrew/init\")"
+}
+
 @test "[POLICY-ONLY] apple toolchain core includes the curated CLT aliases used by common builds" { # https://github.com/eugene1g/agent-safehouse/issues/57
   local profile binary
   local -a binaries=(c++ cc g++ ranlib c++filt gcov lorder nm objdump otool size)
