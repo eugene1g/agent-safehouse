@@ -21,6 +21,12 @@
 
 (allow file-read* file-write*
     (home-subpath "/.bun/install/cache")  ;; Global module cache written by ordinary project installs.
+    ;; `bun pm ls -g` opens these two manifest files read-write even to list
+    ;; already-installed global packages. Carve them out narrowly, leaving
+    ;; install/global/node_modules (the actual payload) read-only, so
+    ;; `bun add -g` still cannot land a new package.
+    (home-literal "/.bun/install/global/package.json")
+    (home-literal "/.bun/install/global/bun.lock")
     (home-subpath "/.cache/bun")
     (home-subpath "/.local/state/bun")
     (home-subpath "/.local/share/bun")
