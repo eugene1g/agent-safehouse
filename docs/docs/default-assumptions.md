@@ -23,7 +23,7 @@ These are baseline allowances intended to keep common workflows functional:
 - Binaries already installed by package managers like Nix are read-only and can be run.
 - Toolchain profile access under `profiles/30-toolchains/`.
 - Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
-- Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
+- Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
 - Agent-specific profile selection for the wrapped command.
 - Network access (open by default).
 - Sanitized runtime environment (not full shell env by default; preserves `SDKROOT`, `EDITOR`, and `VISUAL` when set).
@@ -45,6 +45,7 @@ Enable only when required for the current task:
 - `1password`: 1Password CLI/app integration paths.
 - `keychain`: macOS Keychain and `security`-tool access for credential-backed helper or plugin flows that need explicit opt-in.
 - `kubectl`: kube config/cache + krew state.
+- `launch-services`: the `open` command, for revealing a file, folder, or URL in its handler application. Launch Services starts the handler OUTSIDE the sandbox with the current user's full permissions, so anything that can call `open` can obtain an unsandboxed process.
 - `shell-init`: shell startup/config file reads.
 - `ssh`: extended SSH agent socket and system SSH config integration.
 - `gpg`: GPG git commit signing. The GPG agent must already be running outside the sandbox (`gpgconf --launch gpg-agent && gpgconf --launch keyboxd`).
@@ -54,7 +55,7 @@ Enable only when required for the current task:
 - `playwright-chrome`: Playwright Chrome-family channels plus injected `PLAYWRIGHT_MCP_SANDBOX=false`.
 - `process-control`: host process enumeration/signalling and argv/env visibility for local supervision tools.
 - `lldb`: LLDB/debugger toolchain access plus debugger-grade host process inspection.
-- `vscode`: Visual Studio Code desktop/editor integration, including cold-start Claude editor handoff support. Without `--enable=vscode`, Claude can only reuse an already-running VS Code instance for external-editor handoff. If `EDITOR` or `VISUAL` is set, Safehouse does not inject the VS Code-specific Claude fallback.
+- `vscode`: Visual Studio Code desktop/editor integration, including cold-start Claude editor handoff support. Without `--enable=vscode`, Claude can only reuse an already-running VS Code instance for external-editor handoff, and only alongside `--enable=launch-services`. If `EDITOR` or `VISUAL` is set, Safehouse does not inject the VS Code-specific Claude fallback.
 - `xcode`: full Xcode developer roots plus Xcode/CoreSimulator user state.
 - `macos-gui`: GUI app-related integration paths.
 - `electron`: Electron integration (also enables `macos-gui`).
@@ -74,6 +75,7 @@ Enable only when required for the current task:
 - Host process enumeration/control and argv/env visibility unless `process-control` or `lldb` is enabled.
 - LLDB/debugger toolchain and task-port access unless `lldb` is enabled.
 - Full Xcode developer roots and Xcode/CoreSimulator state unless `xcode` is enabled.
+- Launching applications through Launch Services (`open`) unless `launch-services` is enabled. Launch Services always starts processes OUTSIDE the sandbox with the current user's full permissions.
 - Broad raw device access under `/dev`.
 - Installing new user/machine-level binaries using package managers like Nix.
 

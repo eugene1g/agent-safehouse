@@ -27,6 +27,7 @@
 - `docker` (implies `keychain`)
 - `herdr`
 - `kubectl`
+- `launch-services`
 - `keychain`
 - `macos-gui`
 - `microphone`
@@ -63,7 +64,7 @@ Before using `--enable=shell-init`, audit shell startup/config files for credent
 
 `vscode` is explicit cold-start editor integration for Visual Studio Code. For Claude's external-editor handoff:
 
-- Without `--enable=vscode`, Safehouse can only reuse an already-running VS Code or VS Code Insiders instance.
+- Without `--enable=vscode`, Safehouse can only reuse an already-running VS Code or VS Code Insiders instance, and only when `--enable=launch-services` is also set, because the reuse handoff calls `open -b`.
 - With `--enable=vscode`, Safehouse may cold-start an isolated VS Code editor window for the temp Claude prompt file.
 - If `EDITOR` or `VISUAL` is already set, Safehouse leaves Claude's editor selection alone and does not inject the VS Code fallback shim.
 

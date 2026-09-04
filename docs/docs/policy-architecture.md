@@ -11,7 +11,7 @@ Policy assembly order:
 | `20-network.sb` | Network policy |
 | `30-toolchains/*.sb` | Apple Toolchain Core, Node, Python, Go, Rust, Bun, Java, PHP, Perl, Ruby |
 | `40-shared/*.sb` | Shared cross-agent modules |
-| `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `launch-services`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`) |
+| `50-integrations-core/*.sb` | Core integrations (`container-runtime-default-deny`, `git`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`) |
 | `55-integrations-optional/*.sb` | Opt-in integrations (`--enable=...`) |
 | `60-agents/*.sb` | Per-agent profile selection by command basename |
 | `65-apps/*.sb` | Per-app bundle selection (`Claude.app`, `Cursor.app`, `Visual Studio Code.app`) |
