@@ -101,7 +101,7 @@ Before using `--enable=shell-init`, audit shell startup/config files for credent
 
 For Claude's external-editor handoff (`Ctrl+G`) with VS Code:
 
-- Plain `safehouse -- claude ...` can reuse an already-running unsandboxed VS Code or VS Code Insiders instance.
+- Reusing an already-running unsandboxed VS Code or VS Code Insiders instance requires `--enable=launch-services`, as in `safehouse --enable=launch-services -- claude ...`. That flag lets the sandboxed process start ANY application outside the sandbox, so enable it deliberately.
 - If VS Code is not already running, use `--enable=vscode` so Safehouse can cold-start it.
 - The explicit `--enable=vscode` cold-start path launches a separate Safehouse-managed VS Code profile for the temporary Claude prompt editor, so it does not reuse your normal VS Code settings, extensions, or recently-opened list.
 - If you already set `EDITOR` or `VISUAL`, Safehouse passes that through by default and skips its Claude-specific VS Code fallback shim.

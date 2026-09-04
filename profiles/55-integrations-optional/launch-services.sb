@@ -2,8 +2,15 @@
 ;; Integration: Launch Services
 ;; macOS Launch Services access needed by the `open` command to resolve
 ;; which application should handle a file, folder, or URL, then launch it.
-;; Source: 50-integrations-core/launch-services.sb
+;; Source: 55-integrations-optional/launch-services.sb
 ;; ---------------------------------------------------------------------------
+
+;; WARNING: Processes spawned through Launch Services are created OUTSIDE the
+;; current sandbox, with the user's full privileges.
+;;
+;; This integration is therefore opt-in. Enable it only when a wrapped tool
+;; needs `open` (for example Claude Code's /memory -> "Open auto-memory folder")
+;; and an unsandboxed launch is acceptable.
 
 ;; -- Mach services -----------------------------------------------------------
 ;; `open` queries lsd to map file types / UTIs to default applications, then

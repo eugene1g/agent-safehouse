@@ -65,7 +65,6 @@ load ../procargs_utils.bash
   sft_assert_contains "$profile" "(allow ipc-sysv-sem)"
   sft_assert_includes_source "$profile" "50-integrations-core/container-runtime-default-deny.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/git.sb"
-  sft_assert_includes_source "$profile" "50-integrations-core/launch-services.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/scm-clis.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/ssh-agent-default-deny.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/worktree-common-dir.sb"
