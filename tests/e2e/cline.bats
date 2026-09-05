@@ -65,5 +65,12 @@ login_agent() {
 }
 
 configure_agent_tui() {
+  # cline can leave the terminal blank for well past the 10s default before it
+  # paints its splash, so the first handle_startup_gates call has nothing to
+  # match. Same floor codex uses, and the one CI already sets globally.
+  if (( AGENT_TUI_STARTUP_WAIT_SECS < 20 )); then
+    AGENT_TUI_STARTUP_WAIT_SECS=20
+  fi
+
   return 0
 }
