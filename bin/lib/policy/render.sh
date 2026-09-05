@@ -49,35 +49,6 @@ policy_render_append_profile() {
   policy_render_emit_resolved_home_path_rules "$profile_key" "$content" || return 1
 }
 
-policy_render_list_profile_absolute_path_rules_for_operation() {
-  local content="$1"
-  local operation="$2"
-  local excluded_operation="${3:-}"
-  local line in_matching_block=0 matcher path allow_prefix
-
-  allow_prefix="(allow ${operation}"
-
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$in_matching_block" -eq 0 ]]; then
-      if [[ "$line" =~ ^[[:space:]]*\(allow[[:space:]]+ ]] && [[ "$line" == *"$allow_prefix"* ]] && [[ -z "$excluded_operation" || "$line" != *"$excluded_operation"* ]]; then
-        in_matching_block=1
-      fi
-      continue
-    fi
-
-    if [[ "$line" =~ ^[[:space:]]*\) ]]; then
-      in_matching_block=0
-      continue
-    fi
-
-    if [[ "$line" =~ \((literal|subpath)[[:space:]]+\"(/[^\"]*)\"\) ]]; then
-      matcher="${BASH_REMATCH[1]}"
-      path="${BASH_REMATCH[2]}"
-      printf '%s|%s\n' "$matcher" "$path"
-    fi
-  done <<< "$content"
-}
-
 policy_render_list_profile_home_path_rules() {
   local content="$1"
   local line in_matching_block=0 matcher path operations
@@ -125,33 +96,6 @@ policy_render_should_skip_resolved_builtin_path() {
   return 1
 }
 
-policy_render_resolve_builtin_absolute_path() {
-  local path="$1"
-  local resolved_path=""
-
-  [[ "$path" == /* ]] || return 1
-  [[ -e "$path" ]] || return 1
-
-  resolved_path="$(safehouse_normalize_abs_path "$path" 2>/dev/null)" || return 1
-  [[ "$resolved_path" != "$path" ]] || return 1
-
-  printf '%s\n' "$resolved_path"
-}
-
-policy_render_resolve_home_scoped_path() {
-  local rel_path="$1"
-  local original_path resolved_path
-
-  original_path="${policy_req_home_dir}${rel_path}"
-  [[ "$original_path" == /* ]] || return 1
-  [[ -e "$original_path" ]] || return 1
-
-  resolved_path="$(safehouse_normalize_abs_path "$original_path" 2>/dev/null)" || return 1
-  [[ "$resolved_path" != "$original_path" ]] || return 1
-
-  printf '%s\n' "$resolved_path"
-}
-
 policy_render_emit_resolved_builtin_path_rule() {
   local profile_key="$1"
   local matcher="$2"
@@ -187,35 +131,49 @@ policy_render_emit_resolved_builtin_path_rules() {
   local content="$2"
   local operation="$3"
   local excluded_operation="${4:-}"
-  local entry matcher path resolved_path resolved_key
   local -a candidate_entries=()
-  local -a existing_rule_keys=()
-  local -a emitted_rule_keys=()
 
   [[ "$profile_key" == profiles/* ]] || return 0
+  policy_metadata_collect_profile_absolute_path_rules candidate_entries "$profile_key" "$operation" "$excluded_operation" "$content" || return 1
+  [[ "${#candidate_entries[@]}" -gt 0 ]] || return 0
+  policy_render_emit_resolved_builtin_path_candidates "$profile_key" "$operation" "${candidate_entries[@]}"
+}
 
-  while IFS= read -r entry || [[ -n "$entry" ]]; do
-    candidate_entries+=("$entry")
-  done < <(policy_render_list_profile_absolute_path_rules_for_operation "$content" "$operation" "$excluded_operation")
+policy_render_emit_resolved_builtin_path_candidates() {
+  local profile_key="$1"
+  local operation="$2"
+  shift 2
+  local entry matcher path resolved_path resolved_key idx
+  local -a existing_rule_keys=()
+  local -a emitted_rule_keys=()
+  local -a eligible_entries=()
+  local -a eligible_paths=()
+  local -a resolved_paths=()
 
-  if [[ "${#candidate_entries[@]}" -eq 0 ]]; then
-    return 0
-  fi
-
-  for entry in "${candidate_entries[@]}"; do
+  for entry in "$@"; do
     matcher="${entry%%|*}"
     path="${entry#*|}"
-    safehouse_array_append_unique existing_rule_keys "${matcher}:${path}"
-  done
-
-  for entry in "${candidate_entries[@]}"; do
-    matcher="${entry%%|*}"
-    path="${entry#*|}"
+    # Membership checks do not require this list to be unique.
+    existing_rule_keys+=("${matcher}:${path}")
     if policy_render_should_skip_resolved_builtin_path "$profile_key" "$path"; then
       continue
     fi
-    resolved_path="$(policy_render_resolve_builtin_absolute_path "$path" || true)"
-    [[ -n "$resolved_path" ]] || continue
+    [[ "$path" == /* && -e "$path" ]] || continue
+    eligible_entries+=("$entry")
+    eligible_paths+=("$path")
+  done
+  [[ "${#eligible_paths[@]}" -gt 0 ]] || return 0
+
+  # Keep the exact input snapshot paired with the results even if paths change
+  # while the resolver runs. Rule selection and emission remain in this caller.
+  safehouse_resolve_paths_batch resolved_paths "${eligible_paths[@]}" || return 1
+
+  for idx in "${!eligible_entries[@]}"; do
+    entry="${eligible_entries[$idx]}"
+    matcher="${entry%%|*}"
+    path="${entry#*|}"
+    resolved_path="${resolved_paths[$idx]}"
+    [[ -n "$resolved_path" && "$resolved_path" != "$path" ]] || continue
 
     resolved_key="${matcher}:${resolved_path}"
     if [[ "${#existing_rule_keys[@]}" -gt 0 ]] && safehouse_array_contains_exact "$resolved_key" "${existing_rule_keys[@]}"; then
@@ -233,21 +191,35 @@ policy_render_emit_resolved_builtin_path_rules() {
 policy_render_emit_resolved_home_path_rules() {
   local profile_key="$1"
   local content="$2"
-  local entry operations matcher rel_path original_path resolved_path rule_key
+  local entry operations matcher rel_path original_path resolved_path rule_key idx
   local -a emitted_rule_keys=()
+  local -a eligible_entries=()
+  local -a eligible_paths=()
+  local -a resolved_paths=()
 
   [[ "$profile_key" == profiles/* ]] || return 0
 
   while IFS= read -r entry || [[ -n "$entry" ]]; do
     [[ -n "$entry" ]] || continue
+    rel_path="${entry#*|}"
+    rel_path="${rel_path#*|}"
+    original_path="${policy_req_home_dir}${rel_path}"
+    [[ "$original_path" == /* && -e "$original_path" ]] || continue
+    eligible_entries+=("$entry")
+    eligible_paths+=("$original_path")
+  done < <(policy_render_list_profile_home_path_rules "$content")
+  [[ "${#eligible_paths[@]}" -gt 0 ]] || return 0
+
+  safehouse_resolve_paths_batch resolved_paths "${eligible_paths[@]}" || return 1
+
+  for idx in "${!eligible_entries[@]}"; do
+    entry="${eligible_entries[$idx]}"
     operations="${entry%%|*}"
     entry="${entry#*|}"
     matcher="${entry%%|*}"
-    rel_path="${entry#*|}"
-    original_path="${policy_req_home_dir}${rel_path}"
-
-    resolved_path="$(policy_render_resolve_home_scoped_path "$rel_path" || true)"
-    [[ -n "$resolved_path" ]] || continue
+    original_path="${eligible_paths[$idx]}"
+    resolved_path="${resolved_paths[$idx]}"
+    [[ -n "$resolved_path" && "$resolved_path" != "$original_path" ]] || continue
 
     rule_key="${operations}|${matcher}|${resolved_path}"
     if [[ "${#emitted_rule_keys[@]}" -gt 0 ]] && safehouse_array_contains_exact "$rule_key" "${emitted_rule_keys[@]}"; then
@@ -256,7 +228,7 @@ policy_render_emit_resolved_home_path_rules() {
 
     policy_render_emit_resolved_home_path_rule "$profile_key" "$operations" "$matcher" "$original_path" "$resolved_path" || return 1
     emitted_rule_keys+=("$rule_key")
-  done < <(policy_render_list_profile_home_path_rules "$content")
+  done
 }
 
 policy_render_emit_resolved_builtin_path_rules_for_profiles() {
@@ -268,11 +240,13 @@ policy_render_emit_resolved_builtin_path_rules_for_profiles() {
     excluded_operation="$2"
     shift 2
   fi
-  local profile_key content
+  local profile_key
+  local -a candidate_entries=()
 
   for profile_key in "$@"; do
-    content="$(policy_source_read_profile_content "$profile_key")" || return 1
-    policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "$operation" "$excluded_operation" || return 1
+    policy_metadata_collect_profile_absolute_path_rules candidate_entries "$profile_key" "$operation" "$excluded_operation" || return 1
+    [[ "${#candidate_entries[@]}" -gt 0 ]] || continue
+    policy_render_emit_resolved_builtin_path_candidates "$profile_key" "$operation" "${candidate_entries[@]}" || return 1
   done
 }
 
@@ -423,7 +397,7 @@ policy_render_append_optional_profiles() {
 policy_render_build_path_ancestor_literals_block() {
   local path="$1"
   local label="$2"
-  local chunk trimmed_path current_path path_part escaped_current_path
+  local chunk trimmed_path current_path path_part escaped_current_path ancestor_line
   local IFS='/'
   local -a path_parts=()
 
@@ -446,8 +420,9 @@ policy_render_build_path_ancestor_literals_block() {
     for path_part in "${path_parts[@]}"; do
       [[ -z "$path_part" ]] && continue
       current_path+="/${path_part}"
-      escaped_current_path="$(safehouse_escape_for_sb "$current_path")" || return 1
-      chunk+="$(printf '\n    (literal "%s")' "$escaped_current_path")"
+      safehouse_escape_for_sb_into escaped_current_path "$current_path" || return 1
+      printf -v ancestor_line '\n    (literal "%s")' "$escaped_current_path"
+      chunk+="$ancestor_line"
     done
   fi
 
@@ -462,7 +437,7 @@ policy_render_emit_path_ancestor_literals() {
 policy_render_emit_path_ancestor_metadata_literals() {
   local path="$1"
   local label="$2"
-  local chunk trimmed_path current_path path_part escaped_current_path
+  local chunk trimmed_path current_path path_part escaped_current_path ancestor_line
   local IFS='/'
   local -a path_parts=()
 
@@ -483,8 +458,9 @@ policy_render_emit_path_ancestor_metadata_literals() {
     for path_part in "${path_parts[@]}"; do
       [[ -z "$path_part" ]] && continue
       current_path+="/${path_part}"
-      escaped_current_path="$(safehouse_escape_for_sb "$current_path")" || return 1
-      chunk+="$(printf '\n    (literal "%s")' "$escaped_current_path")"
+      safehouse_escape_for_sb_into escaped_current_path "$current_path" || return 1
+      printf -v ancestor_line '\n    (literal "%s")' "$escaped_current_path"
+      chunk+="$ancestor_line"
     done
   fi
 
