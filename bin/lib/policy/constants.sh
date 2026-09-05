@@ -159,18 +159,6 @@ policy_is_known_optional_integration_feature() {
   return 1
 }
 
-policy_optional_integration_profile_key_from_feature() {
-  local feature="$1"
-
-  policy_ensure_feature_catalog_initialized || return 1
-
-  if ! policy_is_known_optional_integration_feature "$feature"; then
-    return 1
-  fi
-
-  printf 'profiles/55-integrations-optional/%s.sb\n' "$feature"
-}
-
 policy_optional_integration_feature_from_profile_key() {
   local profile_key="$1"
   local feature

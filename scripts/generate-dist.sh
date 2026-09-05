@@ -605,6 +605,44 @@ SCRIPT
 SCRIPT
 }
 
+emit_embedded_command_selection_function() {
+  local profile_key command_alias
+
+  # Alias uniqueness is validated before generation, so one literal case arm
+  # per alias replaces the runtime scan without changing first-match behavior.
+  cat <<'SCRIPT'
+policy_selection_select_matching_command() {
+  local command_basename="$1"
+  local app_bundle_base="$2"
+  local profile_key
+
+  case "$command_basename" in
+SCRIPT
+
+  for profile_key in "${profile_files[@]}"; do
+    [[ "$profile_key" == profiles/60-agents/*.sb ]] || continue
+    while IFS= read -r command_alias || [[ -n "$command_alias" ]]; do
+      [[ -n "$command_alias" ]] || continue
+      printf '    "%s") profile_key="%s" ;;\n' \
+        "$(escape_for_shell_double_quotes "$command_alias")" \
+        "$(escape_for_shell_double_quotes "$profile_key")"
+    done < <(emit_profile_command_alias_tokens_for_dist "$profile_key")
+  done
+
+  cat <<'SCRIPT'
+    *) return 0 ;;
+  esac
+
+  if policy_selection_should_skip_command_alias_match "$profile_key" "$command_basename" "$app_bundle_base"; then
+    return 0
+  fi
+
+  policy_selection_append_scoped_profile "$profile_key" "command basename match: ${command_basename}"
+}
+
+SCRIPT
+}
+
 emit_embedded_profile_exec_env_defaults_function() {
   local rel_path
 
@@ -620,6 +658,50 @@ SCRIPT
   cat <<'SCRIPT'
     *)
       return 1
+      ;;
+  esac
+}
+
+SCRIPT
+}
+
+emit_embedded_absolute_path_candidates_function() {
+  local rel_path content entries entry
+
+  load_generator_metadata_helpers
+  cat <<'SCRIPT'
+# Compile declared read-only path candidates, not host-specific symlink targets.
+# The original parser remains available for other operations and external files.
+policy_metadata_collect_profile_absolute_path_rules() {
+  if [[ "$3" != "file-read*" || "${4:-}" != "file-write*" ]]; then
+    policy_metadata_collect_profile_absolute_path_rules_from_source "$@"
+    return $?
+  fi
+
+  safehouse_array_clear "$1" || return 1
+  case "$2" in
+SCRIPT
+
+  for rel_path in "${profile_files[@]}"; do
+    content="$(cat "${ROOT_DIR}/${rel_path}")"
+    entries="$(policy_metadata_list_absolute_path_rules_for_operation "$content" "file-read*" "file-write*")"
+    printf '    "%s")\n' "$rel_path"
+    if [[ -n "$entries" ]]; then
+      # shellcheck disable=SC2016  # Emit the generated function's array argument.
+      printf '      safehouse_array_append "$1"'
+      while IFS= read -r entry; do
+        printf ' "%s"' "$(escape_for_shell_double_quotes "$entry")"
+      done <<< "$entries"
+      printf '\n'
+    else
+      printf '      :\n'
+    fi
+    printf '      ;;\n'
+  done
+
+  cat <<'SCRIPT'
+    *)
+      policy_metadata_collect_profile_absolute_path_rules_from_source "$@"
       ;;
   esac
 }
@@ -707,7 +789,9 @@ emit_embedded_overrides() {
   printf 'policy_embedded_supported_enable_features="%s"\n\n' "$escaped_supported_enable_features"
   emit_embedded_profile_requirements_function
   emit_embedded_profile_command_aliases_function
+  emit_embedded_command_selection_function
   emit_embedded_profile_exec_env_defaults_function
+  emit_embedded_absolute_path_candidates_function
   emit_preassembled_profile_chunk_function \
     "policy_dist_append_preassembled_fixed_before_home" \
     "__SAFEHOUSE_PREASSEMBLED_FIXED_BEFORE_HOME__" \

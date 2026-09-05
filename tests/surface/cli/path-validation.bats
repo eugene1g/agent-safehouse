@@ -90,6 +90,8 @@ load ../../test_helper.bash
   escaped_weird_dir="${escaped_weird_dir//\"/\\\"}"
   sft_assert_contains "$policy" "(define WORK_DIR \"${escaped_weird_dir}\")"
   sft_assert_contains "$home_policy" "(define HOME_DIR \"${escaped_weird_dir}\")"
+  sft_assert_contains "$policy" "    (literal \"${escaped_weird_dir}\")"
+  sft_assert_contains "$home_policy" "    (literal \"${escaped_weird_dir}\")"
 
   safehouse_denied -- /bin/cat "$weird_file"
 

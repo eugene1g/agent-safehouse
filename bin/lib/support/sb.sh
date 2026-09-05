@@ -12,12 +12,21 @@ safehouse_validate_sb_string() {
   return 0
 }
 
-safehouse_escape_for_sb() {
-  local value="$1"
+# The output variable must not use the helper's _safehouse_sb_ local prefix.
+safehouse_escape_for_sb_into() {
+  local _safehouse_sb_value="$2"
 
-  safehouse_validate_sb_string "$value" "SBPL string" || return 1
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
+  safehouse_require_collection_name "$1" || return 1
+  safehouse_validate_sb_string "$_safehouse_sb_value" "SBPL string" || return 1
+  _safehouse_sb_value="${_safehouse_sb_value//\\/\\\\}"
+  _safehouse_sb_value="${_safehouse_sb_value//\"/\\\"}"
+  printf -v "$1" '%s' "$_safehouse_sb_value"
+}
+
+safehouse_escape_for_sb() {
+  local value
+
+  safehouse_escape_for_sb_into value "$1" || return 1
   printf '%s' "$value"
 }
 

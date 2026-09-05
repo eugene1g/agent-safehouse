@@ -122,6 +122,26 @@ rewrite_file_with_sed() {
   sft_assert_contains "$output" "$(sft_source_marker "60-agents/opencode.sb")"
 }
 
+@test "generated command lookup follows changed metadata and treats shell patterns literally" {
+  local repo_copy custom_dist fake_alias source_policy dist_policy
+  repo_copy="$(sft_workspace_path "repo-copy-command-lookup")"
+  custom_dist="$(sft_workspace_path "standalone/safehouse.sh")"
+  fake_alias="$(sft_workspace_path 'fixture-*?[home]`id`')"
+  copy_generate_dist_fixture "$repo_copy"
+  rewrite_file_with_sed "${repo_copy}/profiles/60-agents/copilot-cli.sb" 's/^;; \$\$command=copilot,copilot-cli\$\$$/;; $$command=fixture-*?[home]`id`$$/'
+  sft_make_fake_command "$fake_alias"
+  "${repo_copy}/scripts/generate-dist.sh" --output "$custom_dist"
+
+  source_policy="$("${repo_copy}/bin/safehouse.sh" --stdout -- "$fake_alias")"
+  dist_policy="$("$custom_dist" --stdout -- "$fake_alias")"
+  [ "$source_policy" = "$dist_policy" ]
+  sft_assert_includes_source "$dist_policy" "60-agents/copilot-cli.sb"
+
+  sft_make_fake_command "$(sft_workspace_path copilot)"
+  dist_policy="$("$custom_dist" --stdout -- "$(sft_workspace_path copilot)")"
+  sft_assert_omits_source "$dist_policy" "60-agents/copilot-cli.sb"
+}
+
 @test "generate-dist.sh fails when an agent profile declares duplicate command aliases" {
   local repo_copy output_dir
 
@@ -150,4 +170,35 @@ rewrite_file_with_sed() {
 
   [ "$status" -ne 0 ]
   sft_assert_contains "$output" 'Command alias copilot is declared by multiple agent profiles: profiles/60-agents/claude-code.sb, profiles/60-agents/copilot-cli.sb'
+}
+
+@test "compiled path metadata preserves literal shell characters and resolves symlinks at runtime" {
+  local repo_copy custom_dist target_one target_two link_path profile_path source_policy dist_policy
+  repo_copy="$(sft_workspace_path "repo-copy-path-candidates")"
+  custom_dist="$(sft_workspace_path "standalone/safehouse.sh")"
+  target_one="$(sft_external_dir "compile-time-target")"
+  target_two="$(sft_external_dir "runtime-target")"
+  link_path="$(sft_external_dir "links")"'/literal $HOME `whoami` $(id)'
+  copy_generate_dist_fixture "$repo_copy"
+  ln -s "$target_one" "$link_path"
+  profile_path="${repo_copy}/profiles/55-integrations-optional/path-candidates.sb"
+  cat > "$profile_path" <<SB
+;; Integration: Path candidates test fixture
+;; Source: 55-integrations-optional/path-candidates.sb
+(allow file-read*
+    (subpath "$link_path")
+)
+SB
+  "${repo_copy}/scripts/generate-dist.sh" --output "$custom_dist"
+
+  # The generated artifact must discover the new destination on the host where
+  # it runs, even though it was compiled while the symlink pointed elsewhere.
+  ln -sfn "$target_two" "$link_path"
+  source_policy="$("${repo_copy}/bin/safehouse.sh" --stdout --enable=path-candidates)"
+  dist_policy="$("$custom_dist" --stdout --enable=path-candidates)"
+  [ "$source_policy" = "$dist_policy" ]
+  sft_assert_contains "$dist_policy" "$link_path -> $target_two"
+  sft_assert_not_contains "$dist_policy" "$link_path -> $target_one"
+  sft_assert_contains "$dist_policy" "(allow file-read* (subpath \"${target_two}\"))"
+  sft_assert_file_not_contains "$custom_dist" "$target_one"
 }
