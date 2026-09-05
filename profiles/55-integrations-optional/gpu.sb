@@ -1,0 +1,26 @@
+;; ---------------------------------------------------------------------------
+;; Integration: GPU
+;; Metal shader compilation and GPU IOKit user clients without the full
+;; Electron/macOS-GUI stack. Use for GPU/Metal-only workloads.
+;; Source: 55-integrations-optional/gpu.sb
+;; #safehouse-test-id:gpu-integration#
+;; ---------------------------------------------------------------------------
+
+;; Metal shader compilation service and WebKit platform support helper,
+;; used by Chromium/Electron GPU processes and Metal tooling.
+(allow mach-lookup
+    (global-name "com.apple.MTLCompilerService")
+    (global-name "com.apple.SafariPlatformSupport.Helper")
+)
+
+;; IOSurface (shared GPU surface buffers) and Apple GPU (AGX) IOKit user
+;; clients required for GPU process startup and Metal rendering.
+(allow iokit-open
+    (iokit-user-client-class "IOSurfaceRootUserClient")
+    (iokit-user-client-class "AGXDeviceUserClient")
+)
+
+;; GPU helper processes probe setup state at startup.
+(allow file-read-metadata
+    (literal "/private/var/db/.AppleSetupDone")
+)

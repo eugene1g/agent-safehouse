@@ -56,7 +56,8 @@ Policy scope options:
   --enable=FEATURES
       Comma-separated optional features to enable
       Supported values: ${policy_supported_enable_features}
-      Note: electron implies macos-gui
+      Note: electron implies gpu and macos-gui
+      Note: chromium-headless implies gpu
       Note: chromium-full implies chromium-headless
       Note: Chromium/Chrome launched inside Safehouse must be passed
             --no-sandbox; Safehouse cannot permit Chromium's nested Seatbelt sandbox

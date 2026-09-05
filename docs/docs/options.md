@@ -30,12 +30,13 @@
 - `keychain`
 - `macos-gui`
 - `microphone`
-- `electron` (implies `macos-gui`)
-- `chromium-headless`
+- `electron` (implies `gpu`, `macos-gui`)
+- `chromium-headless` (implies `gpu`)
 - `chromium-full` (implies `chromium-headless`)
 - `playwright-chrome` (implies `chromium-full`, `chromium-headless`)
 - `ssh`
 - `gpg`
+- `gpu` (pulled in transitively by `electron` and `chromium-headless`)
 - `spotlight`
 - `cleanshot`
 - `1password`
@@ -54,6 +55,8 @@
 Common Apple shimmed developer tools such as `/usr/bin/git`, `/usr/bin/make`, and `/usr/bin/clang` are available by default via `profiles/30-toolchains/apple-toolchain-core.sb`; this is not an optional `--enable` feature.
 
 `chromium-headless` and `chromium-full` grant Safehouse allowances for Chrome-family processes, but they do not disable Chromium's own inner Seatbelt sandbox. Pass `--no-sandbox` to Chromium/Chrome launch arguments whenever a browser process runs inside Safehouse. Without it, Chromium can fail with `sandbox_exec` or sandbox initialization errors before Safehouse allow rules matter.
+
+`gpu` grants Metal shader compilation (`com.apple.MTLCompilerService`) and GPU IOKit user clients (`IOSurfaceRootUserClient`, `AGXDeviceUserClient`) without the full `electron` or `macos-gui` stack. Use it for GPU/Metal-only workloads; `electron` and `chromium-headless` pull it in transitively.
 
 `keychain` is mainly for plugin or helper flows that need macOS credential access but are not auto-detected by a built-in Safehouse profile. For example, core `opencode` does not require keychain access, but plugin-based auth flows such as `opencode-claude-auth` can opt in with `--enable=keychain`.
 

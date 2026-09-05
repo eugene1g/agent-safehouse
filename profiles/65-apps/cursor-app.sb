@@ -6,7 +6,7 @@
 ;; ---------------------------------------------------------------------------
 
 ;; Requires: 55-integrations-optional/keychain.sb     (desktop auth flows)
-;;           55-integrations-optional/electron.sb     (GPU, Metal, crashpad, WebView; transitively pulls macos-gui)
+;;           55-integrations-optional/electron.sb     (crashpad, WebView; transitively pulls gpu + macos-gui)
 
 (allow file-read* file-write*
     (home-subpath "/Library/Application Support/Cursor")

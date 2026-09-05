@@ -48,6 +48,7 @@ Enable only when required for the current task:
 - `shell-init`: shell startup/config file reads.
 - `ssh`: extended SSH agent socket and system SSH config integration.
 - `gpg`: GPG git commit signing. The GPG agent must already be running outside the sandbox (`gpgconf --launch gpg-agent && gpgconf --launch keyboxd`).
+- `gpu`: Metal shader compilation and GPU IOKit access.
 - `spotlight`: Spotlight metadata queries via `mdfind` / `mdls`.
 - `microphone`: microphone capture via TCC/CoreAudio/CMIO without broader GUI grants.
 - `browser-native-messaging`: browser host messaging integration.
