@@ -194,7 +194,30 @@ EOF
     safehouse_ok --enable=playwright-chrome -- /bin/sh -c '[ "${PLAYWRIGHT_MCP_SANDBOX:-}" = "true" ]'
 }
 
-@test "[EXECUTION] claude injects a reuse-mode VS Code editor shim by default even when no running VS Code instance is detected yet" {
+@test "[EXECUTION] claude does NOT inject a reuse-mode VS Code editor shim by default, because the shim needs enable=launch-services" { # https://github.com/eugene1g/agent-safehouse/issues/181
+  local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
+  local fake_bin_dir="${SAFEHOUSE_WORKSPACE}/fake-bin"
+  local env_file
+  local normalized_home=""
+  local shim_path=""
+
+  create_env_printer_command "$claude_bin"
+  mkdir -p "$fake_bin_dir"
+  create_fake_lsappinfo_command "${fake_bin_dir}/lsappinfo" "running"
+  env_file="$(sft_workspace_path "shim-no-launch-services.env")"
+  create_editor_shim_env_file "$env_file" "$fake_bin_dir"
+  normalized_home="$(cd "$HOME" && pwd -P)"
+  shim_path="$(claude_reuse_shim_path_for_home "$normalized_home")"
+
+  safehouse_run --env="$env_file" -- "./claude"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "EDITOR="
+  sft_assert_contains "$output" "VISUAL="
+  sft_assert_contains "$output" "SAFEHOUSE_CLAUDE_VSCODE_MODE="
+  [ ! -e "$shim_path" ]
+}
+
+@test "[EXECUTION] claude injects a reuse-mode VS Code editor shim before any VS Code instance is running, but only if enable=launch-services" {
   local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
   local fake_bin_dir="${SAFEHOUSE_WORKSPACE}/fake-bin"
   local env_file
@@ -209,7 +232,7 @@ EOF
   normalized_home="$(cd "$HOME" && pwd -P)"
   shim_path="$(claude_reuse_shim_path_for_home "$normalized_home")"
 
-  safehouse_run --env="$env_file" -- "./claude"
+  safehouse_run --enable=launch-services --env="$env_file" -- "./claude"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "EDITOR=${shim_path}"
   sft_assert_contains "$output" "VISUAL=${shim_path}"
@@ -217,7 +240,7 @@ EOF
   sft_assert_file_exists "$shim_path"
 }
 
-@test "[EXECUTION] claude injects a reuse-mode VS Code editor shim when a running VS Code instance is detected" {
+@test "[EXECUTION] claude injects a reuse-mode VS Code editor shim when a VS Code instance is running, but only if enable=launch-services" {
   local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
   local fake_bin_dir="${SAFEHOUSE_WORKSPACE}/fake-bin"
   local env_file
@@ -232,7 +255,7 @@ EOF
   normalized_home="$(cd "$HOME" && pwd -P)"
   shim_path="$(claude_reuse_shim_path_for_home "$normalized_home")"
 
-  safehouse_run --env="$env_file" -- "./claude"
+  safehouse_run --enable=launch-services --env="$env_file" -- "./claude"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "EDITOR=${shim_path}"
   sft_assert_contains "$output" "VISUAL=${shim_path}"
@@ -294,7 +317,7 @@ EOF
   [ "$status" -eq 0 ]
 }
 
-@test "[EXECUTION] claude still injects the reuse-mode VS Code editor shim when only enable=all-apps is set" {
+@test "[EXECUTION] claude still injects the reuse-mode VS Code editor shim when only enable=all-apps is set, provided that enable=launch-services is also set" {
   local claude_bin="${SAFEHOUSE_WORKSPACE}/claude"
   local fake_bin_dir="${SAFEHOUSE_WORKSPACE}/fake-bin"
   local env_file
@@ -309,7 +332,7 @@ EOF
   normalized_home="$(cd "$HOME" && pwd -P)"
   shim_path="$(claude_reuse_shim_path_for_home "$normalized_home")"
 
-  safehouse_run --env="$env_file" --enable=all-apps -- "./claude"
+  safehouse_run --env="$env_file" --enable=all-apps,launch-services -- "./claude"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "EDITOR=${shim_path}"
   sft_assert_contains "$output" "VISUAL=${shim_path}"

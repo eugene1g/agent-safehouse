@@ -65,7 +65,6 @@ load ../procargs_utils.bash
   sft_assert_contains "$profile" "(allow ipc-sysv-sem)"
   sft_assert_includes_source "$profile" "50-integrations-core/container-runtime-default-deny.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/git.sb"
-  sft_assert_includes_source "$profile" "50-integrations-core/launch-services.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/scm-clis.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/ssh-agent-default-deny.sb"
   sft_assert_includes_source "$profile" "50-integrations-core/worktree-common-dir.sb"
@@ -225,10 +224,14 @@ load ../procargs_utils.bash
 @test "[EXECUTION] default sandbox can read a same-sandbox process's argv via procargs/procargs2" {
   sft_require_cmd_or_skip python3
 
+  # The target sleeps far longer than the read needs, then gets killed once the
+  # read is done. A target that exits first fails the sysctl with EPERM, which is
+  # indistinguishable from a policy denial (see procargs_utils.bash), and cold
+  # python3 startup inside the sandbox has been measured at over 10s on CI.
   local reader selector
   reader="$(sft_procargs_reader_py)"
   for selector in $KERN_PROCARGS $KERN_PROCARGS2; do
-    safehouse_run -- /bin/sh -c '/bin/sleep 2 & c=$!; /bin/sleep 1; exec python3 -c "$1" "$2" "$c"' _ "$reader" "$selector"
+    safehouse_run -- /bin/sh -c '/bin/sleep 60 & c=$!; /bin/sleep 1; python3 -c "$1" "$2" "$c"; s=$?; /bin/kill "$c"; exit $s' _ "$reader" "$selector"
     [ "$status" -eq 0 ]
     sft_assert_contains "$output" "sleep"
   done

@@ -10,17 +10,16 @@
 # Claude Code + VS Code under Safehouse needs a special editor wrapper:
 # - The full cold-start path is intentionally opt-in behind --enable=vscode.
 #   Most Claude runs do not need desktop VS Code access, so Safehouse should not
-#   grant the broader VS Code integration surface by default.
-# - There is a narrower default case worth supporting: if an unsandboxed VS Code
-#   instance is already running, Claude can hand the temp prompt file to that
-#   existing app through Launch Services without the broader VS Code app profile.
-# - That reuse path needs to be injected eagerly when Claude starts, even if
-#   VS Code is not running yet. Otherwise a user who launches VS Code later in
-#   the same Claude session still cannot use Ctrl+G, because Claude would never
-#   have received the editor wrapper in its environment.
-# - That narrower reuse path still needs a tiny policy carve-out: Launch Services
-#   must be able to read metadata for `/Applications` and the VS Code app bundles
-#   so `open -b ...` can resolve the already-installed handler.
+#   grant the VS Code integration by default.
+# - The reuse path needs no VS Code app profile. If an unsandboxed VS Code is
+#   already running, Claude hands the temp prompt file to it with `open -b`.
+#   That call goes through Launch Services, so reuse mode requires
+#   --enable=launch-services.
+# - Reuse mode is injected as Claude starts, even when VS Code is not running
+#   yet. Claude reads $EDITOR once at startup, so a user who opens VS Code later
+#   in the session would otherwise never get Ctrl+G.
+# - Reuse mode also needs `/Applications` and the VS Code bundles readable as
+#   metadata, so `open -b ...` can resolve the installed handler.
 # - On Ctrl+G, Claude invokes $EDITOR directly and passes only the temp prompt file path.
 # - If $EDITOR points at `code`, VS Code's macOS CLI takes the `open -n -a ...` path.
 # - Under Safehouse, that fresh-instance LaunchServices handoff can open/focus VS Code
@@ -51,6 +50,7 @@
 runtime_claude_editor_reuse_shim_relative_path=".cache/claude/safehouse-vscode-reuse-needs-running-vscode.sh"
 runtime_claude_editor_full_shim_relative_path=".cache/claude/safehouse-claude-vscode-editor.sh"
 runtime_claude_editor_shim_profile_key="profiles/55-integrations-optional/vscode.sb"
+runtime_claude_editor_reuse_profile_key="profiles/55-integrations-optional/launch-services.sb"
 runtime_claude_editor_shim_mode_env_key="SAFEHOUSE_CLAUDE_VSCODE_MODE"
 runtime_claude_editor_vscode_bundle_id="com.microsoft.VSCode"
 runtime_claude_editor_vscode_insiders_bundle_id="com.microsoft.VSCodeInsiders"
@@ -140,6 +140,12 @@ runtime_claude_editor_shim_enabled() {
   policy_plan_optional_profile_selected "$runtime_claude_editor_shim_profile_key"
 }
 
+# Reuse mode calls `open -b`, which needs the opt-in launch-services
+# integration. Full mode execs the app binary directly and does not.
+runtime_claude_editor_reuse_supported() {
+  policy_plan_optional_profile_selected "$runtime_claude_editor_reuse_profile_key"
+}
+
 runtime_claude_editor_shim_mode() {
   if runtime_claude_editor_shim_enabled; then
     if runtime_claude_editor_shim_full_supported; then
@@ -149,6 +155,7 @@ runtime_claude_editor_shim_mode() {
   fi
 
   runtime_command_is_claude_code || return 1
+  runtime_claude_editor_reuse_supported || return 1
   printf 'reuse\n'
 }
 
