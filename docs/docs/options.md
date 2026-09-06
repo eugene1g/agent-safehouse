@@ -24,7 +24,7 @@
 
 - `agent-browser`
 - `clipboard`
-- `docker` (implies `keychain`)
+- `docker`
 - `herdr`
 - `kubectl`
 - `launch-services`

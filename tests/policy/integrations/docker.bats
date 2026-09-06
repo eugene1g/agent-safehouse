@@ -82,11 +82,72 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "/Applications/Docker.app"
 }
 
-@test "[POLICY-ONLY] enable=docker auto-injects the keychain profile for registry credential helpers" { # https://github.com/eugene1g/agent-safehouse/issues/158
-  local profile
+@test "[POLICY-ONLY] enable=docker grants the credential helper its state dir and SecurityServer, without the keychain profile" { # https://github.com/eugene1g/agent-safehouse/issues/158
+  local profile grants
   profile="$(safehouse_profile --enable=docker)"
+  grants="$(sft_profile_source_section "$profile" "55-integrations-optional/docker.sb")"
 
-  sft_assert_includes_source "$profile" "55-integrations-optional/keychain.sb"
+  # docker-credential-desktop aborts during startup unless it can create its own
+  # state directory, and returns an error rather than "credentials not found"
+  # unless it can reach SecurityServer. Both are needed for an anonymous pull.
+  sft_assert_contains "$grants" "(home-literal \"/Library/Containers\")"
+  sft_assert_contains "$grants" "(home-subpath \"/Library/Containers/com.docker.docker\")"
+  sft_assert_contains "$grants" "(global-name \"com.apple.SecurityServer\")"
+
+  # Anonymous pulls need none of the keychain profile's privileges — notably
+  # write access to ~/Library/Keychains and the interactive auth-prompt services.
+  sft_assert_omits_source "$profile" "55-integrations-optional/keychain.sb"
+  sft_assert_not_contains "$profile" "(home-subpath \"/Library/Keychains\")"
+}
+
+@test "[EXECUTION] docker credential helper reports 'not found' rather than erroring when enable=docker is set" { # https://github.com/eugene1g/agent-safehouse/issues/158
+  local helper_bin
+
+  helper_bin="$(sft_command_path_or_skip docker-credential-desktop)" || return 1
+
+  HOME="$SAFEHOUSE_HOST_HOME" "$helper_bin" list >/dev/null 2>&1 ||
+    skip "docker-credential-desktop precheck failed outside sandbox"
+
+  # An anonymous pull of a public image still invokes the helper when
+  # ~/.docker/config.json sets a credsStore. The CLI treats a non-zero exit with
+  # no "credentials not found" message as a hard error and abandons the pull, so
+  # the helper starting successfully is what makes such a pull work at all.
+  HOME="$SAFEHOUSE_HOST_HOME" run safehouse_ok --enable=docker -- \
+    "$helper_bin" list
+  [ "$status" -eq 0 ]
+
+  # Without the integration the helper cannot start at all.
+  HOME="$SAFEHOUSE_HOST_HOME" safehouse_denied -- "$helper_bin" list
+}
+
+@test "[EXECUTION] enable=docker reaches SecurityServer without opening any keychain" { # https://github.com/eugene1g/agent-safehouse/issues/158
+  local login_keychain
+
+  sft_require_cmd_or_skip security
+
+  # The login keychain is the thing that must stay shut; find its path outside
+  # the sandbox so the assertions below name a real file.
+  login_keychain="$(HOME="$SAFEHOUSE_HOST_HOME" /usr/bin/security list-keychains 2>/dev/null |
+    sed -n 's/^ *"\(.*login\.keychain[^"]*\)".*/\1/p' | head -1)"
+  [ -n "$login_keychain" ] && [ -r "$login_keychain" ] || skip "no readable login keychain outside the sandbox"
+
+  # enable=docker grants mach-lookup on com.apple.SecurityServer so the
+  # credential helper can answer "credentials not found" instead of erroring
+  # (-50). A reachable Security framework must not come with keychain contents:
+  # the login keychain is neither searched nor readable. Note that asserting on
+  # `security` exit status would not catch a regression here -- with the grant
+  # in place `find-certificate -a` exits 0 and simply returns nothing.
+  HOME="$SAFEHOUSE_HOST_HOME" run safehouse_ok --enable=docker -- /usr/bin/security list-keychains
+  [ "$status" -eq 0 ]
+  sft_assert_not_contains "$output" "login.keychain"
+
+  HOME="$SAFEHOUSE_HOST_HOME" safehouse_denied --enable=docker -- \
+    /bin/sh -c "cat '$login_keychain' >/dev/null"
+
+  # Opening it stays a separate, explicit opt-in.
+  HOME="$SAFEHOUSE_HOST_HOME" run safehouse_ok --enable=docker,keychain -- /usr/bin/security list-keychains
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "login.keychain"
 }
 
 @test "[EXECUTION] docker cli can reach the configured daemon only when enable=docker is set" { # https://github.com/eugene1g/agent-safehouse/issues/19
