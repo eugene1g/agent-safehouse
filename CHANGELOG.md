@@ -4,23 +4,100 @@
 
 ### Upgrade Notes
 
-- Breaking: `--enable=1password` no longer grants file access to `~/.1password` or `/Users/Shared/.1password`. 
-    - 1Password itself never creates either directory on macOS.
+- No special notes.
+
+### Changed Sandboxing Profiles
+
+- No profiles changed.
+
+## [0.12.0] - 2026-09-07
+
+### Upgrade Notes
+
+- Breaking: `open` is now blocked by default unless you pass `--enable=launch-services`. Launch Services starts the handler application *outside* the sandbox with your full user permissions, so any sandboxed process that could call `open` could escape.
+    - Claude Code's Ctrl+G handoff to an already-running VS Code calls `open -b`, so it now needs `--enable=launch-services`. Full command: `safehouse --enable=launch-services -- claude`
+    - The `--enable=vscode` cold-start path execs the app binary directly and is unaffected.
+- Breaking: Reading an out-of-sandbox process's argv and environment is now denied by default. Thus `ps -ww`, `ps eww`, and similar commands no longer expose host command lines or environment variables (which often carry secrets). Processes inside the sandbox are still fully inspectable.
+    - Restore the old behavior with `--enable=process-control` or `--enable=lldb`.
+- Breaking: `--enable=1password` no longer grants file access to `~/.1password` or `/Users/Shared/.1password`.
+    - 1Password itself never creates either directory on macOS so this change only affects users who have manually created those directories themselves.
 
 ### Features
 
 - Nix-installed programs now run by default.
     - Running `nix` itself to install packages within Safehouse remains unsupported.
     - `~/.config/nix` (which may contain `access-tokens`) remains unreadable.
+- New `--enable=gpg`: GPG git commit signing through a `gpg-agent` running outside the sandbox.
+    - Start the agent outside the sandbox first with `gpgconf --launch gpg-agent && gpgconf --launch keyboxd`.
+    - Secret keys under `~/.gnupg/private-keys-v1.d` and the legacy `~/.gnupg/secring.gpg` stay denied within the sandbox.
+- New `--enable=gpu`: Metal shader compilation and GPU IOKit access without the rest of the `electron` or `macos-gui` stack.
+- New `--enable=herdr`: status and bell reporting to [herdr](https://herdr.dev). Auto-enabled when `HERDR_ENV` is set in the host environment.
+- The Cursor desktop app is now recognized and gets its own app profile.
+- `--append-profile` profiles can use workdir-relative rules.
+    - Safehouse defines `WORK_DIR` and exposes `workdir-literal`, `workdir-subpath`, and `workdir-prefix` helpers to profiles. Example:
+
+    ```scheme
+    (deny file-read* file-write* (workdir-literal "/.env"))
+    ```
+
+    - If workdir is disabled with `--workdir=` (empty string), a policy using these helpers fails to compile rather than silently matching a path built from an empty string.
+
+### Bug Fixes
+
+- The Codex CLI installed by the ChatGPT app no longer errors on startup.
+    - Its bundled `node_repl` MCP server needs the adjacent Node runtime under `ChatGPT.app/Contents/Resources/cua_node`, which was unreadable.
+- Copilot CLI now works inside a VS Code integrated terminal.
+    - VS Code's Copilot Chat extension prepends its own `copilot` launcher shim to `PATH`, shadowing Copilot CLI's `copilot` binary, and that shim needs certain grants to trampoline to the real CLI.
+- `--enable=docker` now allows anonymous image pulls to succeed without additional configuration.
+    - Authenticated image pulls still additionally require `--enable=keychain` permissions.
+- Python `multiprocessing` no longer fails at `sem_open(3)`.
+    - POSIX named semaphores were denied by default, which broke `multiprocessing.Queue`, `Pool`, and anything else backed by them.
+
+### Chores
+
+- E2E agent TUI test improvements:
+    - `cline` and `copilot` tests run in CI.
+    - `copilot` test now submits a real prompt, rather than just launching the binary.
+    - TUI tests run weekly in CI with recent agent versions, catching regressions proactively.
+    - Flakiness reduced: Startup-gate handling is centralized and judged against a single frozen frame.
+    - Improved diagnostics: Failure dumps include a settled frame.
+    - Low-cost model names updated.
+- CI security improvements:
+    - CI now runs `zizmor` against the GitHub Actions workflows and fails on new findings. Existing diagnostics are fixed: 
+        - No unsafe cache usage in the docs deploy.
+        - No docs builds from non-main branches.
+        - Secret-exfiltration paths have documented mitigations.
+    - CI refuses a `dist/safehouse.sh` that does not match a fresh regeneration, via a new `./scripts/generate-dist.sh --check`. Hand-edited dist artifacts no longer reach a release.
+    - Unpinned tool versions in CI now skip anything published in the last 4 days, limiting the blast radius of a compromised upstream release.
+- `CONTRIBUTING` now states the Bash 3.2 compatibility target, which is what ships with macOS.
 
 ### Thanks
 
-- @Rhys-T for contributing Nix package manager support in [#97](https://github.com/eugene1g/agent-safehouse/pull/97).
+- @Rhys-T contributing Nix package manager support in [#97](https://github.com/eugene1g/agent-safehouse/pull/97).
+- @yairchu fixing Python `multiprocessing` semaphores in [#171](https://github.com/eugene1g/agent-safehouse/pull/171).
+- @black-snow adding the `--enable=gpu` option in [#183](https://github.com/eugene1g/agent-safehouse/pull/183).
+- @danra reaping the `nc` listeners left behind by failing network tests in [#166](https://github.com/eugene1g/agent-safehouse/pull/166).
+- @mnadel asking for workdir-relative rules in appended policies in [#172](https://github.com/eugene1g/agent-safehouse/issues/172).
 
 ### Changed Sandboxing Profiles
 
-- `10-system-runtime.sb`: Added read-only grants for `/nix/store`, `/nix/var/nix/profiles`, and Nix per-user profile pointer symlinks.
-- `1password.sb`: Removed the `~/.1password` and `/Users/Shared/.1password` file grants.
+- [`00-base.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-02c38ee50d8f4793102a508750ddd9d62254a5bef2a70f857fdfdb4f9677acb9): Added the `WORK_DIR` replacement token and the `workdir-literal`/`workdir-subpath`/`workdir-prefix` helpers so profiles can express workdir-relative rules.
+- [`10-system-runtime.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-c27b7abd9dcf3cd976d593264e5d14dcfc2e10422b3dcdebb8bb9dbee4d611c8): Added read-only grants for `/nix/store`, `/nix/var/nix/profiles`, and the Nix per-user profile symlinks. Denied `kern.procargs*` and `process-info-pidinfo` for out-of-sandbox processes, re-allowing pidinfo for `same-sandbox` targets.
+- [`ipc-posix-sem.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-f9ed91b3c105be5acbd4822a558e157c1398a19010078b0d0e68ac060980ab34): New shared profile allowing `ipc-posix-sem`, which Python's `multiprocessing` needs for `sem_open(3)`.
+- [`gpu.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-bd3aff3be81e06c958826180359c72d9f652b5f342f5456e70d014ed988ca5eb): New opt-in profile holding the Metal compiler service, `IOSurfaceRootUserClient`, and `AGXDeviceUserClient` grants.
+- [`gpg.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-af2da8d3897b37ae3458bcd1d9f88d6ee42dacbbe67f4c1a790291dd3781a052): New opt-in profile granting `~/.gnupg` reads, dotlock/trustdb writes, and connects to the `gpg-agent` and `keyboxd` sockets. Explicitly denies the secret-key directory and legacy `secring.gpg`.
+- [`herdr.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-94391f56d9d7a6e43b653b4c430177730490ca4422778c2a7cab02594f6040a7): New opt-in profile granting `~/.config/herdr` reads and a connect to `herdr.sock`.
+- [`launch-services.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-5a55e1897c5f20073224394721909e1469f7a8933c11d3dd3ce4f06a1cd8523d): Moved from `50-integrations-core/` to `55-integrations-optional/`, so `lsopen` and the Launch Services mach lookups are now opt-in rather than always on.
+- [`electron.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-4741198d5dabb58afd28c97f7c5c5826fce4e80ed446c120542152160b86bb24): Moved its GPU and Metal rules into `gpu.sb` and now requires it. Same effective grants.
+- [`chromium-headless.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-9f6dc8d781704105880e2f6841f5783b98bf8e483bc6454f3ca1b9560c3fcdc8): Moved its GPU IOKit user clients into `gpu.sb` and now requires it. Same effective grants.
+- [`docker.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-2a99b527bf61c193bd84db192fc7c84224ff91cb9ecacede2c2672c45d2e5124): Now requires `keychain.sb` so registry credential helpers can read `credsStore` entries.
+- [`process-control.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-adc820aead86730d3ff676f3244df95427dc167098218035b09c33a45c8944c5): Added `(allow process-info-pidinfo)` to restore host argv/env visibility now that it is denied by default.
+- [`lldb.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-9b1a1aee4fcd6c90b56db204faf4c05fcb1bec258503143aeb2c87d53b6dfdbd): Marked its existing `process-info-pidinfo` allow with a test id, pinning it as the debugger-side restore path for the new default deny.
+- [`1password.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-dae0a12c26e11eedc851247d601cccdd0445d3918b0ade4cdc869d3ffb23b585): Removed the `~/.1password` and `/Users/Shared/.1password` file grants.
+- [`codex.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-375ef639cf4426f1855e046b144d28f63094bc22f4a8348f176000792c973c25): Added narrow reads for the ChatGPT app's bundled `cua_node` runtime and `codex` CLI, which the bundled `node_repl` MCP server needs. Narrower than granting the whole app bundle.
+- [`copilot-cli.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-4c4b4a874f02531e9888d2fd68d6a7134dd67d9f41db0a08535679e7bd6f8de6): Added reads for the Copilot Chat extension's `copilotCli` launcher shim and the VS Code `Frameworks` directory, plus the metadata traversal needed to reach them.
+- [`cursor-app.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-db51792c4048de7b08e2f3c864744350dce0758b81703cb30f9473441c24670e): New app profile for Cursor Desktop, requiring `keychain.sb` and `electron.sb`.
+- [`claude-app.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-e3ba6b6dab397c0aa1f952d3488cffaa0119bb213d3e73fc3ca2ec39ec5f1ea7), [`codex-app.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-dfd037f71c747a82d9532750cd5ccfd3e79ffbcb83881c0acc599d6ef2072697), [`vscode-app.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.11.1...v0.12.0#diff-e36692fe5535f876b390e4776cf042e90b6c47a6fe5370200f4013d0ead65cfb): Comment-only updates noting that `electron.sb` now pulls in `gpu.sb`.
 
 ## [0.11.1] - 2026-07-16
 
