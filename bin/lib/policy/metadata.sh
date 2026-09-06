@@ -1,9 +1,9 @@
 # shellcheck shell=bash
 
-# Purpose: Parse metadata embedded in .sb profile comments.
+# Purpose: Extract profile metadata and static path candidates for planning/rendering.
 # Reads globals: none.
-# Writes globals: none.
-# Called by: policy/plan.sh and tests that validate metadata parsing behavior.
+# Writes globals: Caller-named arrays when collecting path candidates.
+# Called by: policy/plan.sh, policy/render.sh, and the dist generator.
 # Notes: Requirements and exec env defaults are parsed by separate helpers on purpose.
 
 policy_metadata_extract_csv_metadata_from_line() {
@@ -141,4 +141,58 @@ policy_metadata_emit_profile_exec_env_defaults() {
     normalized_entry="$(policy_metadata_normalize_exec_env_default_entry "$raw_entry" "$profile_key")" || return 1
     printf '%s\n' "$normalized_entry"
   done < <(policy_source_read_profile_content "$profile_key")
+}
+
+policy_metadata_list_absolute_path_rules_for_operation() {
+  local content="$1"
+  local operation="$2"
+  local excluded_operation="${3:-}"
+  local line in_matching_block=0 matcher path allow_prefix
+
+  allow_prefix="(allow ${operation}"
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$in_matching_block" -eq 0 ]]; then
+      if [[ "$line" =~ ^[[:space:]]*\(allow[[:space:]]+ ]] && [[ "$line" == *"$allow_prefix"* ]] && [[ -z "$excluded_operation" || "$line" != *"$excluded_operation"* ]]; then
+        in_matching_block=1
+      fi
+      continue
+    fi
+
+    if [[ "$line" =~ ^[[:space:]]*\) ]]; then
+      in_matching_block=0
+      continue
+    fi
+
+    if [[ "$line" =~ \((literal|subpath)[[:space:]]+\"(/[^\"]*)\"\) ]]; then
+      matcher="${BASH_REMATCH[1]}"
+      path="${BASH_REMATCH[2]}"
+      printf '%s|%s\n' "$matcher" "$path"
+    fi
+  done <<< "$content"
+}
+
+# The dist generator overrides this entrypoint with compiled candidates for its
+# supported operation pair. Other operations and external profiles use the parser.
+policy_metadata_collect_profile_absolute_path_rules() {
+  policy_metadata_collect_profile_absolute_path_rules_from_source "$@"
+}
+
+policy_metadata_collect_profile_absolute_path_rules_from_source() {
+  local target_array_name="$1"
+  local profile_key="$2"
+  local operation="$3"
+  local excluded_operation="${4:-}"
+  local content entry
+
+  safehouse_array_clear "$target_array_name" || return 1
+  if [[ "$#" -ge 5 ]]; then
+    content="$5"
+  else
+    content="$(policy_source_read_profile_content "$profile_key")" || return 1
+  fi
+
+  while IFS= read -r entry || [[ -n "$entry" ]]; do
+    safehouse_array_append "$target_array_name" "$entry" || return 1
+  done < <(policy_metadata_list_absolute_path_rules_for_operation "$content" "$operation" "$excluded_operation")
 }

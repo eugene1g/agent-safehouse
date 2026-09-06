@@ -299,7 +299,8 @@ policy_plan_resolve_explicit_optional_integrations() {
   for feature in "${policy_optional_integration_features[@]}"; do
     policy_plan_feature_is_explicitly_enabled "$feature" || continue
 
-    optional_profile_key="$(policy_optional_integration_profile_key_from_feature "$feature")" || return 1
+    # The feature comes from the validated optional-integration catalog.
+    optional_profile_key="profiles/55-integrations-optional/${feature}.sb"
     policy_plan_append_optional_integration_feature_once "$feature" "explicit" || true
     if policy_plan_append_optional_profile_key "$optional_profile_key"; then
       policy_plan_append_profile_requirement_tokens_to_target "$optional_profile_key" "enabled-optional" || return 1
@@ -319,7 +320,8 @@ policy_plan_inject_implied_optional_integrations() {
         continue
       fi
 
-      optional_profile_key="$(policy_optional_integration_profile_key_from_feature "$feature")" || return 1
+      # The feature comes from the validated optional-integration catalog.
+      optional_profile_key="profiles/55-integrations-optional/${feature}.sb"
       if ! policy_plan_optional_profile_required_by_selected_profiles "$optional_profile_key" && ! policy_plan_optional_profile_required_by_enabled_optional_profiles "$optional_profile_key"; then
         continue
       fi
