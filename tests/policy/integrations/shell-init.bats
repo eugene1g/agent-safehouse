@@ -108,7 +108,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] fish startup config is only loaded when shell-init is enabled" {
   local fish_bin fake_home workdir
 
-  fish_bin="$(sft_command_path_or_skip fish)" || return 1
+  sft_command_path_or_skip fish_bin fish
 
   fake_home="$(sft_fake_home)" || return 1
   workdir="$(sft_workspace_path "fish-workdir")" || return 1

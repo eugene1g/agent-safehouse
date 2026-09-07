@@ -274,7 +274,7 @@ The split is intentional: the default Safehouse profile already allows broad acc
 - **`sft_assert_path_absent <path>`** — asserts that a path does not exist.
 - **`sft_require_cmd_or_skip <cmd>`** — skips the test if the host dependency is not installed.
 - **`sft_require_env_or_skip <VAR>`** — skips the test if the named environment variable is unset or empty.
-- **`sft_command_path_or_skip <cmd>`** — prints the resolved command path or skips if the command is unavailable.
+- **`sft_command_path_or_skip <var> <cmd>`** — assigns the resolved command path to `<var>`, or skips if the command is unavailable.
 
 ### Path helpers
 
@@ -341,7 +341,7 @@ When a test truly depends on real user-scoped host state, opt in explicitly:
 @test "docker cli can reach the configured daemon only when enable=docker is set" {
   local docker_bin
 
-  docker_bin="$(sft_command_path_or_skip docker)" || return 1
+  sft_command_path_or_skip docker_bin docker
 
   HOME="$SAFEHOUSE_HOST_HOME" "$docker_bin" version >/dev/null 2>&1 || skip "docker daemon precheck failed outside sandbox"
 

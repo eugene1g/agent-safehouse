@@ -96,8 +96,8 @@ load ../../test_helper.bash
     java_bin="${java_home}/bin/java"
     javac_bin="${java_home}/bin/javac"
   else
-    java_bin="$(sft_command_path_or_skip java)" || return 1
-    javac_bin="$(sft_command_path_or_skip javac)" || return 1
+    sft_command_path_or_skip java_bin java
+    sft_command_path_or_skip javac_bin javac
   fi
   printf 'public class Hello { public static void main(String[] a) { System.out.println("sandboxed-java"); } }\n' > "$src"
 
@@ -142,8 +142,8 @@ load ../../test_helper.bash
   src="$(sft_workspace_path "archive.c")" || return 1
   obj="$(sft_workspace_path "archive.o")" || return 1
   archive="$(sft_workspace_path "libarchive.a")" || return 1
-  ar_bin="$(sft_command_path_or_skip ar)" || return 1
-  clang_bin="$(sft_command_path_or_skip clang)" || return 1
+  sft_command_path_or_skip ar_bin ar
+  sft_command_path_or_skip clang_bin clang
 
   printf 'int archive_symbol(void) { return 57; }\n' > "$src"
 
@@ -165,7 +165,7 @@ load ../../test_helper.bash
   src_dir="$(sft_workspace_path "src")" || return 1
   lib_rs="$(sft_workspace_path "src/lib.rs")" || return 1
   archive="$(sft_workspace_path "target/debug/librust_staticlib_smoke.a")" || return 1
-  cargo_bin="$(sft_command_path_or_skip cargo)" || return 1
+  sft_command_path_or_skip cargo_bin cargo
 
   mkdir -p "$src_dir" || return 1
   printf '[package]\nname = "rust_staticlib_smoke"\nversion = "0.1.0"\nedition = "2021"\n\n[lib]\ncrate-type = ["staticlib"]\n' > "$cargo_toml"
@@ -303,7 +303,7 @@ load ../../test_helper.bash
   sft_require_cmd_or_skip node
 
   local aube_bin node_bin node_dir project_dir sandbox_home
-  aube_bin="$(sft_command_path_or_skip aube)" || return 1
+  sft_command_path_or_skip aube_bin aube
   node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
   node_dir="$(dirname "$node_bin")"
   project_dir="$(sft_workspace_path "aube-project")" || return 1

@@ -20,7 +20,7 @@ GO_SENTINEL_PROXY="https://safehouse-goenv-sentinel.invalid"
 
 @test "[EXECUTION] go honors go env -w settings from the macOS GOENV file inside the sandbox" { # https://github.com/eugene1g/agent-safehouse/issues/85
   local go_bin goenv_file
-  go_bin="$(sft_command_path_or_skip go)" || return 1
+  sft_command_path_or_skip go_bin go
   goenv_file="$(sft_write_goenv_fixture)" || return 1
 
   run env -u GOENV -u GOPROXY -u GOFLAGS "$go_bin" env GOENV GOPROXY
@@ -35,7 +35,7 @@ GO_SENTINEL_PROXY="https://safehouse-goenv-sentinel.invalid"
 
 @test "[EXECUTION] go env -w cannot modify the GOENV file inside the sandbox" { # https://github.com/eugene1g/agent-safehouse/issues/85
   local go_bin goenv_file
-  go_bin="$(sft_command_path_or_skip go)" || return 1
+  sft_command_path_or_skip go_bin go
   goenv_file="$(sft_write_goenv_fixture)" || return 1
 
   safehouse_denied_env -u GOENV -u GOPROXY -u GOFLAGS -- "$go_bin" env -w GOPROXY=https://changed-in-sandbox.invalid

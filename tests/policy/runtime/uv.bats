@@ -36,7 +36,7 @@ teardown() {
   sft_require_cmd_or_skip uv
 
   local uv_bin
-  uv_bin="$(sft_command_path_or_skip uv)" || skip "uv is not installed"
+  sft_command_path_or_skip uv_bin uv
 
   safehouse_ok -- "$uv_bin" --version
 }
@@ -45,7 +45,7 @@ teardown() {
   sft_require_cmd_or_skip uv
 
   local uv_bin venv_dir
-  uv_bin="$(sft_command_path_or_skip uv)" || skip "uv is not installed"
+  sft_command_path_or_skip uv_bin uv
   venv_dir="$(sft_workspace_path "uv_venv")" || return 1
 
   safehouse_ok -- "$uv_bin" venv "$venv_dir"
@@ -58,7 +58,7 @@ teardown() {
   sft_require_cmd_or_skip python3
 
   local uv_bin repo_dir port venv_dir
-  uv_bin="$(sft_command_path_or_skip uv)" || skip "uv is not installed"
+  sft_command_path_or_skip uv_bin uv
   repo_dir="$(sft_workspace_path "local_pypi")" || return 1
   venv_dir="$(sft_workspace_path "test_venv")" || return 1
 

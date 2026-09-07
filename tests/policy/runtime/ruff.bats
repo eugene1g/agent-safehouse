@@ -8,7 +8,7 @@ load ../../test_helper.bash
 
 @test "[EXECUTION] ruff can lint a file inside the sandbox" {
   local ruff_bin source_file
-  ruff_bin="$(sft_command_path_or_skip ruff)" || return 1
+  sft_command_path_or_skip ruff_bin ruff
   source_file="$(sft_workspace_path "sample.py")" || return 1
 
   cat > "$source_file" <<'EOF'
@@ -29,7 +29,7 @@ EOF
 
 @test "[EXECUTION] ruff can write cache files inside the sandbox" {
   local ruff_bin source_file cache_dir
-  ruff_bin="$(sft_command_path_or_skip ruff)" || return 1
+  sft_command_path_or_skip ruff_bin ruff
   source_file="$(sft_workspace_path "cache_test.py")" || return 1
   cache_dir="$(sft_workspace_path ".ruff_cache")" || return 1
 
@@ -53,7 +53,7 @@ EOF
 
 @test "[EXECUTION] ruff can format a file inside the sandbox" {
   local ruff_bin source_file
-  ruff_bin="$(sft_command_path_or_skip ruff)" || return 1
+  sft_command_path_or_skip ruff_bin ruff
   source_file="$(sft_workspace_path "format_test.py")" || return 1
 
   cat > "$source_file" <<'EOF'
@@ -74,7 +74,7 @@ EOF
 
 @test "[EXECUTION] ruff respects configuration in the sandbox" {
   local ruff_bin source_file
-  ruff_bin="$(sft_command_path_or_skip ruff)" || return 1
+  sft_command_path_or_skip ruff_bin ruff
   source_file="$(sft_workspace_path ".ruff.toml")" || return 1
   local py_file
   py_file="$(sft_workspace_path "config_test.py")" || return 1

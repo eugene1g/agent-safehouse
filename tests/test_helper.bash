@@ -188,13 +188,15 @@ sft_require_env_or_skip() {
   [[ -n "$value" ]] || skip "${var_name} is not set"
 }
 
+# Assigns the resolved path of <cmd> to the caller variable <var_name>,
+# or skips the test when the command is unavailable.
 sft_command_path_or_skip() {
-  local cmd="$1" path
+  local var_name="$1" cmd="$2" path
 
   path="$(command -v "$cmd" || true)"
   [ -n "$path" ] || skip "${cmd} is not installed"
 
-  printf '%s\n' "$path"
+  printf -v "$var_name" '%s' "$path"
 }
 
 sft_assert_contains() {

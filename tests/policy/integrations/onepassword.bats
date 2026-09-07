@@ -83,7 +83,7 @@ onepassword_run() {
 @test "[EXECUTION] 1Password CLI binary can launch when installed" {
   local op_bin
 
-  op_bin="$(sft_command_path_or_skip op)" || return 1
+  sft_command_path_or_skip op_bin op
 
   "$op_bin" --version >/dev/null 2>&1 || skip "op precheck failed outside sandbox"
 

@@ -17,7 +17,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] playwright-chrome lets Playwright launch Chrome and capture a screenshot" {
   local playwright_bin precheck_png allowed_png
 
-  playwright_bin="$(sft_command_path_or_skip playwright)"
+  sft_command_path_or_skip playwright_bin playwright
   precheck_png="$(sft_workspace_path "playwright-chrome-precheck.png")"
   allowed_png="$(sft_workspace_path "playwright-chrome-allowed.png")"
 

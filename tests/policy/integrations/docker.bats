@@ -103,7 +103,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] docker credential helper reports 'not found' rather than erroring when enable=docker is set" { # https://github.com/eugene1g/agent-safehouse/issues/158
   local helper_bin
 
-  helper_bin="$(sft_command_path_or_skip docker-credential-desktop)" || return 1
+  sft_command_path_or_skip helper_bin docker-credential-desktop
 
   HOME="$SAFEHOUSE_HOST_HOME" "$helper_bin" list >/dev/null 2>&1 ||
     skip "docker-credential-desktop precheck failed outside sandbox"
@@ -153,7 +153,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] docker cli can reach the configured daemon only when enable=docker is set" { # https://github.com/eugene1g/agent-safehouse/issues/19
   local docker_bin
 
-  docker_bin="$(sft_command_path_or_skip docker)" || return 1
+  sft_command_path_or_skip docker_bin docker
 
   HOME="$SAFEHOUSE_HOST_HOME" "$docker_bin" version >/dev/null 2>&1 || skip "docker daemon precheck failed outside sandbox"
 
