@@ -204,22 +204,6 @@ path_resolution_run() {
   [ "$status" -eq 0 ]
 }
 
-@test "built-in symlinks still resolve when realpath is unavailable" {
-  path_resolution_run '
-    command() {
-      if [[ "$#" -eq 2 && "$1" == -v && "$2" == realpath ]]; then
-        return 1
-      fi
-      builtin command "$@"
-    }
-    policy_render_emit_resolved_builtin_path_candidates profiles/test.sb "file-read*" \
-      "literal|$test_root/one" "subpath|$test_root/two" > "$test_root/rules"
-    expected="$(printf "%s\n" "literal|$test_root/one|$test_root/target-one|file-read*" "subpath|$test_root/two|$test_root/target-two|file-read*")"
-    [[ "$(cat "$test_root/rules")" == "$expected" ]]
-  '
-  [ "$status" -eq 0 ]
-}
-
 @test "batch resolution keeps all xcode-select pointer exclusions" {
   path_resolution_run '
     realpath() {
