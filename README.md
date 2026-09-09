@@ -126,3 +126,14 @@ Use `--add-dirs-ro` or `--add-dirs` for normal shared-folder access, and keep `-
 Git worktrees are auto-detected at launch when the selected workdir itself is a Git worktree root: that worktree gets the shared Git metadata access it needs when its common dir lives outside the selected workdir, and the other existing linked worktrees for that repo become readable by default for cross-tree inspection. That snapshot does not update for already-running processes, so if you create worktrees under a stable parent such as `~/worktrees`, prefer adding that root explicitly with `--add-dirs-ro`.
 
 All detailed documentation (setup, usage, options, architecture, testing, debugging, and investigations) lives in the VitePress docs site.
+
+## Linux Alternatives
+
+Safehouse is specifically tailored for macOS (`sandbox-exec`). For developers looking for Linux-native sandboxing for AI coding agents, consider:
+
+- **[vetto](https://github.com/shleder/vetto)** — Zero-daemon kernel sandbox (Landlock LSM & seccomp-bpf on Linux, Seatbelt on macOS) with automated PATH shims (`vetto enable <agent>`).
+- **[bubblewrap](https://github.com/containers/bubblewrap)** — Unprivileged user namespaces sandboxing utility for Linux.
+- **[firejail](https://github.com/netblue30/firejail)** — Mature SUID sandbox with ready-made profiles for common applications.
+- **[nono.sh](https://nono.sh)** — Landlock plus seccomp-notify sandboxing with privilege elevation without restart.
+- **[sandlock](https://github.com/multikernel/sandlock)** — Pure-Python sandbox combining Landlock, seccomp-bpf and seccomp user notification; no root, containers or C compiler needed.
+- **[isolated-agent](https://github.com/simonholt/isolated-agent)** — Minimalist helper for isolating a single agent run.
