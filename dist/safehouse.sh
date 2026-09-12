@@ -190,6 +190,15 @@ __SAFEHOUSE_EMBEDDED_profiles_00_base_sb__
     (home-literal "/.local/share")                                    ;; XDG data share dir traversal needed by tools probing data locations.
 )
 
+;; Directory-entry creation for the XDG cache root so tools can bootstrap their
+;; per-tool cache subdirectories (e.g. ~/.cache/uv) on a fresh macOS home where
+;; ~/.cache does not exist yet. mkdir checks file-write-create on the created
+;; path, so the tool subpath grants alone cannot create their own parent entry.
+;; Contents below each tool subdirectory still require the tool-specific grants.
+(allow file-write-create
+    (home-literal "/.cache")                                         ;; XDG cache root: lets tools create ~/.cache/<tool> on first run.
+)
+
 ;; User preference reads needed by local agents/CLIs at startup.
 ;; Shell startup file reads are opt-in via 55-integrations-optional/shell-init.sb.
 (allow file-read*
@@ -9789,6 +9798,15 @@ policy_dist_append_preassembled_fixed_before_home() {
     (home-literal "/.cache")                                          ;; XDG cache root traversal needed by tools probing cache locations.
     (home-literal "/.local")                                          ;; XDG data root traversal needed by tools probing ~/.local paths.
     (home-literal "/.local/share")                                    ;; XDG data share dir traversal needed by tools probing data locations.
+)
+
+;; Directory-entry creation for the XDG cache root so tools can bootstrap their
+;; per-tool cache subdirectories (e.g. ~/.cache/uv) on a fresh macOS home where
+;; ~/.cache does not exist yet. mkdir checks file-write-create on the created
+;; path, so the tool subpath grants alone cannot create their own parent entry.
+;; Contents below each tool subdirectory still require the tool-specific grants.
+(allow file-write-create
+    (home-literal "/.cache")                                         ;; XDG cache root: lets tools create ~/.cache/<tool> on first run.
 )
 
 ;; User preference reads needed by local agents/CLIs at startup.
