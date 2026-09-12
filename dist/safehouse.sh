@@ -1803,6 +1803,7 @@ __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_gpu_sb__
 
 (allow network-outbound
     (remote unix-socket (home-literal "/.config/herdr/herdr.sock"))  ;; herdr unix socket for TUI status updates and bell notifications.
+    (remote unix-socket (home-subpath "/.config/herdr"))            ;; named-session sockets: ~/.config/herdr/sessions/<name>/herdr.sock.
 )
 __SAFEHOUSE_EMBEDDED_profiles_55_integrations_optional_herdr_sb__
       ;;
