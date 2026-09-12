@@ -86,13 +86,13 @@ teardown() {
   HOME="$fake_home" safehouse_ok --enable=herdr -- /bin/sh -c "printf '' | nc -U '$socket_path' >/dev/null 2>&1"
 }
 
-@test "[POLICY-ONLY] herdr profile grants unix-socket access to the whole herdr config dir (default + named-session sockets)" { # https://herdr.dev/docs/socket-api/#socket-paths
+@test "[POLICY-ONLY] herdr profile grants unix-socket access to the default socket and the named-sessions directory" { # https://herdr.dev/docs/socket-api/#socket-paths
   local profile section
 
   profile="$(safehouse_profile --enable=herdr)"
   section="$(sft_profile_source_section "$profile" "55-integrations-optional/herdr.sb")"
 
-  sft_assert_contains "$section" '(remote unix-socket (home-subpath "/.config/herdr"))'
+  sft_assert_contains "$section" '(remote unix-socket (home-subpath "/.config/herdr/sessions"))'
 }
 
 @test "[EXECUTION] herdr named-session socket connect stays denied by default and becomes allowed when enabled" { # https://herdr.dev/docs/socket-api/#socket-paths
