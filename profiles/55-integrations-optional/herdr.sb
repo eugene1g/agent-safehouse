@@ -11,5 +11,8 @@
 )
 
 (allow network-outbound
-    (remote unix-socket (home-literal "/.config/herdr/herdr.sock"))  ;; herdr unix socket for TUI status updates and bell notifications.
+    (remote unix-socket (home-literal "/.config/herdr/herdr.sock"))  ;; herdr API socket for TUI status updates and bell notifications.
+    (remote unix-socket                                              ;; named-session API sockets: ~/.config/herdr/sessions/<name>/herdr.sock.
+        (path-regex (string-append "^" HOME_DIR "/\\.config/herdr/sessions/[^/]+/herdr\\.sock$")))
+    ;; herdr-client.sock (TUI attach, top-level and per-session) is intentionally not granted.
 )
