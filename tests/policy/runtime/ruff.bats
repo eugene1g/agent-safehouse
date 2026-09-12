@@ -28,9 +28,10 @@ EOF
 }
 
 @test "[EXECUTION] ruff can write cache files inside the sandbox" {
-  local ruff_bin source_file "code"
+  local ruff_bin source_file cache_dir
   ruff_bin="$(sft_command_path_or_skip ruff)" || return 1
   source_file="$(sft_workspace_path "cache_test.py")" || return 1
+  cache_dir="$(sft_workspace_path ".ruff_cache")" || return 1
 
   cat > "$source_file" <<'EOF'
 def cached_function():
@@ -38,16 +39,15 @@ def cached_function():
 EOF
 
   # Clear any existing cache to ensure we write new cache files
-  run safehouse_ok -- bash -c 'rm -rf "$HOME/.cache/ruff" 2>/dev/null || true'
+  rm -rf "$cache_dir"
 
   # Run ruff check to trigger cache file creation
   run safehouse_ok -- "$ruff_bin" check "$source_file"
   [ "$status" -eq 0 ]
 
-  # Verify cache files were created in the home directory
-  run safehouse_ok -- bash -c 'ls -la "$HOME/.cache/ruff" 2>/dev/null || echo "cache-directory-missing"'
+  # Ruff's default cache is .ruff_cache under the working directory
+  run safehouse_ok -- ls "$cache_dir"
   [ "$status" -eq 0 ]
-  [[ "$output" != *cache-directory-missing* ]]
 }
 
 @test "[EXECUTION] ruff can format a file inside the sandbox" {
@@ -66,34 +66,36 @@ EOF
   run safehouse_ok -- "$ruff_bin" format "$source_file"
   [ "$status" -eq 0 ]
 
-  # Verify the file was formatted (ruff format modifies in place)
-  run bash -c 'cat "$source_file" | grep -q "def bad_format():"'
+  # Verify the file was formatted in place (ruff adds spaces around =)
+  run grep -q "x = 1" "$source_file"
   [ "$status" -eq 0 ]
 }
 
 @test "[EXECUTION] ruff respects configuration in the sandbox" {
-  local ruff_bin source_file "config_test"
+  local ruff_bin source_file
   ruff_bin="$(sft_command_path_or_skip ruff)" || return 1
   source_file="$(sft_workspace_path ".ruff.toml")" || return 1
-  local py_file "code"
+  local py_file
   py_file="$(sft_workspace_path "config_test.py")" || return 1
 
-  # Create a ruff config that sets line length to 80
+  # Standalone ruff config: no [tool.ruff] wrapper (that is pyproject.toml only)
   cat > "$source_file" <<'EOF'
-[tool.ruff]
-line-length = 80
+line-length = 20
+[lint]
+select = ["E501"]
 EOF
 
-  # Create a Python file with long line that should trigger linting if line length check is applied
+  # Create a Python file with long lines that E501 flags under the config above
   cat > "$py_file" <<'EOF'
 def long_line_function():
-    very_long_variable_name_that_exceeds_eighty_characters = "this should trigger a lint if line length is enforced"
-    return very_long_variable_name_that_exceeds_eighty_characters
+    very_long_variable_name_that_exceeds_twenty_characters = "value"
+    return very_long_variable_name_that_exceeds_twenty_characters
 EOF
 
-  # Run ruff check to lint the file with config
+  # Config must be discovered and applied: the long lines are flagged
   run safehouse_ok -- "$ruff_bin" check "$py_file"
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
+  [[ "$output" == *E501* ]]
 }
 
 @test "[POLICY-ONLY] default profile includes the ruff cache path" {
