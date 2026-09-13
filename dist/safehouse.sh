@@ -5874,24 +5874,13 @@ policy_plan_build() {
 
 policy_render_output_path=""
 policy_render_keep_output_path=0
-policy_render_target_path=""
-policy_render_target_fd=""
-
-policy_render_close_target_fd() {
-  if [[ -n "${policy_render_target_fd:-}" ]]; then
-    # Do not redirect shell stderr here: `exec` is a shell builtin, so `2>/dev/null`
-    # would permanently discard later stderr from wrapped commands.
-    exec 9>&- || true
-    policy_render_target_fd=""
-  fi
-}
 
 policy_render_write_line() {
-  printf '%s\n' "$1" >&"$policy_render_target_fd"
+  printf '%s\n' "$1"
 }
 
 policy_render_write_blank() {
-  printf '\n' >&"$policy_render_target_fd"
+  printf '\n'
 }
 
 policy_render_append_profile() {
@@ -5909,7 +5898,7 @@ policy_render_append_profile() {
   fi
 
   content="$(policy_source_read_profile_content "$profile_key")" || return 1
-  printf '%s\n\n' "$content" >&"$policy_render_target_fd"
+  printf '%s\n\n' "$content"
   policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "file-read*" "file-write*" || return 1
   policy_render_emit_resolved_home_path_rules "$profile_key" "$content" || return 1
 }
@@ -6195,7 +6184,7 @@ policy_render_append_resolved_base_profile() {
   policy_render_write_line "$first_line"
   policy_render_write_blank
   policy_render_emit_policy_origin_preamble
-  printf '%s\n\n' "$remaining_lines" >&"$policy_render_target_fd"
+  printf '%s\n\n' "$remaining_lines"
 }
 
 policy_render_append_unscoped_module_dir() {
@@ -6321,7 +6310,7 @@ policy_render_build_path_ancestor_literals_block() {
 }
 
 policy_render_emit_path_ancestor_literals() {
-  policy_render_build_path_ancestor_literals_block "$1" "$2" >&"$policy_render_target_fd"
+  policy_render_build_path_ancestor_literals_block "$1" "$2"
 }
 
 policy_render_emit_path_ancestor_metadata_literals() {
@@ -6354,7 +6343,7 @@ policy_render_emit_path_ancestor_metadata_literals() {
   fi
 
   chunk+=$'\n)\n'
-  printf '%s' "$chunk" >&"$policy_render_target_fd"
+  printf '%s' "$chunk"
 }
 
 policy_render_emit_extra_access_rules() {
@@ -6475,8 +6464,8 @@ policy_render_append_resolved_worktree_common_dir_profile() {
   runtime_rules="$(policy_render_build_git_worktree_common_dir_runtime_rules_block)" || return 1
 
   content="$(printf '%s' "$content" | safehouse_replace_literal_stream_required "$WORKTREES_COMMON_DIR_STATUS_TEMPLATE_TOKEN" "$common_dir_status")" || return 1
-  printf '%s\n\n' "$content" >&"$policy_render_target_fd"
-  printf '%s\n\n' "$runtime_rules" >&"$policy_render_target_fd"
+  printf '%s\n\n' "$content"
+  printf '%s\n\n' "$runtime_rules"
 }
 
 policy_render_append_resolved_worktrees_profile() {
@@ -6492,8 +6481,8 @@ policy_render_append_resolved_worktrees_profile() {
   runtime_rules="$(policy_render_build_git_linked_worktree_runtime_rules_block)" || return 1
 
   content="$(printf '%s' "$content" | safehouse_replace_literal_stream_required "$WORKTREES_LINKED_PATHS_STATUS_TEMPLATE_TOKEN" "$linked_paths_status")" || return 1
-  printf '%s\n\n' "$content" >&"$policy_render_target_fd"
-  printf '%s\n\n' "$runtime_rules" >&"$policy_render_target_fd"
+  printf '%s\n\n' "$content"
+  printf '%s\n\n' "$runtime_rules"
 }
 
 policy_render_emit_workdir_access() {
@@ -6580,28 +6569,8 @@ policy_render_append_workdir_config_profiles() {
 }
 
 policy_render_reset_output_state() {
-  policy_render_close_target_fd
   policy_render_output_path=""
   policy_render_keep_output_path=0
-  policy_render_target_path=""
-  policy_render_target_fd=""
-}
-
-policy_render_begin_stdout_target() {
-  policy_render_reset_output_state
-  policy_render_target_path="/dev/stdout"
-  # Avoid fd 3 because Bats reserves it when commands run under the test harness.
-  exec 9>&1
-  policy_render_target_fd="9"
-}
-
-policy_render_begin_path_target() {
-  local target_path="$1"
-
-  policy_render_target_path="$target_path"
-  : >"$policy_render_target_path"
-  exec 9>"$policy_render_target_path"
-  policy_render_target_fd="9"
 }
 
 policy_render_open_output_target() {
@@ -6696,9 +6665,7 @@ policy_render_to_path() {
   policy_render_reset_output_state
   temp_output_path="$(policy_render_open_output_target)" || return 1
 
-  policy_render_begin_path_target "$temp_output_path" || return 1
-
-  if policy_render_emit_all_sections; then
+  if policy_render_emit_all_sections >"$temp_output_path"; then
     :
   else
     render_status=$?
@@ -6706,7 +6673,6 @@ policy_render_to_path() {
     return "$render_status"
   fi
 
-  policy_render_close_target_fd
   policy_render_finalize_output_path "$temp_output_path" || return 1
 }
 
@@ -9722,7 +9688,7 @@ policy_dist_emit_embedded_profile_exec_env_defaults() {
 }
 
 policy_dist_append_preassembled_fixed_before_home() {
-  cat <<'__SAFEHOUSE_PREASSEMBLED_FIXED_BEFORE_HOME__' >&"$policy_render_target_fd"
+  cat <<'__SAFEHOUSE_PREASSEMBLED_FIXED_BEFORE_HOME__'
 ;; ---------------------------------------------------------------------------
 ;; System Runtime
 ;; Process execution, tmp/dev access, system binaries, and baseline mach services.
@@ -9932,7 +9898,7 @@ __SAFEHOUSE_PREASSEMBLED_FIXED_BEFORE_HOME__
 }
 
 policy_dist_append_preassembled_fixed_after_home() {
-  cat <<'__SAFEHOUSE_PREASSEMBLED_FIXED_AFTER_HOME__' >&"$policy_render_target_fd"
+  cat <<'__SAFEHOUSE_PREASSEMBLED_FIXED_AFTER_HOME__'
 ;; ---------------------------------------------------------------------------
 ;; Network
 ;; Outbound and inbound TCP/UDP + DNS.
@@ -10524,7 +10490,7 @@ __SAFEHOUSE_PREASSEMBLED_FIXED_AFTER_HOME__
 }
 
 policy_dist_append_preassembled_core_integrations() {
-  cat <<'__SAFEHOUSE_PREASSEMBLED_CORE_INTEGRATIONS__' >&"$policy_render_target_fd"
+  cat <<'__SAFEHOUSE_PREASSEMBLED_CORE_INTEGRATIONS__'
 ;; ---------------------------------------------------------------------------
 ;; Integration: Container Runtime Default Deny
 ;; Default-deny local container daemon sockets; docker integration can re-open later.

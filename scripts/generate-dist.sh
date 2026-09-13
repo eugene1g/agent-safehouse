@@ -634,7 +634,7 @@ emit_preassembled_profile_chunk_function() {
 
   cat <<SCRIPT
 ${function_name}() {
-  cat <<'${marker}' >&"\$policy_render_target_fd"
+  cat <<'${marker}'
 SCRIPT
 
   emit_profile_chunk_body "$@"

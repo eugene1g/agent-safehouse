@@ -55,6 +55,16 @@ load ../../test_helper.bash
   sft_assert_omits_source "$dist_cursor_app" "60-agents/cursor-agent.sb"
 }
 
+@test "[POLICY-ONLY] dist renders policy for a large integration set with extra dirs (#192)" {
+  local enable="docker,playwright-chrome,process-control,lldb,browser-native-messaging,ssh,shell-init,all-agents"
+  local dist_policy
+
+  export SAFEHOUSE_ADD_DIRS="$SAFEHOUSE_WORKSPACE" SAFEHOUSE_ADD_DIRS_RO="$SAFEHOUSE_REPO_ROOT"
+  dist_policy="$(safehouse_profile --enable="$enable")"
+
+  sft_assert_includes_source "$dist_policy" "60-agents/claude-code.sb"
+}
+
 @test "[EXECUTION] bin and dist apply playwright-chrome exec env defaults identically" {
   local bin_value dist_value
 
