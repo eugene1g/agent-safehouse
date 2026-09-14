@@ -3,12 +3,17 @@
 
 load ../../test_helper.bash
 
-# Overrides the shared teardown (test_helper.bash) to also reap the socket listener, which
-# the in-test cleanup misses when a test aborts on a failed assertion.
+# Overrides the shared teardown (test_helper.bash) to also reap the socket listener and the
+# headless herdr server, which the in-test cleanup misses when a test aborts on a failed assertion.
 teardown() {
   if [ -n "${nc_pid:-}" ]; then
     kill "$nc_pid" 2>/dev/null || true
     wait "$nc_pid" 2>/dev/null || true
+  fi
+
+  if [ -n "${herdr_server_pid:-}" ]; then
+    kill "$herdr_server_pid" 2>/dev/null || true
+    wait "$herdr_server_pid" 2>/dev/null || true
   fi
 
   sft_teardown_test_env
@@ -110,4 +115,30 @@ teardown() {
   HOME="$fake_home" safehouse_denied -- /bin/sh -c "nc -U '$socket_path' </dev/null 2>&1"
 
   HOME="$fake_home" safehouse_ok --enable=herdr -- /bin/sh -c "printf '' | nc -U '$socket_path' >/dev/null 2>&1"
+}
+
+@test "[EXECUTION] herdr client stays denied by default and reaches a real headless herdr server when enabled" { # https://herdr.dev/docs/cli-reference/#server
+  local herdr_bin herdr_dir fake_home socket_path i  # herdr_server_pid stays global for teardown
+
+  herdr_bin="$(sft_command_path_or_skip herdr)" || return 1
+  herdr_dir="$(cd -- "$(dirname -- "$herdr_bin")" && pwd -P)"
+  fake_home="$(sft_fake_home)" || return 1
+  socket_path="${fake_home}/.config/herdr/herdr.sock"
+
+  HOME="$fake_home" "$herdr_bin" server </dev/null >/dev/null 2>&1 &
+  herdr_server_pid=$!
+
+  for i in {1..40}; do
+    [ -S "$socket_path" ] && break
+    sleep 0.25
+  done
+  if [ ! -S "$socket_path" ]; then
+    printf 'herdr server socket did not appear\n' >&2
+    cat "${fake_home}/.config/herdr/herdr-server.log" 2>/dev/null >&2
+    return 1
+  fi
+
+  HOME="$fake_home" safehouse_denied --add-dirs-ro "$herdr_dir" -- "$herdr_bin" api snapshot
+
+  HOME="$fake_home" safehouse_ok --enable=herdr --add-dirs-ro "$herdr_dir" -- "$herdr_bin" api snapshot
 }
