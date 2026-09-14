@@ -57,10 +57,7 @@
 
     ;; Package Manager: uv
     (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state (tools/ narrowed to read-only below).
-    (home-subpath "/.local/state/uv")          ;; uv state/cache metadata on XDG-style setups.
     (home-subpath "/.cache/uv")                ;; uv download/build cache for fast repeated runs.
-    (home-subpath "/Library/Caches/uv")        ;; macOS cache variant used by some uv installs.
-    (home-subpath "/.config/uv")               ;; uv config reads/writes during tool resolution.
 
     ;; Package Publisher: setuptools / distutils
     (home-literal "/.pypirc")                  ;; Python package index credentials/config file path.
@@ -72,8 +69,27 @@
     (home-subpath "/.jupyter")                 ;; Jupyter runtime/config paths in home.
 )
 
+(allow file-read*
+    ;; Package Manager: uv
+    (home-subpath "/.config/uv")               ;; uv config reads during tool resolution.
+)
+
 ;; uv: Disallow installs inside sandbox,
 ;; while leaving writable ~/.local/share/uv/python
 (deny file-write*
     (home-subpath "/.local/share/uv/tools")    ;; Installed tool payloads are immutable after install.
+)
+
+;; uv: Allow ephemeral tool runs (`uvx` / `uv tool run`).
+;; Persistent `uv tool install` remains denied.
+(allow file-write*
+    (home-literal "/.local/share/uv/tools")             ;; Create the directory the lock lives in.
+    (home-literal "/.local/share/uv/tools/.lock")       ;; Cross-process lock uv takes for any tool operation.
+    (home-literal "/.local/share/uv/tools/.gitignore")  ;; uv writes this alongside the lock on first use.
+    (home-prefix "/.local/share/uv/tools/.tmp")         ;; uv stages the lock as a temp file, then renames it.
+)
+
+;; uv: Deny read of index credentials, stored by `uv auth login`.
+(deny file-read* file-write*
+    (home-subpath "/.local/share/uv/credentials")
 )
