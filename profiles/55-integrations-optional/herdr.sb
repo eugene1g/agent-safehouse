@@ -12,4 +12,5 @@
 
 (allow network-outbound
     (remote unix-socket (home-literal "/.config/herdr/herdr.sock"))  ;; herdr unix socket for TUI status updates and bell notifications.
+    (remote unix-socket (home-subpath "/.config/herdr/sessions"))   ;; named-session sockets: ~/.config/herdr/sessions/<name>/herdr.sock.
 )
