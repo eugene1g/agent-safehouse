@@ -1,6 +1,6 @@
 ;; ---------------------------------------------------------------------------
-;; Agent: openCode
-;; openCode CLI binary, state, and config paths.
+;; Agent: OpenCode (v1 and v2)
+;; Both versions use the opencode command and the same state/config roots.
 ;; Source: 60-agents/opencode.sb
 ;; ---------------------------------------------------------------------------
 
@@ -31,4 +31,14 @@
 ;; GitHub Copilot token read for auth
 (allow file-read*
     (home-subpath "/.config/github-copilot")
+)
+
+;; V2 canonicalizes optional config roots and files in every project ancestor.
+;; A denied realpath/lstat becomes a fatal location-initialization error (HTTP
+;; 500), even for ~/.claude when only its shared agents/skills are needed.
+;; Metadata alone is insufficient on macOS. Permit reads of these exact entries,
+;; including config file contents and directory listings, but not recursive
+;; directory contents or writes. See https://github.com/eugene1g/agent-safehouse/issues/198.
+(allow file-read*
+    (regex #"/(\.claude|\.agents|\.opencode|opencode\.jsonc?)$")
 )

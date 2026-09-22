@@ -14,7 +14,9 @@ load agent_tui_harness.bash
   local auth_log_path="${AGENT_TUI_ROOT}/goose-login.log"
   local model="gpt-5.6-luna"
 
-  AGENT_TUI_READY_PATTERN='goose is ready|Enter to send'
+  # The banner appears before the editor can accept and submit input. Wait for
+  # the empty editor's hint, otherwise the prompt can remain unsubmitted in CI.
+  AGENT_TUI_READY_PATTERN='> Enter to send'
   # --once: Press the key sequence to dismiss this gate exactly once
   sft_agent_tui_add_gate --once 'Share anonymous usage data' Right Enter
 
