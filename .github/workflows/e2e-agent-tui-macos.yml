@@ -105,6 +105,14 @@ jobs:
             @sourcegraph/amp@0.0.1786054439-gd42f19 \
             cline \
             opencode-ai
+
+          # V1 and V2 both install `opencode`. Keep V2 in a separate prefix so
+          # both real CLIs receive their own startup and prompt-roundtrip tests.
+          opencode_v2_prefix="$(mktemp -d /private/tmp/safehouse-opencode-v2.XXXXXX)"
+          npm install --global --prefix "${opencode_v2_prefix}" \
+            --no-fund --no-audit --min-release-age=4 @opencode/cli
+          echo "SAFEHOUSE_OPENCODE_V2_BIN=${opencode_v2_prefix}/bin/opencode" >> "$GITHUB_ENV"
+          "${opencode_v2_prefix}/bin/opencode" --version
           echo
 
           # @kilocode/cli 7.4.x hangs its TUI on GitHub's macOS runners.

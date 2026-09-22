@@ -69,3 +69,53 @@ EOF
   [ -f "${fake_home}/.local/share/opencode/ok" ]
   [ -f "${fake_home}/.local/state/opencode/ok" ]
 }
+
+make_fake_opencode_exec() {
+  mkdir -p "$(dirname "$1")"
+  printf '#!/bin/sh\nexec "$@"\n' >"$1"
+  chmod 755 "$1"
+}
+
+@test "[EXECUTION] opencode can read existing config discovery entries outside the workdir" {
+  local fake_home fake_opencode parent workdir name
+  fake_home="$(sft_fake_home)"
+  fake_opencode="${fake_home}/.local/bin/opencode"
+  parent="${fake_home}/projects"
+  workdir="${parent}/repo"
+  mkdir -p "$workdir" "${fake_home}/.claude"
+  make_fake_opencode_exec "$fake_opencode"
+
+  HOME="$fake_home" safehouse_ok_in_dir "$workdir" -- "$fake_opencode" /bin/ls "${fake_home}/.claude"
+  for name in .claude .agents .opencode; do
+    mkdir -p "${parent}/${name}"
+    HOME="$fake_home" safehouse_ok_in_dir "$workdir" -- "$fake_opencode" /bin/ls "${parent}/${name}"
+  done
+  for name in opencode.json opencode.jsonc; do
+    printf '{}\n' >"${parent}/${name}"
+    HOME="$fake_home" safehouse_ok_in_dir "$workdir" -- "$fake_opencode" /bin/cat "${parent}/${name}"
+  done
+}
+
+@test "[EXECUTION] opencode discovery grants do not expose directory contents or writes" {
+  local fake_home fake_opencode parent workdir name
+  fake_home="$(sft_fake_home)"
+  fake_opencode="${fake_home}/.local/bin/opencode"
+  parent="${fake_home}/projects"
+  workdir="${parent}/repo"
+  mkdir -p "$workdir"
+  make_fake_opencode_exec "$fake_opencode"
+
+  for name in .claude .agents .opencode; do
+    mkdir -p "${parent}/${name}"
+    printf 'private fixture\n' >"${parent}/${name}/private.txt"
+    HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- "$fake_opencode" /bin/cat "${parent}/${name}/private.txt"
+    HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- "$fake_opencode" /bin/sh -c 'echo changed > "$1"' sh "${parent}/${name}/private.txt"
+  done
+  for name in opencode.json opencode.jsonc; do
+    printf '{}\n' >"${parent}/${name}"
+    HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- "$fake_opencode" /bin/sh -c 'echo changed > "$1"' sh "${parent}/${name}"
+  done
+  printf 'private fixture\n' >"${parent}/opencode.json.backup"
+  HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- "$fake_opencode" /bin/cat "${parent}/opencode.json.backup"
+  HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- /bin/cat "${parent}/opencode.json"
+}

@@ -51,7 +51,7 @@ They currently cover:
 - `gemini`
 - `goose`
 - `kilo-code`
-- `opencode`
+- `opencode` v1 and v2 (separate installations of the same command)
 - `pi`
 
 CI runs this subset in the dedicated `E2E TUI Tests (macOS)` workflow.
@@ -72,6 +72,23 @@ $(brew --prefix node)/bin/npm install --global \
 ```
 
 CI installs these packages directly in the workflow job.
+
+Install OpenCode v2 separately so it does not replace the v1 executable:
+
+```bash
+opencode_v2_prefix="$(mktemp -d /private/tmp/safehouse-opencode-v2.XXXXXX)"
+npm install --global --prefix "$opencode_v2_prefix" \
+  --no-fund --no-audit --min-release-age=4 @opencode/cli
+export SAFEHOUSE_OPENCODE_V2_BIN="$opencode_v2_prefix/bin/opencode"
+bats tests/e2e/opencode-v2.bats
+```
+
+The v2 tests use `--standalone` so the server inherits Safehouse's policy. Their
+isolated home and ancestor configuration files live outside the writable workdir
+and temporary directories to exercise configuration discovery permissions. The
+startup check needs no API key; the prompt roundtrip requires `ANTHROPIC_API_KEY`.
+An explicitly configured `SAFEHOUSE_OPENCODE_V2_BIN` must exist and report v2;
+invalid CI installations fail instead of skipping.
 
 Depending on the specific test file, you may also need provider keys such as:
 
