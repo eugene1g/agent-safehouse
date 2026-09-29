@@ -8,16 +8,24 @@
 ;; Defaults on many setups:
 ;; - GOPATH: ~/go
 ;; - GOCACHE: ~/.cache/go-build or ~/Library/Caches/go-build
+;; - GOENV: ~/Library/Application Support/go/env (macOS; see `go env GOENV`)
 
 (allow file-read* file-write*
     (home-subpath "/go")
     (home-subpath "/.cache/go-build")
     (home-subpath "/Library/Caches/go-build")
-    (home-subpath "/.config/go")
     (home-subpath "/.cache/golangci-lint")
     (home-subpath "/Library/Caches/golangci-lint")
     (home-subpath "/.config/golangci-lint")
     (home-subpath "/.local/share/go")
     (home-subpath "/.goenv")
     (home-subpath "/.cache/gopls")
+)
+
+;; `go env -w` settings file (GOENV). Without read access, sandboxed `go`
+;; silently ignores the user's GOPROXY, GOPRIVATE, GOFLAGS, etc.
+;; Read-only: toolchain settings stay under the user's control, so
+;; `go env -w` / `go env -u` fail inside the sandbox.
+(allow file-read*
+    (home-literal "/Library/Application Support/go/env")
 )
