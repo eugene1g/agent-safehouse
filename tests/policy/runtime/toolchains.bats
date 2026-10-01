@@ -54,6 +54,16 @@ load ../../test_helper.bash
   sft_assert_contains "$profile" "(home-subpath \"/.local/lib/node_modules\")"
 }
 
+@test "[POLICY-ONLY] node toolchain grants aube package manager paths" { # https://github.com/aubepkg/aube
+  local profile
+  profile="$(safehouse_profile)"
+
+  sft_assert_contains "$profile" "(home-subpath \"/.config/aube\")"
+  sft_assert_contains "$profile" "(home-subpath \"/.local/share/aube\")"
+  sft_assert_contains "$profile" "(home-subpath \"/.cache/aube\")"
+  sft_assert_contains "$profile" "(home-subpath \"/Library/Caches/aube\")"
+}
+
 @test "[POLICY-ONLY] node toolchain grants file-read* file-write* to fnm_multishells" { # issue #111
   local profile
   profile="$(safehouse_profile)"
