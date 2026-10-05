@@ -298,6 +298,54 @@ load ../../test_helper.bash
   [ "$output" = "$expected_root" ]
 }
 
+@test "[EXECUTION] aube installs and runs a local dependency inside the sandbox" { # https://github.com/aubepkg/aube
+  sft_require_cmd_or_skip aube
+  sft_require_cmd_or_skip node
+
+  local aube_bin node_bin node_dir project_dir sandbox_home
+  aube_bin="$(sft_command_path_or_skip aube)" || return 1
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
+  node_dir="$(dirname "$node_bin")"
+  project_dir="$(sft_workspace_path "aube-project")" || return 1
+
+  run env HOME="$SAFEHOUSE_HOST_HOME" "$aube_bin" --version
+  [ "$status" -eq 0 ] || skip "aube precheck failed outside sandbox"
+
+  # Keep the default fake HOME for globally installed tools. A toolchain
+  # installed under the host home (mise/asdf) is only readable when the sandbox
+  # HOME is the host home, since the policy resolves home grants against HOME.
+  sandbox_home="$HOME"
+  case "$aube_bin" in "$SAFEHOUSE_HOST_HOME"/*) sandbox_home="$SAFEHOUSE_HOST_HOME" ;; esac
+  case "$node_bin" in "$SAFEHOUSE_HOST_HOME"/*) sandbox_home="$SAFEHOUSE_HOST_HOME" ;; esac
+
+  mkdir -p "${project_dir}/local-dep" || return 1
+  printf '%s\n' '{"name":"local-dep","version":"1.0.0","main":"index.js"}' > "${project_dir}/local-dep/package.json"
+  printf 'module.exports = "sandboxed-aube-ok";\n' > "${project_dir}/local-dep/index.js"
+  printf 'console.log(require("local-dep"));\n' > "${project_dir}/smoke.js"
+  cat > "${project_dir}/package.json" <<'JSON'
+{
+  "name": "aube-smoke",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "smoke": "node smoke.js" },
+  "dependencies": { "local-dep": "file:./local-dep" }
+}
+JSON
+
+  cd "$project_dir" || return 1
+
+  # The file: dependency resolves without the registry, so the install stays
+  # offline and exercises aube's store and virtual-store writes.
+  run env HOME="$sandbox_home" PATH="${node_dir}:$PATH" \
+    "$DIST_SAFEHOUSE" -- "$aube_bin" install --offline
+  [ "$status" -eq 0 ]
+
+  run env HOME="$sandbox_home" PATH="${node_dir}:$PATH" \
+    "$DIST_SAFEHOUSE" -- "$aube_bin" run smoke
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sandboxed-aube-ok"* ]]
+}
+
 @test "[EXECUTION] bundler can read the macOS system default gemspec catalog inside the sandbox" {
   sft_require_cmd_or_skip bundle
   sft_require_cmd_or_skip ruby
