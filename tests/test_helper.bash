@@ -48,6 +48,11 @@ sft_setup_test_env() {
   SAFEHOUSE_WORKSPACE="$(mktemp -d "${SAFEHOUSE_WORKSPACE_ROOT}/workspace.XXXXXX")"
   export HOME="${SAFEHOUSE_DEFAULT_FAKE_HOME}"
 
+  # Strip herdr host env so default-policy assertions do not depend on the
+  # runner being launched inside a herdr session (HERDR_ENV auto-enables the
+  # herdr integration).
+  unset HERDR_ENV HERDR_SOCKET_PATH HERDR_PANE_ID HERDR_TAB_ID HERDR_WORKSPACE_ID
+
   cd "$SAFEHOUSE_WORKSPACE" || return 1
 }
 
