@@ -33,6 +33,14 @@
    (subpath "/private/var/run")                                      ;; Metadata traversal for /private/var/run socket namespace.
 )
 
+;; macOS 27 adds /pkg/env/global/bin to PATH. A denied lookup there makes
+;; Node/libuv abort its PATH search with EPERM before reaching later entries.
+;; Only the global environment symlink needs metadata access for that lookup;
+;; parent directories, bin contents, and the resolved inventory stay private.
+(allow file-read-metadata                                            ;; #safehouse-test-id:pkg-path-metadata#
+    (literal "/pkg/env/global")
+)
+
 ;; /etc and /var are symlinks into /private/* on macOS; keep this scoped to baseline local-agent runtime needs.
 (allow file-read*
     (literal "/private")                                              ;; Required for symlink traversal under macOS /private namespace.
