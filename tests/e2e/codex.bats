@@ -13,31 +13,24 @@ load agent_tui_harness.bash
   local config_dir="${AGENT_TUI_WORKDIR}/codex-config"
   local auth_log_path="${AGENT_TUI_ROOT}/codex-login.log"
   local model="gpt-5.6-luna"
-  # Codex paints its welcome box and a composer that looks ready seconds
-  # before the session can accept a submission. Keystrokes typed during that
-  # window do reach the composer but Enter is discarded.
-  #
-  # Matches only once the session is ready:
-  #   | model:       gpt-5.6-luna medium   /model to change  |
-  #
-  # Deliberately does NOT match any of these, all of which are on screen while
-  # the session is still loading:
-  #   | >_ OpenAI Codex (v0.149.0)                           |  banner, painted first
-  #   | model:       loading   /model to change              |  loading model field
-  #   | directory:   loading                                 |  loading dir field
-  #   > Ask Codex to do anything                                composer
-  #     gpt-5.6-luna default * /tmp/.../workdir                 status footer
-  AGENT_TUI_READY_PATTERN="model: +${model}"
+  # Wait for the loaded model, not just the banner or composer: early Enter
+  # presses can be discarded. Older releases show a model: header; 0.162's
+  # standalone TUI shows the display name and selected effort in its footer.
+  AGENT_TUI_READY_PATTERN="model: +${model}|GPT-5[.]6-Luna medium"
+  # A fresh CODEX_HOME may offer a newer model; keep this test's pinned model.
+  sft_agent_tui_add_gate --once 'Use existing model' Down Enter
   sft_agent_tui_add_gate 'Do you trust the contents of this directory' Enter
 
   prepare_agent_state "${agent_home}" "${config_dir}" "${model}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"
   configure_agent_tui
 
+  # Keep the app server in this sandbox. Codex's shared daemon startup invokes
+  # macOS's setuid /bin/ps, which cannot execute inside a Seatbelt sandbox.
   sft_tmux_start \
     safehouse -- \
     "CODEX_HOME=${agent_home}" \
-    codex --model="${model}" --dangerously-bypass-approvals-and-sandbox
+    codex --no-daemon --model="${model}" --dangerously-bypass-approvals-and-sandbox
   sft_agent_tui_handle_startup_gates
   sft_tmux_assert_roundtrip
 }
@@ -78,7 +71,7 @@ configure_agent_tui() {
   # name -- what AGENT_TUI_READY_PATTERN waits for -- once the model catalog
   # comes back over the network. Under the suite's parallelism that has been
   # observed taking longer than the 10s default, so match the floor CI sets.
-  if (( AGENT_TUI_STARTUP_WAIT_SECS < 20 )); then
+  if ((AGENT_TUI_STARTUP_WAIT_SECS < 20)); then
     AGENT_TUI_STARTUP_WAIT_SECS=20
   fi
 

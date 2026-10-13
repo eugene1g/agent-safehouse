@@ -106,6 +106,17 @@ For Claude's external-editor handoff (`Ctrl+G`) with VS Code:
 - The explicit `--enable=vscode` cold-start path launches a separate Safehouse-managed VS Code profile for the temporary Claude prompt editor, so it does not reuse your normal VS Code settings, extensions, or recently-opened list.
 - If you already set `EDITOR` or `VISUAL`, Safehouse passes that through by default and skips its Claude-specific VS Code fallback shim.
 
+## Codex
+
+For Codex versions with a shared background app server, pass `--no-daemon` so
+the TUI and its app server stay inside the same Safehouse sandbox. Shared daemon
+startup invokes macOS's setuid `/bin/ps`, which cannot execute inside a Seatbelt
+sandbox.
+
+```bash
+safehouse -- codex --no-daemon --dangerously-bypass-approvals-and-sandbox
+```
+
 ## Git Worktrees
 
 When the selected workdir resolves to a Git worktree root, Safehouse automatically grants read/write access to the shared Git common dir when that metadata lives outside the selected workdir.
@@ -117,7 +128,7 @@ This is decided when Safehouse starts the wrapped process. If you create new wor
 If your worktrees are always created under a stable folder such as `~/worktrees/project-name`, grant that parent up front. Use `--add-dirs-ro` for the same cross-worktree read behavior without restarting, or `--add-dirs` if you intentionally want write access too:
 
 ```bash
-safehouse --add-dirs-ro=~/worktrees/project-name -- codex --dangerously-bypass-approvals-and-sandbox
+safehouse --add-dirs-ro=~/worktrees/project-name -- codex --no-daemon --dangerously-bypass-approvals-and-sandbox
 ```
 
 ## Default HOME Behavior
@@ -138,16 +149,16 @@ If you want to tighten the default home allowances further, use `--append-profil
 
 ```bash
 # Full inherited environment pass-through
-safehouse --env -- codex --dangerously-bypass-approvals-and-sandbox
+safehouse --env -- codex --no-daemon --dangerously-bypass-approvals-and-sandbox
 
 # Named env pass-through
-safehouse --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY -- codex --dangerously-bypass-approvals-and-sandbox
+safehouse --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY -- codex --no-daemon --dangerously-bypass-approvals-and-sandbox
 
 # Source env values from file on top of sanitized defaults
-safehouse --env=./agent.env -- codex --dangerously-bypass-approvals-and-sandbox
+safehouse --env=./agent.env -- codex --no-daemon --dangerously-bypass-approvals-and-sandbox
 
 # Combine file + named pass-through (named vars win)
-safehouse --env=./agent.env --env-pass=OPENAI_API_KEY -- codex --dangerously-bypass-approvals-and-sandbox
+safehouse --env=./agent.env --env-pass=OPENAI_API_KEY -- codex --no-daemon --dangerously-bypass-approvals-and-sandbox
 
 # Inject a one-off child env value without inheriting the full host env
 safehouse -- MYVAR=123 printenv MYVAR

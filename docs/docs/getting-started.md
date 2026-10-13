@@ -52,7 +52,7 @@ safe() { safehouse --add-dirs-ro=~/mywork --append-profile="$SAFEHOUSE_APPEND_PR
 safeenv() { safe --env "$@"; }
 safekeys() { safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY,GEMINI_API_KEY "$@"; }
 claude()   { safe claude --dangerously-skip-permissions "$@"; }
-codex()    { safe codex --dangerously-bypass-approvals-and-sandbox "$@"; }
+codex()    { safe codex --no-daemon --dangerously-bypass-approvals-and-sandbox "$@"; }
 amp()      { safe amp --dangerously-allow-all "$@"; }
 opencode() { OPENCODE_PERMISSION='{"*":"allow"}' safekeys opencode "$@"; }
 gemini()   { NO_BROWSER=true safekeys gemini --yolo "$@"; }
@@ -84,7 +84,7 @@ function claude
 end
 
 function codex
-    safe codex --dangerously-bypass-approvals-and-sandbox $argv
+    safe codex --no-daemon --dangerously-bypass-approvals-and-sandbox $argv
 end
 
 function amp
