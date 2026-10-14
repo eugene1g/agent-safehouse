@@ -4,19 +4,22 @@
 load ../../test_helper.bash
 
 @test "[POLICY-ONLY] agent profile selection follows command basename for direct executables" {
-  local codex_bin goose_bin kilo_bin codex_profile goose_profile kilo_profile
+  local codex_bin goose_bin kilo_bin muse_bin codex_profile goose_profile kilo_profile muse_profile
 
   codex_bin="$(sft_workspace_path "codex")"
   goose_bin="$(sft_workspace_path "goose")"
   kilo_bin="$(sft_workspace_path "kilo")"
+  muse_bin="$(sft_workspace_path "muse")"
 
   sft_make_fake_command "$codex_bin"
   sft_make_fake_command "$goose_bin"
   sft_make_fake_command "$kilo_bin"
+  sft_make_fake_command "$muse_bin"
 
   codex_profile="$(safehouse_profile -- "$codex_bin")"
   goose_profile="$(safehouse_profile -- "$goose_bin")"
   kilo_profile="$(safehouse_profile -- "$kilo_bin")"
+  muse_profile="$(safehouse_profile -- "$muse_bin")"
 
   sft_assert_includes_source "$codex_profile" "60-agents/codex.sb"
   sft_assert_includes_source "$codex_profile" "55-integrations-optional/keychain.sb"
@@ -27,6 +30,9 @@ load ../../test_helper.bash
 
   sft_assert_includes_source "$kilo_profile" "60-agents/kilo-code.sb"
   sft_assert_omits_source "$kilo_profile" "60-agents/codex.sb"
+
+  sft_assert_includes_source "$muse_profile" "60-agents/muse.sb"
+  sft_assert_omits_source "$muse_profile" "60-agents/codex.sb"
 }
 
 @test "[POLICY-ONLY] wrapper launchers map to the wrapped command for profile selection" {

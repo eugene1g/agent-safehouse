@@ -1,0 +1,27 @@
+;; ---------------------------------------------------------------------------
+;; Agent: Muse
+;; Muse Code CLI launcher, versioned binary, state, and config paths.
+;; Source: 60-agents/muse.sb
+;; $$command=muse$$
+;; ---------------------------------------------------------------------------
+
+;; - installer-managed launcher: ~/.local/bin/muse (bash wrapper)
+;; - versioned Mach-O next to the launcher: ~/.local/bin/muse-bin-<version>
+;; - launcher sidecars in ~/.local/bin: .muse-version, .muse-update-*, .muse-release-info.json
+;; - config under ~/.config/muse (auth.json, settings, trust, approval-policy)
+;; - state under ~/.local/share/muse (sessions, runtime, plugins, skills)
+;; - channel / auth / download hosts (api.meta.ai, auth.meta.com, lookaside.facebook.com)
+;;   rely on the shared 20-network.sb outbound allow; no host-specific network rules here
+
+(allow file-read* file-write*
+    ;; Launcher + versioned binaries share the "muse" path prefix
+    ;; (muse, muse-bin-1.4.7-R6101.1, …).
+    (home-prefix "/.local/bin/muse")
+    ;; Dotfile sidecars and update scratch paths (.muse-version, .muse-update-*, …).
+    (home-prefix "/.local/bin/.muse")
+    (home-literal "/.config")                       ;; mkdir -p ~/.config/muse
+    (home-literal "/.local")                        ;; mkdir -p ~/.local/share/muse
+    (home-literal "/.local/share")                  ;; mkdir -p ~/.local/share/muse
+    (home-subpath "/.config/muse")
+    (home-subpath "/.local/share/muse")
+)
