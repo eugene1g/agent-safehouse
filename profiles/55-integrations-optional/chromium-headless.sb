@@ -156,8 +156,9 @@
     (fsctl-command (_IO "h" 47))
 )
 
-;; GPU IOKit user clients (IOSurfaceRootUserClient, AGXDeviceUserClient) are
-;; provided by profiles/55-integrations-optional/gpu.sb via $$require above.
+;; GPU IOKit user clients (IOSurfaceRootUserClient, AGXDeviceUserClient,
+;; AppleParavirtDeviceUserClient) are provided by
+;; profiles/55-integrations-optional/gpu.sb via $$require above.
 (allow iokit-open
     (iokit-user-client-class "RootDomainUserClient")
     (iokit-user-client-class "IOHIDParamUserClient")

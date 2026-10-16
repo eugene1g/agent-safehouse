@@ -18,6 +18,7 @@ load ../../test_helper.bash
   sft_assert_contains "$gpu_section" '(global-name "com.apple.SafariPlatformSupport.Helper")'
   sft_assert_contains "$gpu_section" '(iokit-user-client-class "IOSurfaceRootUserClient")'
   sft_assert_contains "$gpu_section" '(iokit-user-client-class "AGXDeviceUserClient")'
+  sft_assert_contains "$gpu_section" '(iokit-user-client-class "AppleParavirtDeviceUserClient")'
   sft_assert_contains "$gpu_section" '(literal "/private/var/db/.AppleSetupDone")'
 }
 

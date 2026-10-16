@@ -18,6 +18,9 @@
 (allow iokit-open
     (iokit-user-client-class "IOSurfaceRootUserClient")
     (iokit-user-client-class "AGXDeviceUserClient")
+    ;; Paravirtualized (virtual) GPU device inside a macOS VM, such as the
+    ;; GitHub Actions macOS runners.
+    (iokit-user-client-class "AppleParavirtDeviceUserClient")
 )
 
 ;; GPU helper processes probe setup state at startup.
