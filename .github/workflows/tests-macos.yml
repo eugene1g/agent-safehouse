@@ -92,7 +92,7 @@ jobs:
           #       (not just the formula author) before publish.
           brew install \
             bats-core parallel \
-            fnm gnupg node ruff uv
+            aube fnm gnupg node ruff uv
           # NOTE: --cask marks vendor-built items (not built by Homebrew).
           #       Integrity checking varies: temurin is currently pinned;
           #       google-chrome is currently unpinned.

@@ -1,6 +1,6 @@
 ;; ---------------------------------------------------------------------------
 ;; Toolchain: Node.js
-;; Node.js runtime with npm, yarn, pnpm, and corepack package manager paths.
+;; Node.js runtime with npm, yarn, pnpm, aube, and corepack package manager paths.
 ;; Source: 30-toolchains/node.sb
 ;; ---------------------------------------------------------------------------
 
@@ -51,6 +51,12 @@
     (home-subpath "/.config/yarn")
     (home-subpath "/.cache/yarn")
     (home-subpath "/Library/Caches/Yarn")
+
+    ;; aube
+    (home-subpath "/.config/aube")
+    (home-subpath "/.local/share/aube")
+    (home-subpath "/.cache/aube")
+    (home-subpath "/Library/Caches/aube")
 
     ;; corepack
     (home-subpath "/.cache/node/corepack")
