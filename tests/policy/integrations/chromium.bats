@@ -38,13 +38,15 @@ load ../../test_helper.bash
   # test stays non-interactive and does not require real host keychain access.
   chrome_args=(--use-mock-keychain --no-sandbox --headless=new --dump-dom https://example.com)
 
-  HOME="$SAFEHOUSE_HOST_HOME" "$chrome_bin" "${chrome_args[@]}" >/dev/null 2>&1 || skip "Google Chrome headless precheck failed outside sandbox"
+  local precheck_output precheck_status=0
+  precheck_output="$(HOME="$SAFEHOUSE_HOST_HOME" "$chrome_bin" "${chrome_args[@]}" 2>&1)" || precheck_status=$?
+  sft_chrome_dump_dom_succeeded "$precheck_status" "$precheck_output" ||
+    skip "Google Chrome headless precheck failed outside sandbox"
 
   HOME="$SAFEHOUSE_HOST_HOME" safehouse_denied -- "$chrome_bin" "${chrome_args[@]}"
 
   HOME="$SAFEHOUSE_HOST_HOME" run safehouse_ok --enable=chromium-full -- "$chrome_bin" "${chrome_args[@]}"
-  [ "$status" -eq 0 ]
-  sft_assert_contains "$output" "Example Domain"
+  sft_chrome_dump_dom_succeeded "$status" "$output"
 }
 
 @test "[EXECUTION] chromium-headless can launch Playwright chrome-headless-shell against example.com when installed" {
@@ -63,6 +65,19 @@ load ../../test_helper.bash
   HOME="$SAFEHOUSE_HOST_HOME" run safehouse_ok --enable=chromium-headless -- "$headless_shell" "${headless_args[@]}"
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "Example Domain"
+}
+
+# Succeeds when a `--dump-dom https://example.com` launch loaded the page.
+# Google Chrome 155 on macOS 26+ (seen on GitHub Actions runners, 2026-10)
+# dumps the DOM, then hangs on shutdown until its own watchdog kills it
+# ("Teardown watchdog expired") and exits non-zero, inside or outside
+# Safehouse. Tolerate that one failure; remove once Chrome fixes the hang.
+sft_chrome_dump_dom_succeeded() {
+  local exit_status="$1" output="$2"
+
+  [[ "$output" == *"Example Domain"* ]] || return 1
+  [ "$exit_status" -eq 0 ] && return 0
+  [[ "$output" == *"Teardown watchdog expired"* ]]
 }
 
 sft_playwright_headless_shell() {
