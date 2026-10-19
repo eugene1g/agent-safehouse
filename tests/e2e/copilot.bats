@@ -14,7 +14,7 @@ load agent_tui_harness.bash
   local auth_log_path="${AGENT_TUI_ROOT}/copilot-login.log"
   local model="gpt-5.6-luna"
 
-  AGENT_TUI_READY_PATTERN='Please use /login|/ commands .* \? help'
+  AGENT_TUI_READY_PATTERN='Please use /login|/ commands'
   sft_agent_tui_add_gate 'Confirm folder trust|Do you trust the files in this folder\?' Enter
   # Printed if the `copilot` on PATH is the VS Code Copilot Chat launcher shim
   # rather than the standalone GitHub Copilot CLI. Nothing to answer: the agent
