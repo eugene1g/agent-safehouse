@@ -15,8 +15,8 @@ cleanup_ssh_agent() {
 @test "[EXECUTION] ssh tooling can read config and known_hosts metadata by default and with enable=ssh" {
   local fake_home ssh_bin ssh_dir ssh_keygen_bin
 
-  ssh_bin="$(sft_command_path_or_skip ssh)" || return 1
-  ssh_keygen_bin="$(sft_command_path_or_skip ssh-keygen)" || return 1
+  sft_command_path_or_skip ssh_bin ssh
+  sft_command_path_or_skip ssh_keygen_bin ssh-keygen
   fake_home="$(sft_fake_home)" || return 1
   ssh_dir="${fake_home}/.ssh"
   mkdir -p "$ssh_dir"
@@ -35,7 +35,7 @@ cleanup_ssh_agent() {
 @test "[EXECUTION] ssh private keys remain denied with and without enable=ssh" {
   local fake_home private_key ssh_dir ssh_keygen_bin
 
-  ssh_keygen_bin="$(sft_command_path_or_skip ssh-keygen)" || return 1
+  sft_command_path_or_skip ssh_keygen_bin ssh-keygen
   fake_home="$(sft_fake_home)" || return 1
   ssh_dir="${fake_home}/.ssh"
   private_key="${ssh_dir}/id_test"
@@ -112,8 +112,8 @@ cleanup_ssh_agent() {
   local fake_home ssh_dir sock key ssh_keygen_bin ssh_add_bin
   local ls_status default_agent_status enable_ls_status enable_agent_status
 
-  ssh_keygen_bin="$(sft_command_path_or_skip ssh-keygen)" || return 1
-  ssh_add_bin="$(sft_command_path_or_skip ssh-add)" || return 1
+  sft_command_path_or_skip ssh_keygen_bin ssh-keygen
+  sft_command_path_or_skip ssh_add_bin ssh-add
   fake_home="$(sft_fake_home)" || return 1
   ssh_dir="${fake_home}/.ssh"
   sock="${ssh_dir}/agent/s.issue36"

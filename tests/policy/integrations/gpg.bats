@@ -6,7 +6,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] gpg keyring access is opt-in via enable=gpg" {
   local gpg_bin fake_home gnupg_dir
 
-  gpg_bin="$(sft_command_path_or_skip gpg)" || return 1
+  sft_command_path_or_skip gpg_bin gpg
   fake_home="$(sft_fake_home)" || return 1
   gnupg_dir="${fake_home}/.gnupg"
   mkdir -m 700 -p "$gnupg_dir"
@@ -21,9 +21,9 @@ load ../../test_helper.bash
 @test "[EXECUTION] git produces a gpg-signed commit inside the sandbox with enable=gpg" {
   local gpg_bin git_bin gpgconf_bin fake_home gnupg_dir keyid
 
-  gpg_bin="$(sft_command_path_or_skip gpg)" || return 1
-  git_bin="$(sft_command_path_or_skip git)" || return 1
-  gpgconf_bin="$(sft_command_path_or_skip gpgconf)" || return 1
+  sft_command_path_or_skip gpg_bin gpg
+  sft_command_path_or_skip git_bin git
+  sft_command_path_or_skip gpgconf_bin gpgconf
   fake_home="$(sft_fake_home)" || return 1
   gnupg_dir="${fake_home}/.gnupg"
   mkdir -m 700 -p "$gnupg_dir"
@@ -61,7 +61,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] gpg secret keys remain denied with and without enable=gpg" {
   local gpg_bin fake_home gnupg_dir
 
-  gpg_bin="$(sft_command_path_or_skip gpg)" || return 1
+  sft_command_path_or_skip gpg_bin gpg
   fake_home="$(sft_fake_home)" || return 1
   gnupg_dir="${fake_home}/.gnupg"
   mkdir -m 700 -p "$gnupg_dir"

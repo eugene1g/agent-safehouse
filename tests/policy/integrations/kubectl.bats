@@ -13,7 +13,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] kubectl can read kubeconfig only when enable=kubectl is set" {
   local kubectl_bin fake_home kube_dir
 
-  kubectl_bin="$(sft_command_path_or_skip kubectl)" || return 1
+  sft_command_path_or_skip kubectl_bin kubectl
   fake_home="$(sft_fake_home)" || return 1
   kube_dir="${fake_home}/.kube"
   mkdir -p "$kube_dir/cache"

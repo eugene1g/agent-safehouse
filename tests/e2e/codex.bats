@@ -59,7 +59,7 @@ login_agent() {
   local _model="$3"
   local codex_command_path=""
 
-  codex_command_path="$(sft_agent_tui_command_path_or_skip "codex")"
+  sft_agent_tui_command_path_or_skip codex_command_path "codex"
   if ! printenv OPENAI_API_KEY | CODEX_HOME="${agent_home}" "${codex_command_path}" login --with-api-key >"${auth_log_path}" 2>&1; then
     cat "${auth_log_path}" >&2
     return 1

@@ -13,7 +13,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] aws cli can read ~/.aws config only when enable=cloud-credentials is set" {
   local aws_bin aws_dir fake_home
 
-  aws_bin="$(sft_command_path_or_skip aws)" || return 1
+  sft_command_path_or_skip aws_bin aws
 
   fake_home="$(sft_fake_home)" || return 1
   aws_dir="${fake_home}/.aws"
