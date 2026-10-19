@@ -34,7 +34,7 @@ prepare_opencode_v2() {
     [[ -z "${SAFEHOUSE_OPENCODE_V2_BIN:-}" ]] || return 1
     skip "OpenCode v2 is not installed (set SAFEHOUSE_OPENCODE_V2_BIN)"
   fi
-  AGENT_TUI_READY_PATTERN='ctrl.p commands'
+  AGENT_TUI_READY_PATTERN='Build · Claude Sonnet 5'
   AGENT_TUI_STARTUP_WAIT_SECS=60
 }
 
