@@ -70,9 +70,10 @@ configure_agent_tui() {
   # Codex paints its header with `model: loading` and only fills in the model
   # name -- what AGENT_TUI_READY_PATTERN waits for -- once the model catalog
   # comes back over the network. Under the suite's parallelism that has been
-  # observed taking longer than the 10s default, so match the floor CI sets.
-  if ((AGENT_TUI_STARTUP_WAIT_SECS < 20)); then
-    AGENT_TUI_STARTUP_WAIT_SECS=20
+  # observed taking longer than the 10s default, and has also overrun CI's 20s
+  # floor by ~2s, so allow 150% of that floor (30s).
+  if ((AGENT_TUI_STARTUP_WAIT_SECS < 30)); then
+    AGENT_TUI_STARTUP_WAIT_SECS=30
   fi
 
   return 0
