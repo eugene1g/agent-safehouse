@@ -16,6 +16,8 @@ load agent_tui_harness.bash
   # Wait for the loaded model, not just the banner or composer: early Enter
   # presses can be discarded. Older releases show a model: header; 0.162's
   # standalone TUI shows the display name and selected effort in its footer.
+  # That footer first reads `GPT-5.6-Luna default` while the session is still
+  # loading, then `GPT-5.6-Luna medium` once it is ready, so don't match `default`.
   AGENT_TUI_READY_PATTERN="model: +${model}|GPT-5[.]6-Luna medium"
   # A fresh CODEX_HOME may offer a newer model; keep this test's pinned model.
   sft_agent_tui_add_gate --once 'Use existing model' Down Enter
