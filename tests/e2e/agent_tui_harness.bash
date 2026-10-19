@@ -199,14 +199,18 @@ sft_agent_tui_resolve_command_path() {
   printf '%s/%s\n' "${resolved_dir}" "$(basename -- "${resolved_path}")"
 }
 
+# Assigns the resolved path to the caller variable <var_name>, or skips. It
+# assigns instead of printing because `skip` inside a command substitution would
+# exit only that subshell.
 sft_agent_tui_command_path_or_skip() {
-  local command_name="$1"
+  local var_name="$1"
+  local command_name="$2"
   local resolved_path=""
 
   resolved_path="$(sft_agent_tui_resolve_command_path "${command_name}" || true)"
   [[ -n "${resolved_path}" ]] || skip "${command_name} is not installed"
 
-  printf '%s\n' "${resolved_path}"
+  printf -v "${var_name}" '%s' "${resolved_path}"
 }
 
 sft_agent_tui_prepend_path_dir() {
