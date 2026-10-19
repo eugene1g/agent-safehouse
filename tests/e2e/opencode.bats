@@ -9,6 +9,15 @@ load agent_tui_harness.bash
   sft_require_cmd_or_skip "opencode"
   sft_require_env_or_skip "ANTHROPIC_API_KEY"
 
+  # V1 (opencode-ai) and V2 (@opencode/cli) both install `opencode`.
+  # - V1 prints a bare version like `1.19.0` and is covered in this test.
+  # - V2 prints `opencode v2.0.29` and is covered by opencode-v2.bats.
+  local version
+  version="$(opencode --version)" || return 1
+  if [[ ! "$version" =~ ^[01]\.[0-9]+\.[0-9]+$ ]]; then
+    skip "OpenCode V1 is not installed (opencode --version: ${version})"
+  fi
+
   local agent_home="${AGENT_TUI_WORKDIR}/opencode-home"
   local config_dir="${AGENT_TUI_WORKDIR}/opencode-config"
   local auth_log_path="${AGENT_TUI_ROOT}/opencode-login.log"
