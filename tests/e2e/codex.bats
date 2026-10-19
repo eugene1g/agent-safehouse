@@ -45,7 +45,6 @@ prepare_agent_state() {
   cat >"${agent_home}/config.toml" <<EOF
 model = "${model}"
 model_reasoning_effort = "medium"
-preferred_auth_method = "apikey"
 check_for_update_on_startup = false
 
 [projects."${AGENT_TUI_WORKDIR}"]
