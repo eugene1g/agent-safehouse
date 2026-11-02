@@ -13,23 +13,22 @@ load agent_tui_harness.bash
   local config_dir="${AGENT_TUI_WORKDIR}/gemini-config"
   local auth_log_path="${AGENT_TUI_ROOT}/gemini-login.log"
   local trusted_folders_path="${config_dir}/trustedFolders.json"
-  local system_settings_path="${config_dir}/system-settings.json"
+  local settings_path="${agent_home}/.gemini/settings.json"
 
   AGENT_TUI_READY_PATTERN='Type your message|@path/to/file|YOLO ctrl\+y'
   sft_agent_tui_add_gate 'Do you trust the files in this folder' Enter
   sft_agent_tui_add_gate 'Get started|How would you like to authenticate for this project\?|Existing API key detected|Use Gemini API Key|Use Enter to select' Enter
   sft_agent_tui_add_gate 'Gemini CLI is restarting to apply the trust changes'
 
-  prepare_agent_state "${agent_home}" "${config_dir}" "${trusted_folders_path}" "${system_settings_path}"
+  prepare_agent_state "${agent_home}" "${config_dir}" "${trusted_folders_path}" "${settings_path}"
   login_agent "${config_dir}" "${auth_log_path}" "${model}"
   configure_agent_tui
 
   GEMINI_API_KEY="${GEMINI_API_KEY}" \
   HOME="${agent_home}" \
   GEMINI_CLI_TRUSTED_FOLDERS_PATH="${trusted_folders_path}" \
-  GEMINI_CLI_SYSTEM_SETTINGS_PATH="${system_settings_path}" \
     sft_tmux_start \
-      safehouse --env-pass=GEMINI_API_KEY,GEMINI_CLI_TRUSTED_FOLDERS_PATH,GEMINI_CLI_SYSTEM_SETTINGS_PATH -- \
+      safehouse --env-pass=GEMINI_API_KEY,GEMINI_CLI_TRUSTED_FOLDERS_PATH -- \
       gemini --yolo
   sft_agent_tui_handle_startup_gates
   sft_tmux_assert_roundtrip
@@ -39,10 +38,10 @@ prepare_agent_state() {
   local agent_home="$1"
   local config_dir="$2"
   local trusted_folders_path="$3"
-  local system_settings_path="$4"
+  local settings_path="$4"
   local workdir_real=""
 
-  mkdir -p "${agent_home}" "${config_dir}"
+  mkdir -p "${agent_home}" "${config_dir}" "$(dirname "${settings_path}")"
   workdir_real="$(cd "${AGENT_TUI_WORKDIR}" && pwd -P)"
 
   cat >"${trusted_folders_path}" <<EOF
@@ -52,8 +51,15 @@ prepare_agent_state() {
 }
 EOF
 
-  cat >"${system_settings_path}" <<'EOF'
+  # With selectedType set, Gemini skips the auth dialog and reads the key
+  # from GEMINI_API_KEY.
+  cat >"${settings_path}" <<'EOF'
 {
+  "security": {
+    "auth": {
+      "selectedType": "gemini-api-key"
+    }
+  },
   "general": {
     "enableAutoUpdate": false,
     "enableAutoUpdateNotification": false
