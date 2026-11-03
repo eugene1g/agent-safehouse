@@ -59,9 +59,6 @@
     (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state (tools/ narrowed to read-only below).
     (home-subpath "/.cache/uv")                ;; uv download/build cache for fast repeated runs.
 
-    ;; Package Publisher: setuptools / distutils
-    (home-literal "/.pypirc")                  ;; Python package index credentials/config file path.
-
     ;; REPL: IPython
     (home-subpath "/.ipython")                 ;; IPython history/profile data.
 

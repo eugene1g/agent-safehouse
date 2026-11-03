@@ -252,6 +252,23 @@ load ../procargs_utils.bash
   HOME="$fake_home" safehouse_denied -- /bin/ls "$nix_config"
 }
 
+@test "[EXECUTION] default sandbox cannot read ~/.pypirc, which may hold upload tokens" {
+  local fake_home pypirc
+
+  fake_home="$(sft_fake_home)" || return 1
+  pypirc="${fake_home}/.pypirc"
+
+  # ~/.pypirc is deliberately not granted: only publishing tools read it
+  # (`twine upload`, probably `setuptools upload`, NOT: `uv publish`),
+  # whose use is out of scope inside the sandbox. It carries a plaintext
+  # PyPI API token that usually has upload scope.
+  printf '%s\n' "[pypi]" "username = __token__" "password = pypi-AgEIcHlwaS5vcmcCJGNhbmFyeQ" \
+    > "$pypirc"
+
+  HOME="$fake_home" safehouse_denied -- /bin/cat "$pypirc"
+  HOME="$fake_home" safehouse_denied -- /usr/bin/touch "$pypirc"
+}
+
 @test "[EXECUTION] Nix store is readable but not writable in the default sandbox" {
   [ -d /nix/store ] || skip "/nix/store not present (Nix not installed)"
 
