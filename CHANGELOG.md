@@ -10,6 +10,67 @@
 
 - No profiles changed.
 
+## [0.13.0] - 2026-11-08
+
+### Upgrade Notes
+
+- Breaking: uv can no longer install, upgrade, or self-update global tools from inside the sandbox.
+    - `uv tool install`, `uv tool upgrade`, and `uv self update` now fail. Run them outside the sandbox.
+    - Ephemeral runs with `uvx` / `uv tool run` still work.
+    - A uv-installed tool that writes runtime state into its own venv will also fail. Re-allow it with `--append-profile` if needed.
+- Breaking: uv config and credentials are locked down.
+    - `~/.config/uv` is now read-only, because writes there can repoint where uv fetches packages from.
+    - `~/.local/share/uv/credentials` (written by `uv auth login`) is now unreadable. Installing from a private index with stored credentials no longer works inside the sandbox. Pass credentials explicitly instead via `UV_INDEX_URL`, `UV_INDEX_<NAME>_USERNAME` / `_PASSWORD`, or `--keyring-provider subprocess`.
+- Breaking: `~/.pypirc` is no longer readable or writable, because it holds package-publishing credentials. This affects `twine upload`, `flit publish`, `hatch publish`, and `maturin upload`. Publish from outside the sandbox instead.
+
+### Features
+
+- `~/.local/bin` symlinked binaries now run by default, including those that uv and pipx create there.
+    - Plain (non-symlinked) binaries there continue to run by default.
+    - Per-binary grants are no longer needed.
+    - The directory stays unwritable because it is on `PATH`.
+- Tools using XDG roots (`~/.cache`, `~/.config`, `~/.local/share`, `~/.local/state`) no longer fail on first run in a fresh home directory where the XDG directories don't exist yet.
+- [aube](https://github.com/endevco/aube) Node package manager now supported.
+
+### Bug Fixes
+
+- Node-based agents (such as `pi`) now start on macOS 27, by granting a metadata lookup on macOS 27's `/pkg/env/global` directory on `PATH`.
+    - Known Issue: Node still fails to spawn programs by bare name when an earlier `PATH` entry is denied by the sandbox ([#205](https://github.com/eugene1g/agent-safehouse/issues/205))
+- OpenCode v2 now starts. It checks for optional config files and directories (`.claude`, `.agents`, `.opencode`, `opencode.json[c]`) in every ancestor of the project directory, and treats a denied check as fatal.
+- Go inside the sandbox now honors `go env -w` settings such as `GOPROXY`, `GOPRIVATE`, and `GOFLAGS`. They were silently ignored before.
+- Fixed Safehouse sometimes aborting with "Bad file descriptor" (fd 9) on macOS's default Bash 3.2. It happened mostly when there were many `--enable` integrations and/or when `SAFEHOUSE_ADD_DIRS` / `SAFEHOUSE_ADD_DIRS_RO` were set.
+- `--enable=gpu` (and Chromium, which requires it) now works inside macOS VMs, such as GitHub Actions macOS runners.
+
+### Chores
+
+- uv tests are rewritten as the reference pattern for testing a sandboxed package manager, with many new execution tests. Ruff and uv now also run in CI.
+- CI now tests on macOS 27.
+- E2E agent TUI tests updated for current Codex, Copilot CLI, Gemini CLI, and OpenCode v1/v2 releases.
+- Missing binaries now skip tests correctly instead of failing them.
+- README now has a Linux Alternatives section.
+- Go's `~/.config/go` dead grant is removed. This `GOENV` location is used on Linux rather than macOS.
+
+### Thanks
+
+- @bellini666 reporting and fixing the Bash 3.2 policy render failure in [#195](https://github.com/eugene1g/agent-safehouse/pull/195).
+- @monody0007 fixing Go `GOENV` support in [#201](https://github.com/eugene1g/agent-safehouse/pull/201).
+- @dolmen asking for Go `GOENV` support in [#85](https://github.com/eugene1g/agent-safehouse/issues/85).
+- @disrupted adding aube package manager support in [#202](https://github.com/eugene1g/agent-safehouse/pull/202).
+- @black-snow adding uv and ruff CI coverage in [#191](https://github.com/eugene1g/agent-safehouse/pull/191) and [#190](https://github.com/eugene1g/agent-safehouse/pull/190).
+- @black-snow reporting the macOS 27 startup failure in [#197](https://github.com/eugene1g/agent-safehouse/issues/197).
+- @jollytoad reporting the OpenCode v2 startup failure in [#198](https://github.com/eugene1g/agent-safehouse/issues/198).
+- @subinznz raising the XDG directory problem in [#140](https://github.com/eugene1g/agent-safehouse/issues/140).
+
+### Changed Sandboxing Profiles
+
+- [`10-system-runtime.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.12.0...v0.13.0#diff-c27b7abd9dcf3cd976d593264e5d14dcfc2e10422b3dcdebb8bb9dbee4d611c8): Allows reading `~/.local/bin` so symlinked binaries run, allows creating the XDG root directories, and allows a metadata lookup on `/pkg/env/global` for macOS 27's new `PATH` entry.
+- [`go.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.12.0...v0.13.0#diff-2dc27cc4b09badbd613e5482358b6398ca059447a36b17b9e60ebfdaac7c9498): Allows reading the macOS `GOENV` file and drops the Linux-only `~/.config/go` grant.
+- [`node.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.12.0...v0.13.0#diff-94a5c97eafdc81daa5ae1e467d55943959ac559f14c59d8c3af198e716ad311f): Adds the aube config, data, and cache paths.
+- [`python.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.12.0...v0.13.0#diff-411c611125e4d288ad47c9dc9b81e8a8ddc23e6591eb8998c2cd3085565feffe): Grants are grouped by tool. uv tool installs and self-updates are denied while `uvx` still works, `~/.config/uv` is read-only, uv credentials and `~/.pypirc` are denied, and unused uv grants are removed.
+- [`chromium-headless.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.12.0...v0.13.0#diff-9f6dc8d781704105880e2f6841f5783b98bf8e483bc6454f3ca1b9560c3fcdc8): Comment-only update naming the new VM GPU client provided by `gpu.sb`.
+- [`gpu.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.12.0...v0.13.0#diff-bd3aff3be81e06c958826180359c72d9f652b5f342f5456e70d014ed988ca5eb): Allows the `AppleParavirtDeviceUserClient` GPU client used inside macOS VMs.
+- [`opencode.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.12.0...v0.13.0#diff-cd89eca750d855f552c01fc868cdf1400d4c482fbf93e47c50425e84f470fa5a): Allows reading OpenCode v2's optional config entries in every ancestor of the project directory.
+
 ## [0.12.0] - 2026-09-07
 
 ### Upgrade Notes
