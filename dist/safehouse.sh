@@ -7143,16 +7143,50 @@ runtime_preflight() {
   return 0
 }
 
+runtime_default_exec_path="/usr/bin:/bin:/usr/sbin:/sbin"
+
+# Splits a colon-separated PATH value into runtime_split_exec_path_entries,
+# keeping empty entries. PATH="" yields one empty entry.
+runtime_split_exec_path() {
+  # -d '': read to end of input, keeping any newlines inside entries.
+  # Appended ':': end every field with a colon, so read keeps a trailing empty entry.
+  # || true: read returns 1 at end of input when it finds no NUL delimiter.
+  IFS=: read -r -d '' -a runtime_split_exec_path_entries < <(printf '%s:' "$1") || true
+}
+
 runtime_build_sanitized_exec_path() {
   local base_path="$1"
   local home_dir="$2"
   local entry existing found
   local -a common_dev_paths=()
   local -a path_entries=()
-  local -a sanitized_path_entries=()
 
-  base_path="${base_path:-/usr/bin:/bin:/usr/sbin:/sbin}"
-  IFS=':' read -r -a path_entries <<< "$base_path"
+  # 1. Drop non-absolute PATH entries (including empty entries)
+  # 2. Drop ~ PATH entries, which aren't processed consistently by tools
+  # 3. Retain absolute PATH entries
+  runtime_split_exec_path "$base_path"
+  for entry in "${runtime_split_exec_path_entries[@]}"; do
+    case "$entry" in
+      /*)
+        path_entries+=("$entry")
+        ;;
+      "~"*)
+        printf '%s\n' "safehouse: Dropped ~ path from PATH: ${entry}" >&2
+        ;;
+      "")
+        printf '%s\n' "safehouse: Dropped empty path from PATH" >&2
+        ;;
+      *)
+        printf '%s\n' "safehouse: Dropped relative path from PATH: ${entry}" >&2
+        ;;
+    esac
+  done
+
+  if [[ "${#path_entries[@]}" -eq 0 ]]; then
+    printf '%s\n' "safehouse: PATH had no usable entries; using default: ${runtime_default_exec_path}" >&2
+    runtime_split_exec_path "$runtime_default_exec_path"
+    path_entries=("${runtime_split_exec_path_entries[@]}")
+  fi
 
   common_dev_paths=(
     "/usr/local/bin"
@@ -7176,14 +7210,9 @@ runtime_build_sanitized_exec_path() {
     fi
   done
 
-  for entry in "${path_entries[@]}"; do
-    [[ -n "$entry" ]] || continue
-    sanitized_path_entries+=("$entry")
-  done
-
   (
     IFS=':'
-    printf '%s\n' "${sanitized_path_entries[*]}"
+    printf '%s\n' "${path_entries[*]}"
   )
 }
 
@@ -7193,7 +7222,7 @@ runtime_build_sanitized_exec_environment() {
 
   runtime_sanitized_exec_environment=()
   runtime_sanitized_exec_environment+=("HOME=${home_dir}")
-  sanitized_path="$(runtime_build_sanitized_exec_path "${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" "$home_dir")"
+  sanitized_path="$(runtime_build_sanitized_exec_path "${PATH-${runtime_default_exec_path}}" "$home_dir")"
   runtime_sanitized_exec_environment+=("PATH=${sanitized_path}")
   runtime_sanitized_exec_environment+=("SHELL=${SHELL:-/bin/sh}")
   runtime_sanitized_exec_environment+=("TMPDIR=${TMPDIR:-/tmp}")
