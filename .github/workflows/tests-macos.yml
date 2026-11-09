@@ -38,6 +38,12 @@ on:
       - ".github/workflows/tests-macos.yml"
       - ".github/workflows/regenerate-dist.yml"
   workflow_dispatch:
+    inputs:
+      bats_files:
+        description: "Space-separated .bats files to run (empty = full suite)"
+        required: false
+        default: ""
+        type: string
 
 # Disallow all GITHUB_TOKEN permissions by default
 permissions: {}
@@ -126,10 +132,20 @@ jobs:
           printf '%s\n' "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
 
       - name: Run test suite
+        if: ${{ inputs.bats_files == '' }}
         run: |
           ./tests/run.sh
 
+      - name: Run selected .bats files
+        if: ${{ inputs.bats_files != '' }}
+        env:
+          BATS_FILES: ${{ inputs.bats_files }}
+        shell: bash
+        run: |
+          bats --print-output-on-failure --show-output-of-passing-tests $BATS_FILES
+
       - name: Run fnm-backed node PATH regression
+        if: ${{ inputs.bats_files == '' }}
         shell: bash
         run: |
           set -euo pipefail
