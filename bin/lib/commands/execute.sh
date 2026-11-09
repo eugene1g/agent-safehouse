@@ -10,7 +10,7 @@ cmd_execute_resolve_base_environment() {
     return 0
   fi
 
-  runtime_build_sanitized_exec_environment "$policy_req_home_dir"
+  runtime_build_sanitized_exec_environment "$policy_req_home_dir" "$policy_render_output_path"
   if [[ "$cli_runtime_env_mode" == "file" ]]; then
     runtime_load_env_file_environment "$cli_runtime_env_file_resolved" || return 1
     runtime_merge_exec_environment_with_env_file

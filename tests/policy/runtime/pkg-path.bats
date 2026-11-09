@@ -17,7 +17,7 @@ load ../../test_helper.bash
   local node_bin
   sft_require_cmd_or_skip node
   [ -d /pkg/env/global ] || skip "macOS pkg environment is not present"
-  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || return 1
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" PATH="$SAFEHOUSE_HOST_PATH" node -p 'process.execPath')" || return 1
 
   safehouse_run_env HOME="$SAFEHOUSE_HOST_HOME" -- -- "$node_bin" -e '
     const assert = require("node:assert/strict");
@@ -36,7 +36,7 @@ load ../../test_helper.bash
 @test "[EXECUTION] pkg lookup traverses a populated symlinked environment without opening its contents" { # issue #197
   local node_bin pkg_root profile_path
   sft_require_cmd_or_skip node
-  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || return 1
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" PATH="$SAFEHOUSE_HOST_PATH" node -p 'process.execPath')" || return 1
   pkg_root="$(sft_external_dir pkg)"
   profile_path="$(sft_workspace_path pkg.sb)"
 
