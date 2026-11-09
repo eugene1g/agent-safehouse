@@ -52,7 +52,7 @@ If the user explicitly gives the target version, honor it even if the default Se
    - `git diff --name-only <from-ref>..<to-ref> -- . ':(exclude)dist/**'`
    Only look at `dist/` after confirmation, during the regeneration and verification stage.
 
-4. Review anything ambiguous before writing notes.
+4a. Review anything ambiguous before writing notes.
    Use `git show --stat <sha>` or `git diff <from-ref>..<to-ref> -- <path>` for commits that are not obvious from the subject line.
    When a commit touches both source files and `dist/`, review only the source files and do not open the generated `dist/` portion.
    For any changed sandbox profile, inspect the actual diff before summarizing it.
@@ -64,6 +64,22 @@ If the user explicitly gives the target version, honor it even if the default Se
    - Do not include open issues or unmerged PRs in `Thanks` unless the user explicitly asks.
    - If the user explicitly asks to include a specific PR or issue in `Thanks`, include it even when it is still open or unmerged.
    - Do not thank the release author for their own PRs or issues unless the user explicitly asks.
+
+4b. Curate the release's GitHub milestone (for example `v0.13`) and derive the list of PRs/issues to notify after release. Step 13 posts to that list after release.
+   - Untagged-items check (optional, thorough). Ask the user whether to run the check or not, because check is expensive and the user usually tags the milestone carefully as work lands. When check approved, map every commit in `<from-ref>..<to-ref>` to its merged PRs (`gh api repos/<owner>/<repo>/commits/<sha>/pulls`), to the issues those PRs close, and to the `#N` references in its commit message. Then report the shipped items that have no milestone or a different one, applying these tagging rules:
+     - A PR with no corresponding issue gets the milestone, infra PRs included.
+     - A PR whose issue already has the milestone gets it only when the PR has participants (author, commenters, reviewers) who are not on the issue.
+     - An issue that lacks the milestone gets it.
+     - Judge a PR by every commit it carries, not by its title. A PR titled `feat(ci): ...` can carry user-facing commits.
+   - Leave open items already in the milestone alone. The user may still be working on them.
+   - Derive the notification list. Start from the milestone's closed items, then subtract:
+     - Items that did not ship: PRs closed without merging, and issues nothing in `<from-ref>..<to-ref>` resolves. Flag these so the user can move them out of the milestone.
+     - PRs whose content was fully rewritten before it shipped.
+     - Items with no change end users can observe, such as test-only, CI-only, infra, and docs-only items.
+     - A PR whose participants are all on its corresponding issue. The issue gets the notification comment instead. Keep the PR when it has participants who are not on the issue, for example a different author or an extra commenter.
+     - Items whose only participants are maintainers. A comment there notifies nobody.
+     - Issues closed as duplicates. Comment on the canonical item instead, and add the duplicate's reporter as a trailing `@username` line, because they are not subscribed to the canonical item.
+   Include the proposed milestone changes and the notification list, with selected and skipped items each carrying a one-line reason, in the dry run. Apply milestone changes only after confirmation.
 
 5. Draft changelog bullets in this order:
    - `### Upgrade Notes`
@@ -102,6 +118,7 @@ If the user explicitly gives the target version, honor it even if the default Se
    - whether the Homebrew tap will be updated
    - the exact next actions you intend to take after confirmation
    The exact next actions should be listed in order:
+   - apply the confirmed milestone changes from step 4b
    - update `VERSION`
    - update `CHANGELOG.md`
    - regenerate `dist/`
@@ -110,6 +127,8 @@ If the user explicitly gives the target version, honor it even if the default Se
    - tag and push the release tag
    - publish or update the GitHub release
    - publish the Homebrew tap for stable releases only
+   - roll milestones forward
+   - notify interested issues/PRs, for stable releases only
    Stop after presenting this overview and wait for explicit user confirmation.
    Do not update `CHANGELOG.md`, regenerate `dist/`, run the verification gate, create commits, create tags, push commits, push tags, create GitHub releases, edit GitHub releases, or publish the Homebrew tap until the user explicitly confirms.
 
@@ -154,6 +173,27 @@ If the user explicitly gives the target version, honor it even if the default Se
    For every stable release, update the Homebrew tap repository at `https://github.com/eugene1g/homebrew-safehouse`.
    Use `./scripts/publish-homebrew-tap.sh "v<version>" --push`.
    Skip this step for prereleases such as `-rc.N` and `-beta.N`.
+
+12. After publishing a stable release, roll the GitHub milestones forward.
+   - Create the next milestone (for example `v0.14` after `v0.13`) if it does not exist.
+   - Move the release milestone's remaining open issues and PRs to the next milestone.
+   - Close the release milestone. Do this after step 13, which reads from it.
+
+13. After publishing a stable release, notify the people who asked for or contributed what shipped.
+   Post one comment on each item in the notification list confirmed in step 4b, so its subscribers learn the fix or feature is out.
+   If step 4b's curation was skipped, do it now, and confirm the list before posting.
+   Use this exact comment body:
+
+   ```md
+   This feature is now released in Agent Safehouse v<major>.<minor>.
+
+   https://github.com/eugene1g/agent-safehouse/releases/tag/v<version>
+   ```
+
+   The prose names the short version (`v0.13`) and the link uses the full tag (`v0.13.0`). The same wording is used for bug fixes. Any trailing `@username` line for a duplicate's reporter goes after the link, separated by a blank line.
+   Wait for confirmation before posting any comment.
+   Post with `gh issue comment <num>` or `gh pr comment <num>`, then confirm that each comment exists.
+   Skip this step for prereleases.
 
 ## Changed Sandboxing Profiles
 
