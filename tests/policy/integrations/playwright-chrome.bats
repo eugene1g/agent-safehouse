@@ -21,7 +21,7 @@ load ../../test_helper.bash
   precheck_png="$(sft_workspace_path "playwright-chrome-precheck.png")"
   allowed_png="$(sft_workspace_path "playwright-chrome-allowed.png")"
 
-  HOME="$SAFEHOUSE_HOST_HOME" "$playwright_bin" screenshot --channel=chrome https://example.com "$precheck_png" >/dev/null 2>&1 ||
+  HOME="$SAFEHOUSE_HOST_HOME" "$playwright_bin" screenshot --channel=chrome https://captive.apple.com/ "$precheck_png" >/dev/null 2>&1 ||
     skip "Playwright Chrome precheck failed outside sandbox"
 
   # The underlying denial path is already covered by chromium-full's bare-Safehouse
@@ -31,6 +31,6 @@ load ../../test_helper.bash
     "HOME=$SAFEHOUSE_HOST_HOME" \
     -- \
     --enable=playwright-chrome \
-    -- "$playwright_bin" screenshot --channel=chrome https://example.com "$allowed_png" >/dev/null
+    -- "$playwright_bin" screenshot --channel=chrome https://captive.apple.com/ "$allowed_png" >/dev/null
   sft_assert_file_exists "$allowed_png"
 }

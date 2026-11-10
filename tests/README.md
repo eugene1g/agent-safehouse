@@ -155,13 +155,13 @@ sft_assert_contains "$profile" '(remote unix-socket (path-literal "/var/run/dock
 - Skip cleanly when the host dependency is unavailable.
 - Precheck outside the sandbox first when host state may be missing or broken, then run the same flow inside Safehouse.
 - Keep the outside-sandbox precheck and the in-sandbox command as close as possible: same binary, same meaningful args, same HOME/cwd assumptions.
-- Prefer a stable public target such as `https://example.com` for networked smoke tests.
+- Prefer a stable public target such as `https://captive.apple.com/` for networked smoke tests.
 - If no meaningful real-binary smoke exists yet, use a weaker path-level test only when that path access is itself the contract or the best available proxy.
 
 Good integration pattern:
 
 ```bash
-@test "enable=agent-browser can open example.com and read the page title" {
+@test "enable=agent-browser can open captive.apple.com and read the page title" {
   local session_name
 
   sft_require_cmd_or_skip agent-browser
@@ -174,12 +174,12 @@ Good integration pattern:
     }
     trap cleanup EXIT
 
-    agent-browser --session "$session_name" open https://example.com >/dev/null &&
+    agent-browser --session "$session_name" open https://captive.apple.com/ >/dev/null &&
       agent-browser --session "$session_name" wait --load networkidle >/dev/null &&
       agent-browser --session "$session_name" get title
   ' _ "$session_name"
   [ "$status" -eq 0 ]
-  sft_assert_contains "$output" "Example Domain"
+  sft_assert_contains "$output" "Success"
 }
 ```
 

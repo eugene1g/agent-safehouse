@@ -24,5 +24,5 @@ load ../../test_helper.bash
 }
 
 @test "[EXECUTION] default sandbox allows outbound https" {
-  safehouse_ok -- /usr/bin/curl -sf --max-time 5 https://example.com
+  safehouse_ok -- /usr/bin/curl -sf --max-time 5 https://captive.apple.com/
 }
