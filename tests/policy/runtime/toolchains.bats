@@ -231,8 +231,9 @@ load ../../test_helper.bash
 }
 
 @test "[EXECUTION] node reproduces the macOS fnm parent traversal failure when app-support metadata is denied" { # issue #13
-  local node_bin entrypoint deny_overlay
+  local node_bin node_prefix entrypoint deny_overlay
   node_bin="$(sft_supported_node_bin_or_skip)" || return 1
+  node_prefix="$(sft_node_install_prefix "$node_bin")" || return 1
   entrypoint="$(sft_setup_fnm_macos_entrypoint_fixture)" || return 1
   deny_overlay="$(sft_write_fnm_app_support_metadata_deny_overlay)" || return 1
 
@@ -241,15 +242,16 @@ load ../../test_helper.bash
     skip "node precheck failed outside sandbox"
   fi
 
-  run env HOME="$HOME" "$DIST_SAFEHOUSE" --append-profile="$deny_overlay" -- "$node_bin" "$entrypoint"
+  run env HOME="$HOME" "$DIST_SAFEHOUSE" --add-dirs-ro="$node_prefix" --append-profile="$deny_overlay" -- "$node_bin" "$entrypoint"
   [ "$status" -ne 0 ]
   [[ "$output" == *"EPERM"* ]]
   [[ "$output" == *"Library/Application Support"* ]]
 }
 
 @test "[EXECUTION] node can execute a script from the macOS fnm install root under the default policy" { # issue #13
-  local node_bin entrypoint
+  local node_bin node_prefix entrypoint
   node_bin="$(sft_supported_node_bin_or_skip)" || return 1
+  node_prefix="$(sft_node_install_prefix "$node_bin")" || return 1
   entrypoint="$(sft_setup_fnm_macos_entrypoint_fixture)" || return 1
 
   run env HOME="$HOME" "$node_bin" "$entrypoint"
@@ -257,7 +259,7 @@ load ../../test_helper.bash
     skip "node precheck failed outside sandbox"
   fi
 
-  run env HOME="$HOME" "$DIST_SAFEHOUSE" -- "$node_bin" "$entrypoint"
+  run env HOME="$HOME" "$DIST_SAFEHOUSE" --add-dirs-ro="$node_prefix" -- "$node_bin" "$entrypoint"
   [ "$status" -eq 0 ]
   [ "$output" = "fnm-app-support-ok" ]
 }
@@ -378,6 +380,23 @@ sft_supported_node_bin_or_skip() {
   esac
 
   printf '%s\n' "$node_bin"
+}
+
+# Prints the install prefix of a node binary at <prefix>/bin/node.
+# Fails if cannot determine prefix.
+# 
+# Tests that launch node under the fake HOME should grant this prefix with
+# --add-dirs-ro so a node installed under the host HOME (nvm, fnm, ...) can
+# load inside the sandbox.
+sft_node_install_prefix() {
+  local node_bin="$1"
+  local node_prefix="${node_bin%/bin/node}"
+
+  if [[ "$node_prefix" == "$node_bin" ]]; then
+    printf 'node binary is not at <prefix>/bin/node: %s\n' "$node_bin" >&2
+    return 1
+  fi
+  printf '%s\n' "$node_prefix"
 }
 
 sft_setup_fnm_macos_entrypoint_fixture() {
