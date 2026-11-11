@@ -32,6 +32,33 @@ teardown() {
   sft_assert_contains "$profile" "(allow network-inbound"
 }
 
+@test "[POLICY-ONLY] appended egress deny (deny network*) suppresses the blanket outbound allow" {
+  local append_file profile
+
+  append_file="$(sft_workspace_path "deny-egress.sb")" || return 1
+  printf '(deny network* (remote ip "*:*"))\n' > "$append_file"
+
+  profile="$(safehouse_profile --append-profile="$append_file")"
+  sft_assert_not_contains "$profile" "(allow network-outbound (remote ip))"
+  sft_assert_contains "$profile" "#safehouse-test-id:network-egress-deny-shim#"
+  sft_assert_contains "$profile" '(allow network-outbound (remote ip "localhost:*"))'
+  # Resolver socket and local dev-server grants survive the suppression.
+  sft_assert_contains "$profile" '(allow network-outbound (literal "/private/var/run/mDNSResponder"))'
+  sft_assert_contains "$profile" "(allow network-bind"
+  sft_assert_contains "$profile" "(allow network-inbound"
+}
+
+@test "[POLICY-ONLY] appended non-network deny keeps the blanket outbound allow" {
+  local append_file profile
+
+  append_file="$(sft_workspace_path "deny-files.sb")" || return 1
+  printf '(deny file-write* (subpath "/etc"))\n' > "$append_file"
+
+  profile="$(safehouse_profile --append-profile="$append_file")"
+  sft_assert_contains "$profile" "(allow network-outbound (remote ip))"
+  sft_assert_not_contains "$profile" "#safehouse-test-id:network-egress-deny-shim#"
+}
+
 @test "[EXECUTION] default sandbox denies outbound to UNIX-domain sockets" { # https://github.com/eugene1g/agent-safehouse/issues/99
   local socket_path  # nc_pid stays global for teardown
 
@@ -43,6 +70,48 @@ teardown() {
   safehouse_denied -- /bin/sh -c "nc -U '$socket_path' </dev/null 2>&1"
 
   rm -f "$socket_path"
+}
+
+@test "[EXECUTION] appended egress deny (deny network*) blocks outbound TCP connects" {
+  local append_file  # nc_pid stays global for teardown
+
+  append_file="$(sft_workspace_path "deny-egress.sb")" || return 1
+  printf '(deny network* (remote ip "*:*"))\n' > "$append_file"
+
+  nc -lk 127.0.0.1 19763 &  # persistent listener: the sandboxed probe must not consume it
+  nc_pid=$!
+  sleep 0.3
+
+  safehouse_denied --append-profile="$append_file" -- /bin/sh -c "nc -z -w 2 127.0.0.1 19763"
+}
+
+@test "[EXECUTION] appended egress deny (deny network*) keeps loopback egress and DNS working" {
+  local append_file
+
+  append_file="$(sft_workspace_path "deny-egress.sb")" || return 1
+  printf '(deny network* (remote ip "*:*"))\n' > "$append_file"
+
+  sft_require_cmd_or_skip python3
+
+  safehouse_ok --append-profile="$append_file" -- python3 -c "import socket; socket.gethostbyname('localhost')"
+}
+
+@test "[EXECUTION] appended egress deny (deny network*) keeps local bind and listen working" {
+  local append_file
+
+  append_file="$(sft_workspace_path "deny-egress.sb")" || return 1
+  printf '(deny network* (remote ip "*:*"))\n' > "$append_file"
+
+  sft_require_cmd_or_skip python3
+
+  safehouse_ok --append-profile="$append_file" -- python3 -c "
+from contextlib import closing
+import socket
+with closing(socket.socket()) as s:
+  s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  s.bind(('127.0.0.1', 19764))
+  s.listen(1)
+"
 }
 
 @test "[EXECUTION] default sandbox allows outbound TCP to IP destinations" { # https://github.com/eugene1g/agent-safehouse/issues/99

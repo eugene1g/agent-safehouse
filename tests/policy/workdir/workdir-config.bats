@@ -149,6 +149,20 @@ load ../../test_helper.bash
   sft_assert_order "$profile" "#safehouse-test-id:workdir-config-append-profile#" "#safehouse-test-id:append-profile#"
 }
 
+@test "[POLICY-ONLY] trusted .safehouse append-profile with (deny network*) suppresses the blanket outbound allow" {
+  local config_file profile_file profile
+
+  profile_file="$(sft_workspace_path "deny-egress.sb")" || return 1
+  config_file="$(sft_workspace_path ".safehouse")" || return 1
+
+  printf '(deny network* (remote ip "*:*"))\n' > "$profile_file"
+  printf 'append-profile=%s\n' "$profile_file" > "$config_file"
+
+  profile="$(safehouse_profile --trust-workdir-config)"
+  sft_assert_not_contains "$profile" "(allow network-outbound (remote ip))"
+  sft_assert_contains "$profile" "#safehouse-test-id:network-egress-deny-shim#"
+}
+
 @test "[POLICY-ONLY] untrusted .safehouse enable= is ignored" {
   local config_file profile
 
