@@ -121,6 +121,15 @@ Policy scope options:
   --append-profile=PATH
       Append an additional sandbox profile file after generated rules
       Repeatable; files are appended in argument order
+      NOTE: wildcard-operation denies like (deny network* ...) cannot
+      override the generated (allow network-outbound (remote ip)) rule
+      because Seatbelt ranks them below matching specific-operation
+      allows. Safehouse detects appended (deny network* ...) rules and
+      suppresses that blanket allow, so your deny rules take effect
+      while DNS (mDNSResponder socket) and local bind/inbound grants
+      remain. To keep loopback egress, re-allow it in your profile with
+      (allow network-outbound (remote ip "localhost:*")) after your
+      deny rules.
 
   --allow-profile-writes
       Skip automatic deny-write rules for appended profile files.

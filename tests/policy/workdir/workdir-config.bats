@@ -159,7 +159,9 @@ load ../../test_helper.bash
   printf 'append-profile=%s\n' "$profile_file" > "$config_file"
 
   profile="$(safehouse_profile --trust-workdir-config)"
-  sft_assert_not_contains "$profile" "(allow network-outbound (remote ip))"
+  # Match only uncommented rule lines; the suppression shim comment legitimately
+  # documents the loopback re-allow incantation as suggestion text.
+  sft_assert_not_contains "$profile" "$(printf '\n(allow network-outbound (remote ip')"
   sft_assert_contains "$profile" "#safehouse-test-id:network-egress-deny-shim#"
 }
 

@@ -712,8 +712,14 @@ emit_embedded_overrides() {
     "policy_dist_append_preassembled_fixed_before_home" \
     "__SAFEHOUSE_PREASSEMBLED_FIXED_BEFORE_HOME__" \
     "${dist_preassembled_fixed_before_home_keys[@]}"
+  # The after-home chunk contains profiles/20-network.sb, whose blanket outbound
+  # allow must be suppressible at RUNTIME when appended profiles carry network
+  # egress deny rules (Seatbelt ranks wildcard-operation denies below matching
+  # specific-operation allows). The chunk function is named ..._emit_... so the
+  # runtime wrapper below can reuse the name ..._append_... and pipe the chunk
+  # through the shared suppressor without recursion.
   emit_preassembled_profile_chunk_function \
-    "policy_dist_append_preassembled_fixed_after_home" \
+    "policy_dist_emit_preassembled_fixed_after_home_chunk" \
     "__SAFEHOUSE_PREASSEMBLED_FIXED_AFTER_HOME__" \
     "${dist_preassembled_fixed_after_home_keys[@]}"
   emit_preassembled_profile_chunk_function \
@@ -883,6 +889,18 @@ policy_render_emit_fixed_sections() {
   policy_render_emit_home_ancestor_metadata_access || return 1
   policy_dist_append_preassembled_fixed_after_home || return 1
   policy_render_emit_resolved_builtin_path_rules_for_profiles "file-read*" "file-write*" "${policy_dist_preassembled_fixed_after_home_keys[@]}" || return 1
+}
+
+# Runtime wrapper over the preassembled fixed-after-home chunk (which contains
+# profiles/20-network.sb). Mirrors the live-assembly path in render.sh: when any
+# appended profile carries a wildcard network deny, suppress the blanket
+# outbound allow so appended egress restrictions take effect.
+policy_dist_append_preassembled_fixed_after_home() {
+  if policy_render_appended_profiles_deny_network_egress; then
+    policy_dist_emit_preassembled_fixed_after_home_chunk | policy_render_suppress_blanket_network_outbound_allow || return 1
+  else
+    policy_dist_emit_preassembled_fixed_after_home_chunk || return 1
+  fi
 }
 
 policy_render_emit_integration_sections() {

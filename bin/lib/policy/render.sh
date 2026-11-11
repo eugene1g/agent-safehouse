@@ -9,6 +9,9 @@
 
 policy_render_output_path=""
 policy_render_keep_output_path=0
+# Memoized result for policy_render_appended_profiles_deny_network_egress().
+# Empty string means "not computed yet"; 0/1 once scanned.
+policy_render_network_egress_deny_detected=""
 
 policy_render_write_line() {
   printf '%s\n' "$1"
@@ -29,6 +32,11 @@ policy_render_append_profile() {
 
   if [[ "$profile_key" == "profiles/50-integrations-core/worktrees.sb" ]]; then
     policy_render_append_resolved_worktrees_profile "$profile_key" || return 1
+    return 0
+  fi
+
+  if [[ "$profile_key" == "profiles/20-network.sb" ]]; then
+    policy_render_append_network_profile "$profile_key" || return 1
     return 0
   fi
 
@@ -320,6 +328,112 @@ policy_render_append_resolved_base_profile() {
   policy_render_write_blank
   policy_render_emit_policy_origin_preamble
   printf '%s\n\n' "$remaining_lines"
+}
+
+policy_render_line_has_wildcard_network_deny_rule() {
+  local line="$1" operation_token
+  # Held in a variable: an unquoted =~ regex with ')' inside a bracket
+  # expression is a bash conditional-expression syntax error.
+  local wildcard_deny_regex='^[[:space:]]*\(deny[[:space:]]+([^[:space:])]+)'
+
+  # Anchored to rule start so commented-out deny rules never match.
+  [[ "$line" =~ $wildcard_deny_regex ]] || return 1
+  operation_token="${BASH_REMATCH[1]}"
+
+  [[ "$operation_token" == "network*" ]]
+}
+
+policy_render_content_has_wildcard_network_deny_rule() {
+  local content="$1" line
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if policy_render_line_has_wildcard_network_deny_rule "$line"; then
+      return 0
+    fi
+  done <<< "$content"
+
+  return 1
+}
+
+policy_render_appended_profiles_have_wildcard_network_deny_rule() {
+  # Prints 1 when any appended profile (trusted workdir config or CLI) contains
+  # a wildcard-operation network deny rule, 0 otherwise. A wildcard deny like
+  # (deny network* ...) is subordinate to matching specific-operation allows in
+  # Seatbelt, so it is inert while the blanket (allow network-outbound
+  # (remote ip)) rule is present. File read failures propagate as errors.
+  local found=0 profile_path content
+  local -a appended_profile_paths=()
+
+  if [[ "$(safehouse_array_length policy_req_workdir_config_append_profile_paths)" -gt 0 ]]; then
+    safehouse_array_append_from_array appended_profile_paths policy_req_workdir_config_append_profile_paths
+  fi
+  if [[ "$(safehouse_array_length policy_req_append_profile_paths)" -gt 0 ]]; then
+    safehouse_array_append_from_array appended_profile_paths policy_req_append_profile_paths
+  fi
+
+  if [[ "${#appended_profile_paths[@]}" -gt 0 ]]; then
+    for profile_path in "${appended_profile_paths[@]}"; do
+      content="$(policy_source_read_profile_content "$profile_path")" || return 1
+      if policy_render_content_has_wildcard_network_deny_rule "$content"; then
+        found=1
+        break
+      fi
+    done
+  fi
+
+  printf '%s\n' "$found"
+}
+
+policy_render_appended_profiles_deny_network_egress() {
+  local detected
+
+  if [[ -z "$policy_render_network_egress_deny_detected" ]]; then
+    detected="$(policy_render_appended_profiles_have_wildcard_network_deny_rule)" || return 1
+    policy_render_network_egress_deny_detected="$detected"
+  fi
+
+  [[ "$policy_render_network_egress_deny_detected" == "1" ]]
+}
+
+# Stream filter: reads SBPL content on stdin, prints it with the blanket
+# outbound network allow replaced by the egress-deny shim block. Shared by the
+# live-assembly render path (bin/) and the dist preassembled-chunk path
+# (scripts/generate-dist.sh) so both emit byte-identical suppression output.
+policy_render_suppress_blanket_network_outbound_allow() {
+  local content
+
+  content="$(cat)" || return 1
+  content="$(printf '%s\n' "$content" | safehouse_replace_literal_stream_required \
+    "(allow network-outbound (remote ip))" \
+    ";; #safehouse-test-id:network-egress-deny-shim# Blanket outbound allow suppressed: appended profile denies network egress.
+;; Seatbelt ranks wildcard-operation denies like (deny network* ...) below matching specific-operation
+;; allows, so keeping this rule would silently neutralize appended egress restrictions. Appended rules
+;; now fully govern remote-IP egress; DNS still uses the mDNSResponder socket grant below. To restore
+;; loopback egress for local dev servers, add this AFTER your deny rules (later specific-operation
+;; allows win):
+;;   (allow network-outbound (remote ip \"localhost:*\"))")" || {
+    safehouse_fail \
+      "Failed to suppress the blanket outbound allow in the network policy section." \
+      "Expected blanket rule: (allow network-outbound (remote ip))"
+    return 1
+  }
+
+  printf '%s\n' "$content"
+}
+
+policy_render_append_network_profile() {
+  local profile_key="$1"
+  local content
+
+  content="$(policy_source_read_profile_content "$profile_key")" || return 1
+
+  if policy_render_appended_profiles_deny_network_egress; then
+    content="$(printf '%s\n' "$content" | policy_render_suppress_blanket_network_outbound_allow)" || return 1
+  fi
+
+  printf '%s\n\n' "$content"
+  policy_render_emit_resolved_builtin_path_rules "$profile_key" "$content" "file-read*" "file-write*" || return 1
+  policy_render_emit_resolved_home_path_rules "$profile_key" "$content" || return 1
 }
 
 policy_render_append_unscoped_module_dir() {

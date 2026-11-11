@@ -39,9 +39,10 @@ teardown() {
   printf '(deny network* (remote ip "*:*"))\n' > "$append_file"
 
   profile="$(safehouse_profile --append-profile="$append_file")"
-  sft_assert_not_contains "$profile" "(allow network-outbound (remote ip))"
+  # Match only uncommented rule lines; the suppression shim comment legitimately
+  # documents the loopback re-allow incantation as suggestion text.
+  sft_assert_not_contains "$profile" "$(printf '\n(allow network-outbound (remote ip')"
   sft_assert_contains "$profile" "#safehouse-test-id:network-egress-deny-shim#"
-  sft_assert_contains "$profile" '(allow network-outbound (remote ip "localhost:*"))'
   # Resolver socket and local dev-server grants survive the suppression.
   sft_assert_contains "$profile" '(allow network-outbound (literal "/private/var/run/mDNSResponder"))'
   sft_assert_contains "$profile" "(allow network-bind"
@@ -112,6 +113,21 @@ with closing(socket.socket()) as s:
   s.bind(('127.0.0.1', 19764))
   s.listen(1)
 "
+}
+
+@test "[EXECUTION] appended loopback re-allow after egress deny re-opens loopback connects" {
+  local append_file  # nc_pid stays global for teardown
+
+  # Later specific-operation allows win over earlier denies, so appended
+  # profiles can carve loopback exceptions out of a wildcard egress deny.
+  append_file="$(sft_workspace_path "deny-egress-loopback-ok.sb")" || return 1
+  printf '(deny network* (remote ip "*:*"))\n(allow network-outbound (remote ip "localhost:*"))\n' > "$append_file"
+
+  nc -lk 127.0.0.1 19765 &  # persistent listener: the sandboxed probe must not consume it
+  nc_pid=$!
+  sleep 0.3
+
+  safehouse_ok --append-profile="$append_file" -- /bin/sh -c "nc -z -w 2 127.0.0.1 19765"
 }
 
 @test "[EXECUTION] default sandbox allows outbound TCP to IP destinations" { # https://github.com/eugene1g/agent-safehouse/issues/99
