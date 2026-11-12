@@ -185,12 +185,12 @@ If the user explicitly gives the target version, honor it even if the default Se
    Use this exact comment body:
 
    ```md
-   This feature is now released in Agent Safehouse v<major>.<minor>.
+   This feature is now released in Agent Safehouse <short-version>.
 
    https://github.com/eugene1g/agent-safehouse/releases/tag/v<version>
    ```
 
-   The prose names the short version (`v0.13`) and the link uses the full tag (`v0.13.0`). The same wording is used for bug fixes. Any trailing `@username` line for a duplicate's reporter goes after the link, separated by a blank line.
+   `<short-version>` is `v<major>.<minor>` when the patch number is 0 (`v0.13` for `v0.13.0`), and the full `v<major>.<minor>.<patch>` otherwise (`v0.13.1`). The link always uses the full tag. The same wording is used for bug fixes. Any trailing `@username` line for a duplicate's reporter goes after the link, separated by a blank line.
    Wait for confirmation before posting any comment.
    Post with `gh issue comment <num>` or `gh pr comment <num>`, then confirm that each comment exists.
    Skip this step for prereleases.
