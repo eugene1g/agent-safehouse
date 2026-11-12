@@ -47,8 +47,42 @@ sft_setup_test_env() {
   # Default cwd for tests that exercise "current workspace" behavior.
   SAFEHOUSE_WORKSPACE="$(mktemp -d "${SAFEHOUSE_WORKSPACE_ROOT}/workspace.XXXXXX")"
   export HOME="${SAFEHOUSE_DEFAULT_FAKE_HOME}"
+  sft_isolate_path_from_host_home
 
   cd "$SAFEHOUSE_WORKSPACE" || return 1
+}
+
+# Removes PATH entries that point inside the host HOME,
+# keeping the original PATH in SAFEHOUSE_HOST_PATH.
+# 
+# While tests are running HOME is swapped for a fake one and the sandbox denies
+# host-home directories such as ~/.cargo/bin. Without the isolation performed by
+# this function, every Safehouse call performed by tests would print a warning
+# to stderr for each dropped denied home-home PATH entry, which would pollute
+# the test output and possibly cause the test to fail.
+# 
+# Tool discovery (sft_require_cmd_or_skip, sft_command_path_or_skip) still
+# searches SAFEHOUSE_HOST_PATH, so tools installed under the host HOME are found.
+# 
+# Anything that runs as the host user with HOME="$SAFEHOUSE_HOST_HOME" should
+# also set PATH="$SAFEHOUSE_HOST_PATH" so that bare tool names resolve.
+sft_isolate_path_from_host_home() {
+  local entry rest isolated_path=""
+
+  export SAFEHOUSE_HOST_PATH="${SAFEHOUSE_HOST_PATH:-$PATH}"
+
+  rest="$SAFEHOUSE_HOST_PATH"
+  while :; do
+    entry="${rest%%:*}"
+    case "$entry" in
+      "$SAFEHOUSE_HOST_HOME" | "$SAFEHOUSE_HOST_HOME"/*) ;;
+      *) isolated_path="${isolated_path:+${isolated_path}:}${entry}" ;;
+    esac
+    [[ "$rest" == *:* ]] || break
+    rest="${rest#*:}"
+  done
+
+  export PATH="$isolated_path"
 }
 
 sft_teardown_test_env() {
@@ -178,7 +212,7 @@ safehouse_profile_in_dir() {
 sft_require_cmd_or_skip() {
   local cmd="$1"
 
-  command -v "$cmd" >/dev/null 2>&1 || skip "${cmd} is not installed"
+  PATH="${SAFEHOUSE_HOST_PATH:-$PATH}" command -v "$cmd" >/dev/null 2>&1 || skip "${cmd} is not installed"
 }
 
 sft_require_env_or_skip() {
@@ -193,7 +227,7 @@ sft_require_env_or_skip() {
 sft_command_path_or_skip() {
   local var_name="$1" cmd="$2" path
 
-  path="$(command -v "$cmd" || true)"
+  path="$(PATH="${SAFEHOUSE_HOST_PATH:-$PATH}" command -v "$cmd" || true)"
   [ -n "$path" ] || skip "${cmd} is not installed"
 
   printf -v "$var_name" '%s' "$path"

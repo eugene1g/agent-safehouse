@@ -27,7 +27,9 @@ sft_agent_tui_setup_test_env() {
   command -v tmux >/dev/null 2>&1 || skip "tmux is required"
   sft_agent_tui_preflight_sandbox_exec_or_skip
 
+  # Agents run as the host user, so restore the original host HOME and PATH
   export HOME="${SAFEHOUSE_HOST_HOME:-${HOME:?}}"
+  export PATH="${SAFEHOUSE_HOST_PATH:-${PATH}}"
 
   AGENT_TUI_ROOT="$(mktemp -d "${BATS_TEST_TMPDIR:-/tmp}/safehouse-agent-tui-root.XXXXXX")"
   AGENT_TUI_WORKDIR="${AGENT_TUI_ROOT}/workdir"

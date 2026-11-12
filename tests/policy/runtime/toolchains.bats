@@ -192,7 +192,7 @@ load ../../test_helper.bash
   sft_require_cmd_or_skip node
 
   local node_bin blocked_parent blocked_root blocked_bin fallback_bin
-  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" PATH="$SAFEHOUSE_HOST_PATH" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
   case "$node_bin" in
     /opt/*|/usr/*|/bin/*|/sbin/*|\
     "${SAFEHOUSE_HOST_HOME}"/.local/share/fnm/*|\
@@ -269,7 +269,7 @@ load ../../test_helper.bash
   sft_require_cmd_or_skip node
 
   local host_path node_bin npm_path expected_root
-  host_path="$PATH"
+  host_path="$SAFEHOUSE_HOST_PATH"
 
   run env HOME="$SAFEHOUSE_HOST_HOME" PATH="$host_path" /bin/sh -c 'command -v npm'
   if [[ "$status" -ne 0 ]]; then
@@ -306,7 +306,7 @@ load ../../test_helper.bash
 
   local aube_bin node_bin node_dir project_dir sandbox_home
   sft_command_path_or_skip aube_bin aube
-  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" PATH="$SAFEHOUSE_HOST_PATH" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
   node_dir="$(dirname "$node_bin")"
   project_dir="$(sft_workspace_path "aube-project")" || return 1
 
@@ -364,7 +364,7 @@ sft_supported_node_bin_or_skip() {
   sft_require_cmd_or_skip node
 
   local node_bin
-  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
+  node_bin="$(env HOME="$SAFEHOUSE_HOST_HOME" PATH="$SAFEHOUSE_HOST_PATH" node -p 'process.execPath')" || skip "node precheck failed outside sandbox"
   case "$node_bin" in
     /opt/*|/usr/*|/bin/*|/sbin/*|\
     "${SAFEHOUSE_HOST_HOME}"/.local/share/fnm/*|\

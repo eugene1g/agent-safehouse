@@ -112,9 +112,15 @@ Path grant merge order:
 
 ## Environment Variables
 
-Prefer sanitized mode plus `--env-pass` or `SAFEHOUSE_ENV_PASS` when only a few host variables are needed. For one-off child env values, put `NAME=VALUE` immediately after `--`, for example `safehouse -- MYVAR=123 printenv MYVAR`. `--env` disables that boundary and forwards the entire inherited host environment, including cloud credentials, API keys, and other secrets.
+Safehouse sanitizes environment variables it passes through to commands by default, which is usually what you want. The default sanitized environment preserves a small terminal/editor baseline, including `TERM`, locale variables, `SDKROOT`, `EDITOR`, and `VISUAL`. It also cleans up the host `PATH`, dropping non-absolute paths and dropping any path `P` where a read of `P/<filename>` fails with a permission error (which break Node PATH lookups).
 
-The default sanitized environment already preserves a small terminal/editor baseline, including `TERM`, locale variables, `SDKROOT`, `EDITOR`, and `VISUAL`.
+Less-sanitized alternatives:
+
+- Add individual one-off environment variables using `NAME=VALUE` immediately after `--`. For example: `safehouse -- MYVAR=123 printenv MYVAR`.
+- `--env-pass` / `SAFEHOUSE_ENV_PASS` adds a few specific variables from the host environment verbatim, leaving the rest of the environment variables sanitized.
+- `--env` forwards the entire unsanitized host environment, including cloud credentials, API keys, and other secrets. Not recommended.
+
+Additional environment variables that Safehouse recognizes:
 
 - `SAFEHOUSE_ADD_DIRS_RO`: colon-separated read-only path grants
 - `SAFEHOUSE_ADD_DIRS`: colon-separated read/write path grants

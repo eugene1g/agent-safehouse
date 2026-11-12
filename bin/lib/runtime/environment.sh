@@ -78,57 +78,138 @@ runtime_preflight() {
   return 0
 }
 
+runtime_default_exec_path="/usr/bin:/bin:/usr/sbin:/sbin"
+
+# Splits a colon-separated PATH value into runtime_split_exec_path_entries,
+# keeping empty entries. PATH="" yields one empty entry.
+runtime_split_exec_path() {
+  # -d '': read to end of input, keeping any newlines inside entries.
+  # Appended ':': end every field with a colon, so read keeps a trailing empty entry.
+  # || true: read returns 1 at end of input when it finds no NUL delimiter.
+  IFS=: read -r -d '' -a runtime_split_exec_path_entries < <(printf '%s:' "$1") || true
+}
+
+# For each directory argument D, tries to read D/<filename>.
+# Stores a result array to runtime_exec_path_probe_results with values:
+# - "ok" (ENOENT)
+# - "denied" (EPERM)
+# - "other"
+# 
+# Returns 1 if the probe itself could not run, for example when safehouse
+# is already running inside a sandbox.
+runtime_probe_exec_path_dirs() {
+  local policy_path="$1"
+  local probe_output line
+  shift
+
+  runtime_exec_path_probe_results=()
+  [[ "$#" -gt 0 ]] || return 0
+
+  # NOTE: Uses shell builtins only to avoid unrelated sandbox denials.
+  # NOTE: Uses /bin/bash (rather than /bin/sh) for predictable error message format.
+  # NOTE: env -i leaves the locale unset to force C-locale error messages.
+  # shellcheck disable=SC2016
+  probe_output="$(sandbox-exec -f "$policy_path" -- /usr/bin/env -i /bin/bash -c '
+    for dir do
+      # Stat $dir/.safehouse-path-probe
+      error="$( { true < "$dir/.safehouse-path-probe"; } 2>&1 )"
+      case "$error" in
+        "" | *"No such file or directory") echo ok ;;
+        *"Operation not permitted") echo denied ;;
+        *) echo other ;;
+      esac
+    done
+  ' _ "$@" 2>/dev/null)" || return 1
+
+  while IFS= read -r line; do
+    runtime_exec_path_probe_results+=("$line")
+  done <<< "$probe_output"
+  [[ "${#runtime_exec_path_probe_results[@]}" -eq "$#" ]]
+}
+
 runtime_build_sanitized_exec_path() {
   local base_path="$1"
   local home_dir="$2"
-  local entry existing found
-  local -a common_dev_paths=()
+  local policy_path="${3:-}"
+  local entry i
   local -a path_entries=()
-  local -a sanitized_path_entries=()
+  local -a user_entries=()
+  local -a probed_entries=()
 
-  base_path="${base_path:-/usr/bin:/bin:/usr/sbin:/sbin}"
-  IFS=':' read -r -a path_entries <<< "$base_path"
+  # 1. Drop non-absolute PATH entries (including empty entries)
+  # 2. Drop ~ PATH entries, which aren't processed consistently by tools
+  # 3. Retain absolute PATH entries
+  runtime_split_exec_path "$base_path"
+  for entry in "${runtime_split_exec_path_entries[@]}"; do
+    case "$entry" in
+      /*)
+        path_entries+=("$entry")
+        ;;
+      "~"*)
+        printf '%s\n' "safehouse: Dropped ~ path from PATH: ${entry}" >&2
+        ;;
+      "")
+        printf '%s\n' "safehouse: Dropped empty path from PATH" >&2
+        ;;
+      *)
+        printf '%s\n' "safehouse: Dropped relative path from PATH: ${entry}" >&2
+        ;;
+    esac
+  done
+  user_entries=(${path_entries[@]+"${path_entries[@]}"})
 
-  common_dev_paths=(
-    "/usr/local/bin"
-    "/usr/local/sbin"
-    "/opt/homebrew/bin"
-    "/opt/homebrew/sbin"
+  if [[ "${#path_entries[@]}" -eq 0 ]]; then
+    printf '%s\n' "safehouse: PATH had no usable entries; using default: ${runtime_default_exec_path}" >&2
+    runtime_split_exec_path "$runtime_default_exec_path"
+    path_entries=("${runtime_split_exec_path_entries[@]}")
+  fi
+
+  # Append common dev path entries
+  safehouse_array_append_unique path_entries \
+    "/usr/local/bin" \
+    "/usr/local/sbin" \
+    "/opt/homebrew/bin" \
+    "/opt/homebrew/sbin" \
     "${home_dir}/.local/bin"
-  )
-
-  for entry in "${common_dev_paths[@]}"; do
-    found=0
-    for existing in "${path_entries[@]}"; do
-      if [[ "$existing" == "$entry" ]]; then
-        found=1
-        break
-      fi
-    done
-
-    if [[ "$found" -eq 0 ]]; then
-      path_entries+=("$entry")
+  
+  # Drop any PATH entry P where a read of P/<filename> fails with EPERM.
+  # Such PATH entries cause libuv's PATH search to stop early.
+  if [[ -n "$policy_path" ]]; then
+    if runtime_probe_exec_path_dirs "$policy_path" "${path_entries[@]}"; then
+      i=0
+      for entry in "${path_entries[@]}"; do
+        if [[ "${runtime_exec_path_probe_results[$i]}" == "denied" ]]; then
+          # 1. Drop the path entry
+          # 2. Warn if the dropped entry was in the caller's original PATH
+          if safehouse_array_contains_exact "$entry" ${user_entries[@]+"${user_entries[@]}"}; then
+            printf '%s\n' "safehouse: Dropped sandbox-denied path from PATH: ${entry}" >&2
+          fi
+        else
+          # Retain the path entry
+          probed_entries+=("$entry")
+        fi
+        i=$((i + 1))
+      done
+      path_entries=(${probed_entries[@]+"${probed_entries[@]}"})
+    else
+      printf '%s\n' "safehouse: Could not check for unreadable PATH directories inside the sandbox" >&2
     fi
-  done
-
-  for entry in "${path_entries[@]}"; do
-    [[ -n "$entry" ]] || continue
-    sanitized_path_entries+=("$entry")
-  done
+  fi
 
   (
     IFS=':'
-    printf '%s\n' "${sanitized_path_entries[*]}"
+    printf '%s\n' "${path_entries[*]}"
   )
 }
 
 runtime_build_sanitized_exec_environment() {
   local home_dir="$1"
+  local policy_path="${2:-}"
   local resolved_pwd resolved_user resolved_logname sanitized_path var_name
 
   runtime_sanitized_exec_environment=()
   runtime_sanitized_exec_environment+=("HOME=${home_dir}")
-  sanitized_path="$(runtime_build_sanitized_exec_path "${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}" "$home_dir")"
+  sanitized_path="$(runtime_build_sanitized_exec_path "${PATH-${runtime_default_exec_path}}" "$home_dir" "$policy_path")"
   runtime_sanitized_exec_environment+=("PATH=${sanitized_path}")
   runtime_sanitized_exec_environment+=("SHELL=${SHELL:-/bin/sh}")
   runtime_sanitized_exec_environment+=("TMPDIR=${TMPDIR:-/tmp}")

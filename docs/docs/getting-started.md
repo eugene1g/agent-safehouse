@@ -40,7 +40,10 @@ EOF2
 
 ## Shell Functions (Recommended)
 
-Prefer selective env passthrough by default. `safeenv` forwards the entire inherited host environment, including secrets such as `AWS_SECRET_ACCESS_KEY`, `GITHUB_TOKEN`, and provider API keys. Use `safekeys` for the common agent-key case and reserve `safeenv` for wrappers that genuinely need broad host env access.
+Safehouse (`safe`) sanitizes environment variables it passes through to commands by default, which is usually what you want. Less-sanitized alternatives:
+
+- `safekeys` forwards common key variables needed to run agents.
+- `safeenv` forwards the entire unsanitized host environment, including cloud credentials, API keys, and other secrets. Not recommended.
 
 POSIX shells (`zsh` / `bash`):
 
@@ -48,9 +51,12 @@ POSIX shells (`zsh` / `bash`):
 # ~/.bashrc or ~/.zshrc
 SAFEHOUSE_APPEND_PROFILE="$HOME/.config/agent-safehouse/local-overrides.sb"
 
+# Safehouse
 safe() { safehouse --add-dirs-ro=~/mywork --append-profile="$SAFEHOUSE_APPEND_PROFILE" "$@"; }
 safeenv() { safe --env "$@"; }
 safekeys() { safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY,GEMINI_API_KEY "$@"; }
+
+# Safehouse-Wrapped Agents
 claude()   { safe claude --dangerously-skip-permissions "$@"; }
 codex()    { safe codex --no-daemon --dangerously-bypass-approvals-and-sandbox "$@"; }
 amp()      { safe amp --dangerously-allow-all "$@"; }
@@ -67,48 +73,41 @@ pi()       { safe pi "$@"; }
 # ~/.config/fish/config.fish
 set -gx SAFEHOUSE_APPEND_PROFILE "$HOME/.config/agent-safehouse/local-overrides.sb"
 
+# Safehouse
 function safe
     safehouse --add-dirs-ro="$HOME/mywork" --append-profile="$SAFEHOUSE_APPEND_PROFILE" $argv
 end
-
 function safeenv
     safe --env $argv
 end
-
 function safekeys
     safe --env-pass=OPENAI_API_KEY,ANTHROPIC_API_KEY,GEMINI_API_KEY $argv
 end
 
+# Safehouse-Wrapped Agents
 function claude
     safe claude --dangerously-skip-permissions $argv
 end
-
 function codex
     safe codex --no-daemon --dangerously-bypass-approvals-and-sandbox $argv
 end
-
 function amp
     safe amp --dangerously-allow-all $argv
 end
-
 function opencode
     set -lx OPENCODE_PERMISSION '{"*":"allow"}'
     safekeys opencode $argv
 end
-
 function gemini
     set -lx NO_BROWSER true
     safekeys gemini --yolo $argv
 end
-
 function goose
     safe goose $argv
 end
-
 function kilo
     safe kilo $argv
 end
-
 function pi
     safe pi $argv
 end
