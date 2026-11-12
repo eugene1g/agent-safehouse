@@ -10,6 +10,32 @@
 
 - No profiles changed.
 
+## [0.13.1] - 2026-11-12
+
+### Bug Fixes
+
+- Node-based agents (like `pi`, `gemini`, and `amp`) can now spawn programs by bare name when an earlier `PATH` entry is denied by the sandbox.
+    - Safehouse now drops any `PATH` entry whose lookups fail with a permission error, and warns on stderr if you added that entry yourself.
+    - The sanitized `PATH` also drops empty, relative, and `~` entries.
+    - Only the default sanitized environment is affected. A `PATH` from `--env`, `--env-pass=PATH`, `--env=FILE`, or `NAME=VALUE` after `--` is used as-is.
+- `--enable=herdr` now works for agents running in named herdr sessions (`herdr --session <name>`). Before, every herdr command failed there.
+
+### Chores
+
+- Environment Variables docs now describe the default env sanitization and its less-sanitized alternatives more clearly, including the `PATH` cleanup.
+- herdr is now installed in CI, so herdr integration tests run there.
+- Manual CI runs can now target specific `.bats` files.
+- Network smoke tests now hit `captive.apple.com` instead of `example.com`.
+- Node execution tests now support a Node binary installed outside Homebrew.
+
+### Thanks
+
+- @technicalpickles reporting the Node `PATH` spawn failure in [#205](https://github.com/eugene1g/agent-safehouse/issues/205).
+
+### Changed Sandboxing Profiles
+
+- [`herdr.sb`](https://github.com/eugene1g/agent-safehouse/compare/v0.13.0...v0.13.1#diff-94391f56d9d7a6e43b653b4c430177730490ca4422778c2a7cab02594f6040a7): Allows connecting to named-session API sockets (`~/.config/herdr/sessions/<name>/herdr.sock`). `herdr-client.sock` stays denied because only the TUI client needs it.
+
 ## [0.13.0] - 2026-11-08
 
 ### Upgrade Notes
