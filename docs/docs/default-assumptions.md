@@ -13,21 +13,21 @@ This page documents the baseline assumptions Safehouse makes so default behavior
 
 These are baseline allowances intended to keep common workflows functional:
 
-- Selected invocation directory read/write by default.
-- Safehouse does not auto-widen the default workdir to an enclosing Git repo; broader parent-repo access must be granted explicitly.
-- Existing linked Git worktrees are granted read-only visibility only when the selected workdir itself is a Git worktree root.
-- Shared Git common-dir metadata for linked worktrees is granted read/write only when the selected workdir itself is a linked Git worktree root and that metadata lives outside the selected workdir.
+- Selected **invocation directory** read/write by default.
+- Safehouse does NOT auto-widen the default workdir to an **enclosing Git repo**; broader parent-repo access must be granted explicitly.
+- Existing **linked Git worktrees** are granted read-only visibility only when the selected workdir itself is a Git worktree root.
+    - Shared Git common-dir metadata for linked worktrees is granted read/write only when the selected workdir itself is a linked Git worktree root and that metadata lives outside the selected workdir.
 - Metadata-only traversal on `/`, the path to `$HOME`, and `$HOME` itself so runtimes can reach explicitly allowed home-scoped paths without opening broad home reads.
 - Directory-root reads for `~/.config` and `~/.cache` so tools can discover XDG locations; contents under those trees still need more specific grants.
-- Core system/runtime paths required by shells, compilers, and package managers.
-- Binaries already installed globally by package managers are read-only and can be run, including those in the XDG binary directory `~/.local/bin`.
-- Toolchain profile access under `profiles/30-toolchains/`.
-- Curated Apple Command Line Tools shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
-- Core integrations in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
+- Core system/runtime paths required by **shells, compilers, and package managers**.
+- **Binaries already installed globally** by package managers are read-only and can be run, including those in the XDG binary directory `~/.local/bin`.
+- **Toolchain profile** access under `profiles/30-toolchains/`.
+    - Curated **Apple Command Line Tools** shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
+- **Core integrations** in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
 - Agent-specific profile selection for the wrapped command.
-- Network access (open by default).
-- Sanitized runtime environment (not full shell env by default; preserves `SDKROOT`, `EDITOR`, and `VISUAL` when set).
-- SSH metadata read support (`~/.ssh/config`, `~/.ssh/known_hosts`) for git-over-ssh workflows.
+- **Network access** (open by default).
+- **Sanitized environment variables** (NOT full shell environment by default). Preserves `SDKROOT`, `EDITOR`, and `VISUAL` when set.
+- **SSH metadata** read support (`~/.ssh/config`, `~/.ssh/known_hosts`) for git-over-ssh workflows. Denies SSH credentials.
 
 ## Opt-In (Disabled by Default)
 
@@ -67,20 +67,19 @@ Enable only when required for the current task:
 ## Not Granted (or Explicitly Denied) by Default
 
 - Broad recursive reads of `$HOME`, directory listing of `$HOME` itself, and arbitrary file reads under `$HOME` unless a narrower explicit rule grants that path.
-- SSH private keys under `~/.ssh`.
-- SSH agent sockets (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
-- GPG secret keys under `~/.gnupg/private-keys-v1.d` or the legacy `~/.gnupg/secring.gpg` keyring (GnuPG < 2.1)
-- Browser profile/cookie/session data, even when `browser-native-messaging` is enabled.
-- Shell startup files unless `shell-init` is enabled.
-- Clipboard access unless `clipboard` is enabled.
-- Host process enumeration/control and argv/env visibility unless `process-control` or `lldb` is enabled.
-- LLDB/debugger toolchain and task-port access unless `lldb` is enabled.
-- Full Xcode developer roots and Xcode/CoreSimulator state unless `xcode` is enabled.
-- Launching applications through Launch Services (`open`) unless `launch-services` is enabled. Launch Services always starts processes OUTSIDE the sandbox with the current user's full permissions.
-- Broad raw device access under `/dev`.
-- Installing new user/machine-level binaries using package managers like Nix.
-
-`browser-native-messaging` is intentionally narrower: it grants NativeMessagingHosts registration paths and browser extension-manifest reads, not cookies, passwords, history, or bookmarks.
+- **SSH private keys** under `~/.ssh`.
+- **SSH agent sockets** (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
+- **GPG secret keys** under `~/.gnupg/private-keys-v1.d` or the legacy `~/.gnupg/secring.gpg` keyring (GnuPG < 2.1)
+- **Browser profile data** (cookies, passwords, history, or bookmarks), even when `browser-native-messaging` is enabled.
+    - `browser-native-messaging` only grants NativeMessagingHosts registration paths and browser extension-manifest reads.
+- **Shell startup files** unless `shell-init` is enabled.
+- **Clipboard** access unless `clipboard` is enabled.
+- Host **process** enumeration/control and argv/env visibility, unless `process-control` or `lldb` is enabled.
+- **LLDB/debugger toolchain** and task-port access, unless `lldb` is enabled.
+- **Full Xcode** developer roots and Xcode/CoreSimulator state, unless `xcode` is enabled.
+- **Launching applications** through Launch Services (`open`), unless `launch-services` is enabled. Launch Services always starts processes OUTSIDE the sandbox with the current user's full permissions.
+- Broad **raw device access** under `/dev`.
+- **Installing new user/machine-level binaries** using package managers like Nix.
 
 ## Operational Defaults for Common Scenarios
 
