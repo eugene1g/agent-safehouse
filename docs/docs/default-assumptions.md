@@ -21,6 +21,8 @@ These are baseline allowances intended to keep common workflows functional:
 - Directory-root reads for `~/.config` and `~/.cache` so tools can discover XDG locations; contents under those trees still need more specific grants.
 - Core system/runtime paths required by **shells, compilers, and package managers**.
 - **Binaries already installed globally** by package managers are read-only and can be run, including those in the XDG binary directory `~/.local/bin`.
+- **Package manager config files** (e.g. `pip.conf`) are readable but not writable so installs from private package indexes work. Put only tokens with read-only scope there.
+    - Put tokens with publish (write) scope in your publishing tool's credential file (e.g. `~/.pypirc`) instead, which the sandbox denies by default.
 - **Toolchain profile** access under `profiles/30-toolchains/`.
     - Curated **Apple Command Line Tools** shim targets for common `/usr/bin` developer commands such as `git`, `make`, and `clang`.
 - **Core integrations** in `profiles/50-integrations-core/` (`container-runtime-default-deny`, `git`, `scm-clis`, `ssh-agent-default-deny`, `worktree-common-dir`, `worktrees`).
@@ -70,6 +72,7 @@ Enable only when required for the current task:
 - **SSH private keys** under `~/.ssh`.
 - **SSH agent sockets** (`SSH_AUTH_SOCK`, including launchd listeners and `~/.ssh/agent/*`) unless `ssh` is enabled.
 - **GPG secret keys** under `~/.gnupg/private-keys-v1.d` or the legacy `~/.gnupg/secring.gpg` keyring (GnuPG < 2.1)
+- **Package publishing credentials**, such as `~/.pypirc`.
 - **Browser profile data** (cookies, passwords, history, or bookmarks), even when `browser-native-messaging` is enabled.
     - `browser-native-messaging` only grants NativeMessagingHosts registration paths and browser extension-manifest reads.
 - **Shell startup files** unless `shell-init` is enabled.
