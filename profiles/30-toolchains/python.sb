@@ -4,6 +4,10 @@
 ;; Source: 30-toolchains/python.sb
 ;; ---------------------------------------------------------------------------
 
+;; Supports Python installed from:
+;; - python.org
+;; - brew install python
+
 ;; Covers common Python package/cache/config paths.
 
 (allow file-read* file-write*
@@ -38,7 +42,6 @@
 
     ;; Package Manager: pip
     (home-subpath "/.cache/pip")               ;; pip cache writes used by Python package installs.
-    (home-subpath "/.config/pip")              ;; pip config reads for index/auth/behavior settings.
     (home-subpath "/Library/Caches/pip")       ;; macOS pip cache location used by some Python setups.
 
     ;; Package Manager: pipx
@@ -67,8 +70,24 @@
 )
 
 (allow file-read*
+    ;; Package Manager: pip
+    ;; Config is read-only so an agent cannot repoint index-url.
+    ;; Reading it stays allowed so installs from private indexes work.
+    (home-subpath "/.config/pip")              ;; pip config reads for index/auth/behavior settings.
+    (home-subpath "/.pip")                     ;; Legacy pip config location (~/.pip/pip.conf), still read by pip.
+
+    ;; Package Manager: pip
+    ;; Packages and console scripts installed by `pip install --user`.
+    ;; Read-only: they run, but cannot be modified.
+    (home-subpath "/Library/Python")           ;; PEP 370 user base: ~/Library/Python/3.X/{lib/python/site-packages,bin}.
+
     ;; Package Manager: uv
     (home-subpath "/.config/uv")               ;; uv config reads during tool resolution.
+)
+
+;; pip: Cache usage requires ~/Library/Caches to be writable.
+(allow file-read-metadata file-write-data
+    (home-literal "/Library/Caches")           ;; The directory itself only; creating siblings stays denied.
 )
 
 ;; uv: Disallow installs inside sandbox,

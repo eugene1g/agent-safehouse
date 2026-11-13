@@ -19,14 +19,15 @@ SFT_UV_TEST_TOKEN="sft-not-a-real-token"
 # ------------------------------------------------------------------------------
 # Tests
 
-# Skip tests if uv not installed. Set SFT_UV_BIN to uv's path.
+# 1. Skip tests if uv not installed.
+# 2. Set SFT_UV_BIN to uv's path.
 setup_file() {
   export SFT_UV_BIN
   SFT_UV_BIN="$(command -v uv || true)"
   [ -n "$SFT_UV_BIN" ] || skip "uv is not installed"
 }
 
-@test "[EXECUTION] uv version works" {
+@test "[EXECUTION] uv --version works" {
   safehouse_ok -- "$SFT_UV_BIN" --version
 }
 
