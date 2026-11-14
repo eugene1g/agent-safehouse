@@ -17,6 +17,16 @@ sft_setup_test_env() {
   [[ "$(uname -s)" == "Darwin" ]] || skip "requires macOS"
   command -v sandbox-exec >/dev/null 2>&1 || skip "sandbox-exec is required"
 
+  # Run suite setup if bats did not (no setup_suite.bash found for this run).
+  # This test then owns the suite root, and its teardown removes it.
+  #
+  # NOTE: Runs before the exports below, which sft_sanitize_env would remove.
+  if [ "${SFT_SUITE_SETUP_DONE:-}" != 1 ]; then
+    # NOTE: Not `|| return 1`: that would disable errexit inside the function
+    sft_setup_suite
+    SFT_TEST_OWNS_SUITE=1
+  fi
+
   export SAFEHOUSE_WORKSPACE_ROOT
   export SAFEHOUSE_EXTERNAL_ROOT
   export SAFEHOUSE_FAKE_HOME_ROOT
@@ -27,14 +37,6 @@ sft_setup_test_env() {
 
   SAFEHOUSE_REPO_ROOT="$(cd "${helper_dir}/.." && pwd -P)"
   SAFEHOUSE_HOST_HOME="${HOME:?}"
-
-  # Run suite setup if bats did not (no setup_suite.bash found for this run).
-  # This test then owns the suite root, and its teardown removes it.
-  if [ "${SFT_SUITE_SETUP_DONE:-}" != 1 ]; then
-    # NOTE: Not `|| return 1`: that would disable errexit inside the function
-    sft_setup_suite
-    SFT_TEST_OWNS_SUITE=1
-  fi
 
   # Holds the default workspace available to tests that want explicit current-workdir behavior.
   SAFEHOUSE_WORKSPACE_ROOT="$(mktemp -d "${BATS_TEST_TMPDIR}/safehouse-workspace-root.XXXXXX")"
@@ -48,11 +50,6 @@ sft_setup_test_env() {
   SAFEHOUSE_WORKSPACE="$(mktemp -d "${SAFEHOUSE_WORKSPACE_ROOT}/workspace.XXXXXX")"
   export HOME="${SAFEHOUSE_DEFAULT_FAKE_HOME}"
   sft_isolate_path_from_host_home
-
-  # Strip herdr host env so default-policy assertions do not depend on the
-  # runner being launched inside a herdr session (HERDR_ENV auto-enables the
-  # herdr integration).
-  unset HERDR_ENV HERDR_SOCKET_PATH HERDR_PANE_ID HERDR_TAB_ID HERDR_WORKSPACE_ID
 
   cd "$SAFEHOUSE_WORKSPACE" || return 1
 }
