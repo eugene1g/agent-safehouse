@@ -110,7 +110,7 @@ sft_pip_test_install_pypi() {
 sft_pip_test_install_requirements() {
   local venv_dir
   venv_dir="$(sft_workspace_path "pip_req_venv")" || return 1
-  
+
   # Create project directory with a requirements.txt
   local project_dir
   project_dir="$(sft_workspace_path "pip_req_project")" || return 1
@@ -137,7 +137,7 @@ sft_pip_test_install_requirements() {
 sft_pip_test_install_editable() {
   local venv_dir
   venv_dir="$(sft_workspace_path "pip_editable_venv")" || return 1
-  
+
   # Create project directory with a pyproject.toml and a .py file marked "before"
   # NOTE: Exercises PEP 517 build isolation: pip will download the build backend
   #       into a temp build env.
@@ -170,7 +170,7 @@ EOF
 
   # Modify project directory's .py file to have "after" marker
   printf 'VALUE = "after"\n' > "${project_dir}/sft_pip_editable_probe.py"
-  
+
   # Ensure installed project now has "after" marker, without reinstalling,
   # which is how "editable" installs are supposed to behave
   safehouse_run -- "${venv_dir}/bin/python" -c \
@@ -247,7 +247,7 @@ sft_pip_test_user_install_denied() {
   # Prevent a concurrent global install of the package
   # from being detected as "already installed" by `install --user`
   sft_pip_lock_global_site || return 1
-  
+
   local user_base user_site
   sft_pip_user_dirs || return 1
   user_base="$SFT_PIP_USER_BASE"
@@ -348,7 +348,7 @@ sft_pip_test_user_binary_runs() {
   # Prevent a concurrent global install of the package
   # from competing with a --user install when locating the package's binary
   sft_pip_lock_global_site || return 1
-  
+
   # Install package from outside sandbox, with --user
   sft_pip_user_dirs || return 1
   sft_pip_user_install_outside_sandbox || return 1
@@ -371,7 +371,7 @@ sft_pip_test_user_package_imports() {
   # Prevent a concurrent global install of the package
   # from competing with a --user install when importing the package
   sft_pip_lock_global_site || return 1
-  
+
   # Install package from outside sandbox, with --user
   sft_pip_user_dirs || return 1
   sft_pip_user_install_outside_sandbox || return 1
@@ -392,7 +392,7 @@ sft_pip_test_user_binary_immutable() {
   # Prevent a concurrent global install of the package
   # from competing with a --user install when attempting to (re)install its binary
   sft_pip_lock_global_site || return 1
-  
+
   # Install binary from outside sandbox, with --user
   sft_pip_user_dirs || return 1
   sft_pip_user_install_outside_sandbox || return 1
@@ -432,7 +432,7 @@ sft_pip_test_config() {
 # asserts pip honors it and the sandbox cannot modify or remove it.
 sft_pip_assert_config_readonly() {
   local conf_path="$1"
-  
+
   local cache_dir
   # NOTE: pip prints the physical path (/private/var/...), not the /var symlink
   cache_dir="$(cd "$SAFEHOUSE_WORKSPACE" && pwd -P)/pip_configured_cache_$(basename "$(dirname "$conf_path")")"
@@ -569,7 +569,7 @@ sft_pip_lock_global_site() {
     'import sysconfig; print(sysconfig.get_path("purelib"))')" || return 1
   SFT_PIP_SCRIPTS_DIR="$("$SFT_PIP_PYTHON_BIN" -c \
     'import sysconfig; print(sysconfig.get_path("scripts"))')" || return 1
-  
+
   sft_pip_acquire_global_lock || return 1
 
   # Skip if package appears to have been installed before test run started,
@@ -579,14 +579,14 @@ sft_pip_lock_global_site() {
 }
 
 # Serializes tests that use one interpreter's global site-packages.
-# 
+#
 # Tests running in parallel targeting the same interpreter would otherwise
 # install, see, and uninstall each other's package.
-# 
+#
 # Released by sft_pip_release_global_lock in teardown.
 sft_pip_acquire_global_lock() {
   local timeout=600
-  
+
   local key lock_dir
   key="$(printf '%s' "$SFT_PIP_SITE_PACKAGES" | cksum | cut -d' ' -f1)"
   lock_dir="${BATS_RUN_TMPDIR}/sft-pip-global-${key}.lock"
@@ -603,7 +603,7 @@ sft_pip_acquire_global_lock() {
     sleep 1
     waited=$((waited + 1))
   done
-  
+
   SFT_PIP_GLOBAL_LOCK="$lock_dir"
 }
 
@@ -643,7 +643,7 @@ sft_pip_user_install_outside_sandbox() {
 # $3 is "--user" for a user-site install, else empty.
 sft_pip_assert_installed_pkg_immutable() {
   local script_path="$1" package_dir="$2" scope="$3"
-  
+
   local init_file
   init_file="$(find "$package_dir" -maxdepth 1 -name '*.py' -print -quit)"
   [ -n "$init_file" ] || return 1
@@ -652,7 +652,7 @@ sft_pip_assert_installed_pkg_immutable() {
   # shellcheck disable=SC2086
   safehouse_denied -- "$SFT_PIP_PYTHON_BIN" -m pip uninstall -y $scope $SFT_PIP_PEP668_FLAG \
     "$SFT_PIP_TEST_PKG"
-  
+
   # pip install --force-reinstall -> denied
   # shellcheck disable=SC2086
   safehouse_denied -- "$SFT_PIP_PYTHON_BIN" -m pip install --force-reinstall $scope $SFT_PIP_PEP668_FLAG \
