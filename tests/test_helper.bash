@@ -1,13 +1,16 @@
 #
 # Per-test helper:
-# - Assumes setup_suite.bash already staged dist/safehouse.sh for the full bats run.
+# - Runs suite setup (sft_setup_suite) itself when bats did not run setup_suite.bash,
+#   as when running a single file with `bats <file>.bats`.
 # - Creates a per-test workspace root and a separate per-test external root.
 # - Exposes helpers used by individual .bats files.
 # - Removes only exact per-test roots created here.
 #
 
+source "$(dirname "${BASH_SOURCE[0]}")/suite_helper.bash"
+
 sft_setup_test_env() {
-  local helper_dir source_dist_safehouse
+  local helper_dir
 
   helper_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
@@ -20,20 +23,17 @@ sft_setup_test_env() {
   export SAFEHOUSE_HOST_HOME
   export SAFEHOUSE_DEFAULT_FAKE_HOME
   export SAFEHOUSE_WORKSPACE
-  export SAFEHOUSE_TEST_DIST_ROOT
   export SAFEHOUSE_REPO_ROOT
 
   SAFEHOUSE_REPO_ROOT="$(cd "${helper_dir}/.." && pwd -P)"
   SAFEHOUSE_HOST_HOME="${HOME:?}"
 
-  if [ ! -x "${DIST_SAFEHOUSE:-}" ]; then
-    source_dist_safehouse="${SAFEHOUSE_REPO_ROOT}/dist/safehouse.sh"
-    [ -x "$source_dist_safehouse" ] || skip "dist/safehouse.sh is not available"
-
-    SAFEHOUSE_TEST_DIST_ROOT="$(mktemp -d "${BATS_TEST_TMPDIR}/safehouse-test-dist-root.XXXXXX")"
-    DIST_SAFEHOUSE="${SAFEHOUSE_TEST_DIST_ROOT}/safehouse.sh"
-    cp "$source_dist_safehouse" "$DIST_SAFEHOUSE"
-    chmod 755 "$DIST_SAFEHOUSE"
+  # Run suite setup if bats did not (no setup_suite.bash found for this run).
+  # This test then owns the suite root, and its teardown removes it.
+  if [ "${SFT_SUITE_SETUP_DONE:-}" != 1 ]; then
+    # NOTE: Not `|| return 1`: that would disable errexit inside the function
+    sft_setup_suite
+    SFT_TEST_OWNS_SUITE=1
   fi
 
   # Holds the default workspace available to tests that want explicit current-workdir behavior.
@@ -95,7 +95,9 @@ sft_teardown_test_env() {
   sft_remove_test_root "${SAFEHOUSE_FAKE_HOME_ROOT:-}" || return 1
   sft_remove_test_root "${SAFEHOUSE_EXTERNAL_ROOT:-}" || return 1
   sft_remove_test_root "${SAFEHOUSE_WORKSPACE_ROOT:-}" || return 1
-  sft_remove_test_root "${SAFEHOUSE_TEST_DIST_ROOT:-}" || return 1
+  if [ "${SFT_TEST_OWNS_SUITE:-}" = 1 ]; then
+    sft_teardown_suite || return 1
+  fi
 }
 
 setup() {
@@ -112,9 +114,6 @@ sft_remove_test_root() {
   [[ -z "$path" ]] && return 0
 
   case "$path" in
-    "${BATS_TEST_TMPDIR}"/safehouse-test-dist-root.*)
-      rm -rf -- "$path"
-      ;;
     "${BATS_TEST_TMPDIR}"/safehouse-workspace-root.*)
       rm -rf -- "$path"
       ;;

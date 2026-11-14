@@ -97,9 +97,10 @@ Suite infrastructure stays at the `tests/` root:
 
 - `run.sh`
 - `setup_suite.bash`
+- `suite_helper.bash`
 - `test_helper.bash`
 
-The helpers in [setup_suite.bash](setup_suite.bash) and [test_helper.bash](test_helper.bash) are designed to test the distributed artifact as a standalone file, not as a repo-relative wrapper.
+The helpers in [suite_helper.bash](suite_helper.bash) and [test_helper.bash](test_helper.bash) are designed to test the distributed artifact as a standalone file, not as a repo-relative wrapper.
 
 - The suite copies `dist/safehouse.sh` into a managed temp root once per `bats` run.
 - That staged copy is the file under test, which helps catch hidden assumptions about the repository layout.
@@ -241,7 +242,10 @@ The split is intentional: the default Safehouse profile already allows broad acc
 
 ### Lifecycle
 
-- `setup_suite.bash` — owns host checks and one-time dist staging for the full bats run.
+- `setup_suite.bash` — bats suite hooks.
+  - Runs suite setup once per bats run when bats finds this file, as with `bats -r tests` (what `run.sh` does).
+- `suite_helper.bash` — owns host checks and dist staging (`sft_setup_suite`).
+  - When bats did not run `setup_suite.bash`, as with `bats <file>.bats`, `test_helper.bash` runs suite setup itself for each test and removes it in teardown.
 - `test_helper.bash` — loaded by nested policy/surface tests via `load ../../test_helper.bash`, and directly by E2E tests before `load tmux_utils.bash` and `load agent_tui_harness.bash`. Owns per-test setup/teardown, changes into the default workspace, and provides the helpers below.
 
 ### Running safehouse
