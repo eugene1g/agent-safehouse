@@ -107,6 +107,7 @@ The helpers in [suite_helper.bash](suite_helper.bash) and [test_helper.bash](tes
 - The per-test helper changes into `SAFEHOUSE_WORKSPACE` by default, so tests model real CLI usage instead of invoking the wrapper from the repo root.
 - Paths outside the workspace that should be denied or require explicit grants are created under a separate home-scoped external root.
 - Each test also runs with a deterministic fake `HOME` by default. Tests that truly need the real user home for host-installed integrations should opt in explicitly via `SAFEHOUSE_HOST_HOME`.
+- Suite setup filters the host environment to an allowlist (`SFT_ENV_ALLOWED_NAMES` and `SFT_ENV_ALLOWED_PREFIXES` in [suite_helper.bash](suite_helper.bash)), so variables such as `XDG_DATA_HOME`, `UV_CACHE_DIR`, or `PIP_INDEX_URL` cannot redirect where tools under test read or write. A test that needs such a variable sets it explicitly. To pass a new host variable through to tests, such as an E2E credential, add it to the allowlist.
 
 ## Writing Tests
 

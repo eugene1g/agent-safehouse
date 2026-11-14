@@ -36,11 +36,63 @@ sft_source_dist_path() {
   printf '%s/dist/safehouse.sh\n' "$repo_root"
 }
 
-# 1. Verify the host can run Safehouse tests.
-# 2. Stage dist/safehouse.sh into a suite-scoped temp root.
-# 3. Set SFT_SUITE_SETUP_DONE=1 to signal that steps 1-2 ran.
+# Host environment variables that tests may inherit. All others are removed
+# by sft_sanitize_env, so that variables such as XDG_DATA_HOME, UV_CACHE_DIR,
+# or PIP_INDEX_URL cannot redirect where tools under test read or write.
+# Tests that need such a variable set it explicitly.
+SFT_ENV_ALLOWED_NAMES=(
+  # Process basics
+  HOME PATH USER LOGNAME SHELL TMPDIR PWD OLDPWD SHLVL
+  # Terminal and locale (LC_* below)
+  TERM COLORTERM TERM_PROGRAM TERM_PROGRAM_VERSION LANG TZ
+  __CF_USER_TEXT_ENCODING
+  # Network
+  HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
+  NODE_EXTRA_CA_CERTS
+  # Host integrations exercised by specific tests
+  SSH_AUTH_SOCK  # ssh.bats: launchd listener socket
+  SDKROOT
+  JAVA_HOME      # toolchains.bats: java test (set on GitHub runners)
+  # E2E agent credentials
+  ANTHROPIC_API_KEY OPENAI_API_KEY GEMINI_API_KEY
+)
+SFT_ENV_ALLOWED_PREFIXES=(
+  BATS_       # bats internals
+  PARALLEL_   # GNU parallel, used by bats --jobs
+  SAFEHOUSE_  # test configuration, e.g. SAFEHOUSE_AGENT_TUI_*, SAFEHOUSE_BATS_JOBS
+  SFT_        # test helpers
+  LC_
+)
+
+sft_env_name_allowed() {
+  local name="$1" allowed prefix
+
+  for allowed in "${SFT_ENV_ALLOWED_NAMES[@]}"; do
+    [ "$name" = "$allowed" ] && return 0
+  done
+  for prefix in "${SFT_ENV_ALLOWED_PREFIXES[@]}"; do
+    case "$name" in "$prefix"*) return 0 ;; esac
+  done
+  return 1
+}
+
+# Removes exported variables not allowed by SFT_ENV_ALLOWED_NAMES/_PREFIXES.
+sft_sanitize_env() {
+  local name
+
+  while IFS= read -r name; do
+    sft_env_name_allowed "$name" || unset "$name" 2>/dev/null || true
+  done < <(compgen -e)
+}
+
+# 1. Filter the environment to an allowlist.
+# 2. Verify the host can run Safehouse tests.
+# 3. Stage dist/safehouse.sh into a suite-scoped temp root.
+# 4. Set SFT_SUITE_SETUP_DONE=1 to signal that steps 1-3 ran.
 sft_setup_suite() {
   local source_dist_safehouse
+
+  sft_sanitize_env
 
   if ! sft_require_host; then
     echo "ERROR: bats suite requires macOS, sandbox-exec, dist/safehouse.sh, and an unsandboxed terminal session." >&2
