@@ -23,12 +23,14 @@ GO_SENTINEL_PROXY="https://safehouse-goenv-sentinel.invalid"
   sft_command_path_or_skip go_bin go
   goenv_file="$(sft_write_goenv_fixture)" || return 1
 
-  run env -u GOENV -u GOPROXY -u GOFLAGS "$go_bin" env GOENV GOPROXY
+  # NOTE: Host GOENV/GOPROXY/GOFLAGS, which would override the GOENV file,
+  #       are already removed by the suite's environment allowlist.
+  run "$go_bin" env GOENV GOPROXY
   if [[ "$status" -ne 0 ]] || [[ "$output" != "${goenv_file}"$'\n'"${GO_SENTINEL_PROXY}" ]]; then
     skip "go does not use ${goenv_file} outside the sandbox"
   fi
 
-  safehouse_run_env -u GOENV -u GOPROXY -u GOFLAGS -- "$go_bin" env GOPROXY
+  safehouse_run -- "$go_bin" env GOPROXY
   [ "$status" -eq 0 ]
   [ "$output" = "$GO_SENTINEL_PROXY" ]
 }
@@ -38,7 +40,7 @@ GO_SENTINEL_PROXY="https://safehouse-goenv-sentinel.invalid"
   sft_command_path_or_skip go_bin go
   goenv_file="$(sft_write_goenv_fixture)" || return 1
 
-  safehouse_denied_env -u GOENV -u GOPROXY -u GOFLAGS -- "$go_bin" env -w GOPROXY=https://changed-in-sandbox.invalid
+  safehouse_denied -- "$go_bin" env -w GOPROXY=https://changed-in-sandbox.invalid
   sft_assert_file_content "$goenv_file" "GOPROXY=${GO_SENTINEL_PROXY}"
 }
 
