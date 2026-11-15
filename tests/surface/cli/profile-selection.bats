@@ -3,6 +3,8 @@
 
 load ../../test_helper.bash
 
+bats_require_minimum_version 1.5.0
+
 @test "[POLICY-ONLY] agent profile selection follows command basename for direct executables" {
   local codex_bin goose_bin kilo_bin codex_profile goose_profile kilo_profile
 
@@ -83,6 +85,19 @@ load ../../test_helper.bash
 
   sft_assert_omits_source "$pipx_install_profile" "60-agents/aider.sb"
   sft_assert_omits_source "$pipx_bare_profile" "60-agents/aider.sb"
+}
+
+@test "[POLICY-ONLY] wrapper launchers followed by an option print no basename errors" {
+  local launcher launcher_bin
+
+  for launcher in npx bunx uvx pipx xcrun; do
+    launcher_bin="$(sft_workspace_path "$launcher")"
+    sft_make_fake_command "$launcher_bin"
+
+    run --separate-stderr "$DIST_SAFEHOUSE" --stdout -- "$launcher_bin" --version
+    [ "$status" -eq 0 ]
+    sft_assert_not_contains "$stderr" "basename"
+  done
 }
 
 @test "[POLICY-ONLY] leading command env assignments still map profile selection to the wrapped command" {

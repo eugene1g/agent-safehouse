@@ -5011,7 +5011,7 @@ policy_request_resolve_profile_target_path() {
   local first_arg="$1"
   local first_basename first_lower
 
-  first_basename="$(basename "$first_arg")"
+  first_basename="$(basename -- "$first_arg")"
   first_lower="$(safehouse_to_lowercase "$first_basename")"
 
   case "$first_lower" in
@@ -5517,9 +5517,9 @@ policy_request_resolve_invoked_command_context() {
   fi
 
   policy_req_invoked_command_path="${cli_command_exec_args[0]}"
-  policy_req_invoked_command_basename="$(basename "${cli_command_exec_args[0]}")"
+  policy_req_invoked_command_basename="$(basename -- "${cli_command_exec_args[0]}")"
   policy_req_invoked_command_profile_path="$(policy_request_resolve_profile_target_path "${cli_command_exec_args[@]}")"
-  policy_req_invoked_command_profile_basename="$(basename "$policy_req_invoked_command_profile_path")"
+  policy_req_invoked_command_profile_basename="$(basename -- "$policy_req_invoked_command_profile_path")"
   policy_req_invoked_command_app_bundle="${cli_detected_app_bundle:-}"
 }
 
