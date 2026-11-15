@@ -284,6 +284,39 @@ EOF
     "$(sft_workspace_path "uv_creds_venv")"
 }
 
+# === Cache Poisoning: Accepted Risk ===
+
+# NOTE: Test characterizes current behavior. Ideal behavior would disallow tampering.
+@test "[EXECUTION] can tamper with a cached uvx venv to place a binary where it will run outside sandbox" {
+  local fake_home cache_dir cached_bins cached_bin fake_bin
+  fake_home="$(sft_fake_home)" || return 1
+
+  # Outside sandbox, create a cached venv
+  HOME="$fake_home" run "$SFT_UV_BIN" tool run \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}" --version
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "$SFT_UV_TEST_PKG_VERSION"
+
+  # Locate the cached venv's console script (at ~/.cache/uv/archive-v0/<id>/bin/<pkg>)
+  cache_dir="$(HOME="$fake_home" "$SFT_UV_BIN" cache dir)" || return 1
+  cached_bins="$(find "${cache_dir}/archive-v0" -path "*/bin/${SFT_UV_TEST_PKG}")" || return 1
+  [ -n "$cached_bins" ]
+  [ "$(printf '%s\n' "$cached_bins" | wc -l)" -eq 1 ]
+  cached_bin="$cached_bins"
+
+  # Inside sandbox, replace the console script
+  fake_bin="$(sft_workspace_path "fake_cowsay")" || return 1
+  printf '%s\n' '#!/bin/sh' "echo \"I'm not cowsay\"" > "$fake_bin"
+  HOME="$fake_home" safehouse_ok -- /bin/cp "$fake_bin" "$cached_bin"
+
+  # Outside sandbox, rerun the same tool.
+  # Ensure the reused venv ran the replaced script.
+  HOME="$fake_home" run "$SFT_UV_BIN" tool run \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}" --version
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "I'm not cowsay"
+}
+
 # ------------------------------------------------------------------------------
 # Utility
 
