@@ -64,7 +64,7 @@
     (home-subpath "/Library/Caches/pypoetry")  ;; macOS Poetry cache variant.
 
     ;; Package Manager: uv
-    (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state (tools/ narrowed to read-only below).
+    (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state (tools/ and python/ narrowed to read-only below).
     ;; NOTE: Accepted risk: An agent can tamper with a cached venv that runs outside sandbox
     (home-subpath "/.cache/uv")                ;; download/build cache for fast repeated runs; ephemeral venvs that `uvx` / `uv tool run` reuse
 
@@ -126,16 +126,30 @@
     (home-literal "/.local/pipx")
 )
 
-;; uv: Disallow installs inside sandbox,
-;; while leaving writable ~/.local/share/uv/python
+;; uv:
+;; 1. Disallow installs inside sandbox to uv/tools.
+;; 2. Disallow uv/python because venvs created from a uv-managed interpreter
+;;    use it as their Python home, including installed tools' venvs and
+;;    project venvs that run outside the sandbox.
 (deny file-write*
-    (home-subpath "/.local/share/uv/tools")    ;; Installed tool payloads are immutable after install.
+    (home-subpath "/.local/share/uv/tools")
+    (home-subpath "/.local/share/uv/python")
 )
 
-;; uv: Allow ephemeral tool runs (`uvx` / `uv tool run`).
+;; uv: Disallow moving ~/.local/share/uv out from under the read-only rules above
+;; and moving it back, which would make its tools/ and python/ writable.
+;; NOTE: Side effect is that ~/.local/share/uv cannot be created inside the sandbox,
+;;       because a directory moved into place is indistinguishable from one
+;;       created empty. Therefore `uvx` / `uv tool run` work only after uv has
+;;       created uv/tools/ outside the sandbox, by running `uvx`, `uv tool run`,
+;;       or `uv tool install` once.
+(deny file-write*
+    (home-literal "/.local/share/uv")
+)
+
+;; uv: Allow ephemeral tool runs (`uvx` / `uv tool run`) inside an existing uv/tools/.
 ;; Persistent `uv tool install` remains denied.
 (allow file-write*
-    (home-literal "/.local/share/uv/tools")             ;; Create the directory the lock lives in.
     (home-literal "/.local/share/uv/tools/.lock")       ;; Cross-process lock uv takes for any tool operation.
     (home-literal "/.local/share/uv/tools/.gitignore")  ;; uv writes this alongside the lock on first use.
     (home-prefix "/.local/share/uv/tools/.tmp")         ;; uv stages the lock as a temp file, then renames it.

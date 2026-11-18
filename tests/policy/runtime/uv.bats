@@ -41,52 +41,147 @@ setup_file() {
   [ -x "$venv_dir/bin/python" ]
 }
 
-@test "[EXECUTION] uv venv can provision a uv-managed shared Python interpreter" {
+@test "[EXECUTION] uv venv cannot provision a uv-managed Python interpreter" {
   local fake_home venv_dir python_dir
   fake_home="$(sft_fake_home)" || return 1
   venv_dir="$(sft_workspace_path "uv_managed_venv")" || return 1
   python_dir="${fake_home}/.local/share/uv/python"
-  
-  # Ensure `uv venv` can create a virtualenv using a
-  # dynamically downloaded Python interpreter.
+
+  # Create python/ outside the sandbox,
+  # as it would be for a user who has installed a uv-managed interpreter before
+  mkdir -p "$python_dir" || return 1
+
+  # Ensure `uv venv` cannot download an interpreter into python/
   # NOTE: `only-managed` stops uv adopting a system interpreter,
-  #       so the download always happens.
+  #       so it must download one.
+  HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" venv \
+    --python-preference only-managed \
+    --python "$SFT_UV_TEST_PYTHON_VERSION" \
+    "$venv_dir"
+  [ -z "$(ls -A "$python_dir")" ]
+}
+
+@test "[EXECUTION] uv python install cannot install a shared Python interpreter" {
+  local fake_home global_bin python_dir
+  fake_home="$(sft_fake_home)" || return 1
+  global_bin="${fake_home}/.local/bin"
+  python_dir="${fake_home}/.local/share/uv/python"
+
+  # Create ~/.local/bin and python/ outside the sandbox, as they would be for a real user
+  mkdir -p "$global_bin" "$python_dir" || return 1
+
+  # Ensure cannot install a shared interpreter (under ~/.local/share/uv/python),
+  # nor put it on the global PATH (under ~/.local/bin)
+  HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" python install \
+    "$SFT_UV_TEST_PYTHON_VERSION"
+  [ -z "$(ls -A "$python_dir")" ]
+  [ -z "$(ls -A "$global_bin")" ]
+}
+
+@test "[EXECUTION] a uv-managed interpreter installed outside the sandbox is usable by uv venv, uv run --script and uvx" {
+  local fake_home python_dir venv_dir script_path snapshot_before
+  fake_home="$(sft_fake_home)" || return 1
+  python_dir="${fake_home}/.local/share/uv/python"
+  venv_dir="$(sft_workspace_path "uv_preinstalled_python_venv")" || return 1
+
+  sft_uv_python_install_outside_sandbox "$fake_home" || return 1
+  sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
+  snapshot_before="$(sft_uv_snapshot "$python_dir")" || return 1
+
+  # NOTE: `only-managed` stops uv adopting a system interpreter,
+  #       so each command below must use the preinstalled one.
+
+  # Ensure `uv venv` can create a venv from the interpreter
   HOME="$fake_home" safehouse_ok -- "$SFT_UV_BIN" venv \
     --python-preference only-managed \
     --python "$SFT_UV_TEST_PYTHON_VERSION" \
     "$venv_dir"
+  HOME="$fake_home" safehouse_run -- "${venv_dir}/bin/python" -c \
+    'import sys; print(sys.version.split()[0], sys.base_prefix)'
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "${SFT_UV_TEST_PYTHON_VERSION}."
+  sft_assert_contains "$output" "/.local/share/uv/python/cpython-${SFT_UV_TEST_PYTHON_VERSION}."
 
-  # Ensure a real interpreter landed under python/, and the venv built from it runs.
-  [ -n "$(find "$python_dir" -maxdepth 1 \
-      -name "cpython-${SFT_UV_TEST_PYTHON_VERSION}*" -print -quit)" ]
-  HOME="$fake_home" safehouse_run -- "${venv_dir}/bin/python" --version
+  # Ensure `uv run --script` can run a script with inline dependencies on the interpreter
+  script_path="$(sft_workspace_path "uv_inline_deps.py")" || return 1
+  cat > "$script_path" <<EOF
+# /// script
+# dependencies = ["${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}"]
+# ///
+import importlib.metadata, sys
+print("${SFT_UV_TEST_PKG}", importlib.metadata.version("${SFT_UV_TEST_PKG}"), sys.base_prefix)
+EOF
+  HOME="$fake_home" safehouse_run -- "$SFT_UV_BIN" run \
+    --python-preference only-managed \
+    --python "$SFT_UV_TEST_PYTHON_VERSION" \
+    --script "$script_path"
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "${SFT_UV_TEST_PKG} ${SFT_UV_TEST_PKG_VERSION}"
+  sft_assert_contains "$output" "/.local/share/uv/python/cpython-${SFT_UV_TEST_PYTHON_VERSION}."
+
+  # Ensure `uvx` can run an ephemeral tool on the interpreter
+  HOME="$fake_home" safehouse_run -- "$SFT_UV_BIN" tool run \
+    --python-preference only-managed \
+    --python "$SFT_UV_TEST_PYTHON_VERSION" \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}" --version
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "$SFT_UV_TEST_PKG_VERSION"
+
+  # Ensure nothing changed
+  [ "$(sft_uv_snapshot "$python_dir")" = "$snapshot_before" ]
+}
+
+@test "[EXECUTION] a uv-managed interpreter cannot be modified" {
+  local fake_home uv_data_dir python_dir interp_dir minor_link stdlib_dir snapshot_before
+  fake_home="$(sft_fake_home)" || return 1
+  uv_data_dir="${fake_home}/.local/share/uv"
+  python_dir="${uv_data_dir}/python"
+
+  sft_uv_python_install_outside_sandbox "$fake_home" || return 1
+  interp_dir="$(find "$python_dir" -maxdepth 1 -type d \
+    -name "cpython-${SFT_UV_TEST_PYTHON_VERSION}.*" -print -quit)"
+  [ -n "$interp_dir" ]
+  stdlib_dir="${interp_dir}/lib/python${SFT_UV_TEST_PYTHON_VERSION}"
+  sft_assert_file_exists "${stdlib_dir}/site.py"
+  # uv 0.8+ links cpython-X.Y-<platform> to the newest cpython-X.Y.Z-<platform>,
+  # and venvs use the link as their Python home
+  minor_link="$(find "$python_dir" -maxdepth 1 -type l \
+    -name "cpython-${SFT_UV_TEST_PYTHON_VERSION}-*" -print -quit)"
+  snapshot_before="$(sft_uv_snapshot "$python_dir")" || return 1
+
+  # Ensure cannot modify the interpreter with uv subcommands
+  HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" python install \
+    --reinstall "$SFT_UV_TEST_PYTHON_VERSION"
+  HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" python uninstall \
+    "$SFT_UV_TEST_PYTHON_VERSION"
+
+  # Ensure cannot write to the interpreter directly,
+  # including planting a sitecustomize.py that every venv built on it would run
+  HOME="$fake_home" safehouse_denied -- /usr/bin/touch "${stdlib_dir}/sitecustomize.py"
+  HOME="$fake_home" safehouse_denied -- /usr/bin/touch "${stdlib_dir}/site.py"
+  HOME="$fake_home" safehouse_denied -- /usr/bin/touch "${interp_dir}/bin/python${SFT_UV_TEST_PYTHON_VERSION}"
+  if [ -n "$minor_link" ]; then
+    HOME="$fake_home" safehouse_denied -- /bin/ln -sfh \
+      "$(sft_workspace_path "fake_interp")" "$minor_link"
+  fi
+
+  # Ensure cannot move the interpreter out from under the read-only rule,
+  # where it could be modified and then moved back
+  HOME="$fake_home" safehouse_denied -- /bin/mv "$interp_dir" "$(sft_workspace_path "moved_interp")"
+  HOME="$fake_home" safehouse_denied -- /bin/mv "$python_dir" "$(sft_workspace_path "moved_python")"
+  HOME="$fake_home" safehouse_denied -- /bin/mv "$uv_data_dir" "$(sft_workspace_path "moved_uv")"
+
+  # Ensure cannot hard link the interpreter into the workspace, to modify it there
+  HOME="$fake_home" safehouse_denied -- /bin/ln "${stdlib_dir}/site.py" "$(sft_workspace_path "linked_site.py")"
+
+  # Ensure the interpreter still runs
+  HOME="$fake_home" safehouse_run -- "${interp_dir}/bin/python${SFT_UV_TEST_PYTHON_VERSION}" --version
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "Python ${SFT_UV_TEST_PYTHON_VERSION}."
 
-  # Ensure no interpreter symlink was installed globally to PATH
-  [ ! -e "${fake_home}/.local/bin/python${SFT_UV_TEST_PYTHON_VERSION}" ]
-}
-
-@test "[EXECUTION] uv python install can install a shared Python binary but not put it on global PATH" {
-  local fake_home global_bin python_symlink
-  fake_home="$(sft_fake_home)" || return 1
-  global_bin="${fake_home}/.local/bin"
-  python_symlink="${global_bin}/python${SFT_UV_TEST_PYTHON_VERSION}"
-
-  # Ensure ~/.local/bin already exists, as it would for a real user
-  mkdir -p "$global_bin" || return 1
-
-  # 1. Ensure can install shared interpreter (under ~/.local/share/uv/python)
-  # 2. Ensure cannot install it to the global PATH (under ~/.local/bin)
-  # NOTE: Not a `safehouse_denied` case. uv reports the refused symlink as a
-  #       warning and still exits 0, so only the missing symlink and the denial
-  #       message distinguish this from an unsandboxed install.
-  HOME="$fake_home" safehouse_run -- "$SFT_UV_BIN" python install \
-    "$SFT_UV_TEST_PYTHON_VERSION"
-  [ "$status" -eq 0 ]
-  [ -n "$(find "${fake_home}/.local/share/uv/python" -maxdepth 1 \
-      -name "cpython-${SFT_UV_TEST_PYTHON_VERSION}*" -print -quit)" ]
-  [ ! -e "$python_symlink" ]
+  # Ensure nothing changed
+  [ ! -e "${stdlib_dir}/sitecustomize.py" ]
+  [ "$(sft_uv_snapshot "$python_dir")" = "$snapshot_before" ]
 }
 
 @test "[EXECUTION] uv pip install can install a package from PyPI into a venv" {
@@ -173,7 +268,8 @@ EOF
 @test "[EXECUTION] uv tool install cannot install a global binary" {
   local fake_home
   fake_home="$(sft_fake_home)" || return 1
-  
+  sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
+
   # Ensure cannot write payload (under ~/.local/share/uv/tools)
   HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" tool install \
     "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}"
@@ -184,6 +280,7 @@ EOF
 @test "[EXECUTION] uvx and uv tool run can run an ephemeral tool" {
   local fake_home
   fake_home="$(sft_fake_home)" || return 1
+  sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
 
   # Ensure `uvx` (an alias for `uv tool run`) can resolve, create .venv
   # under ~/.cache/uv, install dependency, and exec it
@@ -195,6 +292,39 @@ EOF
   # Ensure installed nothing persistent to PATH
   [ ! -e "${fake_home}/.local/share/uv/tools/${SFT_UV_TEST_PKG}" ]
   [ ! -e "${fake_home}/.local/bin/${SFT_UV_TEST_PKG}" ]
+}
+
+@test "[EXECUTION] uvx and uv tool run fail on a fresh home directory, with uv's own error" {
+  local fake_home
+  fake_home="$(sft_fake_home)" || return 1
+
+  # Ensure fails creating ~/.local/share/uv/tools,
+  # with an error that names the directory the user must create
+  HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" tool run \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}" --version
+  sft_assert_contains "$output" "failed to create directory"
+  sft_assert_contains "$output" "/.local/share/uv/tools"
+  sft_assert_contains "$output" "Operation not permitted"
+}
+
+@test "[EXECUTION] uv's data directories cannot be created inside the sandbox" {
+  local fake_home uv_data_dir
+  fake_home="$(sft_fake_home)" || return 1
+  uv_data_dir="${fake_home}/.local/share/uv"
+
+  # NOTE: Creating a directory is indistinguishable from moving a
+  #       pre-filled one into place, which would plant tools or interpreters.
+
+  # Ensure cannot create ~/.local/share/uv
+  mkdir -p "${fake_home}/.local/share" || return 1
+  HOME="$fake_home" safehouse_denied -- /bin/mkdir "$uv_data_dir"
+  [ ! -e "$uv_data_dir" ]
+
+  # Ensure cannot create its tools/ or python/
+  mkdir -p "$uv_data_dir" || return 1
+  HOME="$fake_home" safehouse_denied -- /bin/mkdir "${uv_data_dir}/tools"
+  HOME="$fake_home" safehouse_denied -- /bin/mkdir "${uv_data_dir}/python"
+  [ -z "$(ls -A "$uv_data_dir")" ]
 }
 
 @test "[EXECUTION] a uv-installed global binary runs" {
@@ -210,13 +340,17 @@ EOF
 }
 
 @test "[EXECUTION] a uv-installed global binary cannot be modified" {
-  local fake_home payload_bin
+  local fake_home uv_data_dir tools_dir payload_bin bin_link snapshot_before
   fake_home="$(sft_fake_home)" || return 1
-  payload_bin="${fake_home}/.local/share/uv/tools/${SFT_UV_TEST_PKG}/bin/${SFT_UV_TEST_PKG}"
+  uv_data_dir="${fake_home}/.local/share/uv"
+  tools_dir="${uv_data_dir}/tools"
+  payload_bin="${tools_dir}/${SFT_UV_TEST_PKG}/bin/${SFT_UV_TEST_PKG}"
+  bin_link="${fake_home}/.local/bin/${SFT_UV_TEST_PKG}"
 
   sft_uv_tool_install_outside_sandbox "$fake_home" || return 1
   sft_assert_file_exists "$payload_bin"
-  
+  snapshot_before="$(sft_uv_snapshot "$tools_dir" "$bin_link")" || return 1
+
   # Ensure cannot reinstall/uninstall binary
   # NOTE: Both subcommands try to rewrite the payload in place
   HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" tool install \
@@ -227,6 +361,18 @@ EOF
   # including to its __pycache__ which a Python tool writes on first run
   HOME="$fake_home" safehouse_denied -- /usr/bin/touch "${payload_bin}"
   HOME="$fake_home" safehouse_denied -- /bin/mkdir "$(dirname "$payload_bin")/__pycache__"
+  HOME="$fake_home" safehouse_denied -- /bin/rm "$bin_link"
+
+  # Ensure cannot move the payload out from under the read-only rule,
+  # where it could be modified and then moved back
+  HOME="$fake_home" safehouse_denied -- /bin/mv "$tools_dir" "$(sft_workspace_path "moved_tools")"
+  HOME="$fake_home" safehouse_denied -- /bin/mv "$uv_data_dir" "$(sft_workspace_path "moved_uv")"
+
+  # Ensure cannot hard link the payload into the workspace, to modify it there
+  HOME="$fake_home" safehouse_denied -- /bin/ln "$payload_bin" "$(sft_workspace_path "linked_bin")"
+
+  # Ensure nothing changed
+  [ "$(sft_uv_snapshot "$tools_dir" "$bin_link")" = "$snapshot_before" ]
 }
 
 @test "[EXECUTION] uv can read user config but not write it" {
@@ -319,6 +465,36 @@ EOF
 
 # ------------------------------------------------------------------------------
 # Utility
+
+# Runs `uv tool run` once outside the sandbox, as a user would before starting
+# a sandboxed agent, then clears uv's cache so a sandboxed run must build its
+# own venv.
+#
+# Global paths created, inside $fake_home:
+# - ~/.local/share/uv/tools, which `uv tool run` needs and cannot create inside the sandbox
+sft_uv_prepare_home_outside_sandbox() {
+  local fake_home="$1"
+
+  HOME="$fake_home" "$SFT_UV_BIN" tool run \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}" --version >/dev/null || return 1
+  HOME="$fake_home" "$SFT_UV_BIN" cache clean >/dev/null 2>&1
+}
+
+# Installs a uv-managed interpreter, as a user would before starting a sandboxed agent.
+#
+# Global paths created, inside $fake_home:
+# - ~/.local/share/uv/python/cpython-<version>-<platform>
+sft_uv_python_install_outside_sandbox() {
+  local fake_home="$1"
+
+  HOME="$fake_home" "$SFT_UV_BIN" python install "$SFT_UV_TEST_PYTHON_VERSION" >/dev/null 2>&1
+}
+
+# Prints a digest of the names, modes, inodes and change times of every path
+# under the given paths, without following symlinks.
+sft_uv_snapshot() {
+  find "$@" -exec /usr/bin/stat -f '%N %Sp %i %z %m' {} + | LC_ALL=C sort | shasum
+}
 
 # Installs the test package globally,
 # as a user would before starting a sandboxed agent.

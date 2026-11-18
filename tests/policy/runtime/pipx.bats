@@ -588,12 +588,21 @@ sft_pipx_install_outside_sandbox() {
 #     - shared/ (pip backend only), which is read-only inside the sandbox
 # - ~/.local/bin
 # - ~/.local/share/man
+# - ~/.local/share/uv/tools (uv backend only), which `uv tool run` needs
+#   and cannot create inside the sandbox
 sft_pipx_prepare_home_outside_sandbox() {
   local fake_home="$1" cache_dir
 
   if [ "$SFT_PIPX_BACKEND" = "uv" ]; then
-    # Run a pipx command, creating pipx's global paths
-    HOME="$fake_home" "$SFT_PIPX_BIN" interpreter list >/dev/null
+    # 1. Run a pipx command, creating pipx's global paths
+    # 2. Run `uv tool run`, via `pipx run`, creating uv's global paths
+    HOME="$fake_home" "$SFT_PIPX_BIN" run \
+      ${SFT_PIPX_BACKEND_ARGS[@]+"${SFT_PIPX_BACKEND_ARGS[@]}"} \
+      "${SFT_PIPX_TEST_PKG}==${SFT_PIPX_TEST_PKG_VERSION}" --version >/dev/null || return 1
+
+    # Remove the cached venv
+    HOME="$fake_home" uv cache clean >/dev/null 2>&1 || return 1
+
     return
   fi
   
