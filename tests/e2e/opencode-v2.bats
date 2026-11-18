@@ -25,7 +25,10 @@ prepare_opencode_v2() {
   export XDG_DATA_HOME="${HOME}/.local/share"
   export XDG_STATE_HOME="${HOME}/.local/state"
   AGENT_TUI_WORKDIR="${HOME}/projects/repo"
-  mkdir -p "$AGENT_TUI_WORKDIR" "${HOME}/.claude" "${XDG_CONFIG_HOME}/opencode"
+  # Create the XDG roots, which OpenCode cannot create inside the sandbox,
+  # as they exist for a user who has run OpenCode before
+  mkdir -p "$AGENT_TUI_WORKDIR" "${HOME}/.claude" "${XDG_CONFIG_HOME}/opencode" \
+    "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
   printf '{}\n' >"${HOME}/projects/opencode.json"
   printf '{"model":"anthropic/claude-sonnet-5"}\n' >"${XDG_CONFIG_HOME}/opencode/opencode.json"
 
