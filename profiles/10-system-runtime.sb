@@ -75,16 +75,6 @@
     (home-literal "/.local/share")                                    ;; XDG data share dir traversal needed by tools probing data locations.
 )
 
-;; Directory-entry creation for the XDG base directory roots.
-;; See https://specifications.freedesktop.org/basedir/latest/
-(allow file-write-create                                              ;; #safehouse-test-id:xdg-root-create#
-    (home-literal "/.cache")                                          ;; $XDG_CACHE_HOME default; parent of ~/.cache/<tool>.
-    (home-literal "/.config")                                         ;; $XDG_CONFIG_HOME default; parent of ~/.config/<tool>.
-    (home-literal "/.local")                                          ;; Parent of the ~/.local/* roots below.
-    (home-literal "/.local/share")                                    ;; $XDG_DATA_HOME default; parent of ~/.local/share/<tool>.
-    (home-literal "/.local/state")                                    ;; $XDG_STATE_HOME default; parent of ~/.local/state/<tool>.
-)
-
 ;; User preference reads needed by local agents/CLIs at startup.
 ;; Shell startup file reads are opt-in via 55-integrations-optional/shell-init.sb.
 (allow file-read*
