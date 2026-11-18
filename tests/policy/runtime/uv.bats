@@ -34,7 +34,24 @@ setup_file() {
 }
 
 @test "[EXECUTION] uv tool list and uv tool dir work on a fresh home directory, without creating uv's data directories" {
-  skip "not yet automated"
+  local fake_home uv_data_dir
+  fake_home="$(sft_fake_home)" || return 1
+  uv_data_dir="${fake_home}/.local/share/uv"
+
+  # Ensure `uv tool list` works, reporting no tools
+  HOME="$fake_home" safehouse_run -- "$SFT_UV_BIN" tool list
+  [ "$status" -eq 0 ]
+  sft_assert_contains "$output" "No tools installed"
+
+  # Ensure `uv tool dir` works, naming the directory without creating it
+  HOME="$fake_home" safehouse_run -- "$SFT_UV_BIN" tool dir
+  [ "$status" -eq 0 ]
+  [ "$output" = "${uv_data_dir}/tools" ]
+
+  # Ensure neither command created uv's data directories
+  # NOTE: Only `uvx`, `uv tool run` and `uv tool install` create them,
+  #       which the sandbox denies.
+  [ ! -e "$uv_data_dir" ]
 }
 
 @test "[EXECUTION] uvx and uv tool run fail on a fresh home directory, with uv's own error" {
@@ -110,11 +127,67 @@ setup_file() {
 }
 
 @test "[EXECUTION] uv pip install -e can install a workspace project in editable mode" {
-  skip "not yet automated"
+  local venv_dir project_dir
+  venv_dir="$(sft_workspace_path "uv_editable_venv")" || return 1
+  project_dir="$(sft_workspace_path "uv_editable_project")" || return 1
+
+  # Create project directory with a pyproject.toml and a .py file marked "before"
+  # NOTE: Exercises PEP 517 build isolation: uv will download the build backend
+  #       into a temp build env.
+  mkdir -p "$project_dir" || return 1
+  cat > "${project_dir}/pyproject.toml" <<'EOF'
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sft-uv-editable-probe"
+version = "0.0.0"
+
+[tool.setuptools]
+py-modules = ["sft_uv_editable_probe"]
+EOF
+  printf 'VALUE = "before"\n' > "${project_dir}/sft_uv_editable_probe.py"
+
+  # Install project as editable inside venv
+  safehouse_ok -- "$SFT_UV_BIN" venv "$venv_dir"
+  safehouse_ok -- "$SFT_UV_BIN" pip install \
+    --python "${venv_dir}/bin/python" \
+    -e "$project_dir"
+
+  # Ensure installed project has "before" marker
+  safehouse_run -- "${venv_dir}/bin/python" -c \
+    "import sft_uv_editable_probe as m; print(m.VALUE)"
+  [ "$status" -eq 0 ]
+  [ "$output" = "before" ]
+
+  # Modify project directory's .py file to have "after" marker
+  printf 'VALUE = "after"\n' > "${project_dir}/sft_uv_editable_probe.py"
+
+  # Ensure installed project now has "after" marker, without reinstalling,
+  # which is how "editable" installs are supposed to behave
+  safehouse_run -- "${venv_dir}/bin/python" -c \
+    "import sft_uv_editable_probe as m; print(m.VALUE)"
+  [ "$status" -eq 0 ]
+  [ "$output" = "after" ]
 }
 
 @test "[EXECUTION] uv pip uninstall can remove a package from a venv" {
-  skip "not yet automated"
+  local venv_dir
+  venv_dir="$(sft_workspace_path "uv_uninstall_venv")" || return 1
+
+  # Create venv with package installed (outside the sandbox)
+  "$SFT_UV_BIN" venv "$venv_dir" >/dev/null 2>&1 || return 1
+  "$SFT_UV_BIN" pip install --python "${venv_dir}/bin/python" \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}" >/dev/null 2>&1 || return 1
+  [ -x "${venv_dir}/bin/${SFT_UV_TEST_PKG}" ]
+
+  # Ensure can uninstall package
+  safehouse_ok -- "$SFT_UV_BIN" pip uninstall \
+    --python "${venv_dir}/bin/python" \
+    "$SFT_UV_TEST_PKG"
+  [ ! -e "${venv_dir}/bin/${SFT_UV_TEST_PKG}" ]
+  safehouse_denied -- "${venv_dir}/bin/python" -c "import ${SFT_UV_TEST_PKG}"
 }
 
 @test "[EXECUTION] uv sync can install project dependencies" {
@@ -148,7 +221,32 @@ EOF
 }
 
 @test "[EXECUTION] uv add can add a dependency to a project and lock it" {
-  skip "not yet automated"
+  local project_dir
+  project_dir="$(sft_workspace_path "uv_add_project")" || return 1
+  mkdir -p "$project_dir" || return 1
+
+  # Create project with no dependencies
+  cat > "${project_dir}/pyproject.toml" <<EOF
+[project]
+name = "sft-uv-add-probe"
+version = "0.0.0"
+requires-python = ">=3.9"
+dependencies = []
+EOF
+
+  # Ensure `uv add` can rewrite pyproject.toml, write the lockfile,
+  # and install the dependency into .venv
+  safehouse_ok -- "$SFT_UV_BIN" add --project "$project_dir" \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}"
+  sft_assert_file_contains "${project_dir}/pyproject.toml" \
+    "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}"
+  sft_assert_file_contains "${project_dir}/uv.lock" "name = \"${SFT_UV_TEST_PKG}\""
+
+  # Ensure the added dependency imports from the project venv
+  safehouse_run -- "${project_dir}/.venv/bin/python" -c \
+    "import ${SFT_UV_TEST_PKG} as pkg; print(pkg.__version__)"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$SFT_UV_TEST_PKG_VERSION" ]
 }
 
 @test "[EXECUTION] uv run can execute a project command" {
