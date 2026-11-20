@@ -45,7 +45,12 @@
     (home-subpath "/Library/Caches/pip")       ;; macOS pip cache location used by some Python setups.
 
     ;; Package Manager: pipx
-    (home-subpath "/.local/pipx")              ;; pipx-managed virtualenvs and shared python runtime.
+    ;; NOTE: pipx/venvs/, pipx/shared/, and pipx/py/ narrowed to read-only below.
+    (home-subpath "/Library/Application Support/pipx")  ;; PIPX_HOME default (pipx 1.16+).
+    (home-subpath "/.local/pipx")                       ;; PIPX_HOME legacy, used only if it already exists.
+    ;; NOTE: Accepted risk: An agent can tamper with a cached venv that runs outside sandbox
+    (home-subpath "/Library/Caches/pipx")               ;; ephemeral `pipx run` venvs (pip backend); reused for up to 14 days.
+    (home-subpath "/Library/Logs/pipx")                 ;; Per-invocation logs.
 
     ;; Package Manager: PDM
     (home-subpath "/.cache/pdm")               ;; PDM dependency/cache data.
@@ -59,8 +64,9 @@
     (home-subpath "/Library/Caches/pypoetry")  ;; macOS Poetry cache variant.
 
     ;; Package Manager: uv
-    (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state (tools/ narrowed to read-only below).
-    (home-subpath "/.cache/uv")                ;; uv download/build cache for fast repeated runs.
+    (home-subpath "/.local/share/uv")          ;; uv tool metadata and installed tool/runtime state (tools/ and python/ narrowed to read-only below).
+    ;; NOTE: Accepted risk: An agent can tamper with a cached venv that runs outside sandbox
+    (home-subpath "/.cache/uv")                ;; download/build cache for fast repeated runs; ephemeral venvs that `uvx` / `uv tool run` reuse
 
     ;; REPL: IPython
     (home-subpath "/.ipython")                 ;; IPython history/profile data.
@@ -90,16 +96,60 @@
     (home-literal "/Library/Caches")           ;; The directory itself only; creating siblings stays denied.
 )
 
-;; uv: Disallow installs inside sandbox,
-;; while leaving writable ~/.local/share/uv/python
-(deny file-write*
-    (home-subpath "/.local/share/uv/tools")    ;; Installed tool payloads are immutable after install.
+;; pipx: Every subcommand checks that PIPX_MAN_DIR exists before trying to create it.
+(allow file-read-metadata
+    (home-literal "/.local/share/man")         ;; The directory itself only; man pages stay unreadable.
 )
 
-;; uv: Allow ephemeral tool runs (`uvx` / `uv tool run`).
+;; pipx:
+;; 1. Disallow installs inside sandbox to pipx/venvs.
+;; 2. Disallow pipx/shared/ because on PATH.
+;; 3. Disallow pipx/py/ because installed tools' venvs use it.
+(deny file-write*
+    (home-subpath "/Library/Application Support/pipx/venvs")
+    (home-subpath "/Library/Application Support/pipx/shared")
+    (home-subpath "/Library/Application Support/pipx/py")
+    (home-subpath "/.local/pipx/venvs")
+    (home-subpath "/.local/pipx/shared")
+    (home-subpath "/.local/pipx/py")
+)
+
+;; pipx: Disallow moving PIPX_HOME out from under the read-only rules above
+;; and moving it back, which would make its venvs/, shared/, and py/ writable.
+;; NOTE: Side effect is that PIPX_HOME cannot be created inside the sandbox,
+;;       because a directory moved into place is indistinguishable from one
+;;       created empty. Therefore pipx subcommands other than `list` and
+;;       `environment` work only after pipx has run once outside the sandbox
+;;       and created pipx/venvs/, pipx/py/, ~/.local/bin, and ~/.local/share/man.
+(deny file-write*
+    (home-literal "/Library/Application Support/pipx")
+    (home-literal "/.local/pipx")
+)
+
+;; uv:
+;; 1. Disallow installs inside sandbox to uv/tools.
+;; 2. Disallow uv/python because venvs created from a uv-managed interpreter
+;;    use it as their Python home, including installed tools' venvs and
+;;    project venvs that run outside the sandbox.
+(deny file-write*
+    (home-subpath "/.local/share/uv/tools")
+    (home-subpath "/.local/share/uv/python")
+)
+
+;; uv: Disallow moving ~/.local/share/uv out from under the read-only rules above
+;; and moving it back, which would make its tools/ and python/ writable.
+;; NOTE: Side effect is that ~/.local/share/uv cannot be created inside the sandbox,
+;;       because a directory moved into place is indistinguishable from one
+;;       created empty. Therefore `uvx` / `uv tool run` work only after uv has
+;;       created uv/tools/ outside the sandbox, by running `uvx`, `uv tool run`,
+;;       or `uv tool install` once.
+(deny file-write*
+    (home-literal "/.local/share/uv")
+)
+
+;; uv: Allow ephemeral tool runs (`uvx` / `uv tool run`) inside an existing uv/tools/.
 ;; Persistent `uv tool install` remains denied.
 (allow file-write*
-    (home-literal "/.local/share/uv/tools")             ;; Create the directory the lock lives in.
     (home-literal "/.local/share/uv/tools/.lock")       ;; Cross-process lock uv takes for any tool operation.
     (home-literal "/.local/share/uv/tools/.gitignore")  ;; uv writes this alongside the lock on first use.
     (home-prefix "/.local/share/uv/tools/.tmp")         ;; uv stages the lock as a temp file, then renames it.

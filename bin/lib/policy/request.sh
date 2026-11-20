@@ -149,6 +149,9 @@ policy_request_load_workdir_config_into_arrays() {
   done < "$config_path"
 }
 
+# Given a command line to execute, like (aider) or (pipx run aider),
+# returns the short name of the underlying binary (e.g. "aider"),
+# on a best effort basis.
 policy_request_resolve_profile_target_path() {
   local first_arg="$1"
   local first_basename first_lower
@@ -157,14 +160,27 @@ policy_request_resolve_profile_target_path() {
   first_lower="$(safehouse_to_lowercase "$first_basename")"
 
   case "$first_lower" in
-    npx|bunx|uvx|pipx|xcrun)
+    # <runner> <app> ...
+    npx|bunx|uvx|xcrun)
+      # NOTE: Does NOT correctly handle case like (npx --yes cline),
+      #       misidentifying the option "--yes" as the <app>
       if [[ $# -ge 2 && -n "$2" ]]; then
         printf '%s\n' "$2"
         return 0
       fi
       ;;
+    # pipx run <app> ...
+    pipx)
+      # NOTE: Does NOT correctly handle cases like (pipx run --python 3.12 aider),
+      #       misidentifying the option "--python" as the <app>
+      if [[ $# -ge 3 && "$2" == "run" && -n "$3" ]]; then
+        printf '%s\n' "$3"
+        return 0
+      fi
+      ;;
   esac
 
+  # <app> ...
   printf '%s\n' "$first_arg"
 }
 

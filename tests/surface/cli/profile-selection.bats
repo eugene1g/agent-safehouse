@@ -59,7 +59,7 @@ load ../../test_helper.bash
   npx_profile="$(safehouse_profile -- "$npx_bin" "$cline_bin")"
   bunx_profile="$(safehouse_profile -- "$bunx_bin" "$codex_bin")"
   uvx_profile="$(safehouse_profile -- "$uvx_bin" "$aider_bin")"
-  pipx_profile="$(safehouse_profile -- "$pipx_bin" "$aider_bin")"
+  pipx_profile="$(safehouse_profile -- "$pipx_bin" run "$aider_bin")"
   xcrun_profile="$(safehouse_profile -- "$xcrun_bin" "$codex_bin")"
 
   sft_assert_includes_source "$npx_profile" "60-agents/cline.sb"
@@ -67,6 +67,22 @@ load ../../test_helper.bash
   sft_assert_includes_source "$uvx_profile" "60-agents/aider.sb"
   sft_assert_includes_source "$pipx_profile" "60-agents/aider.sb"
   sft_assert_includes_source "$xcrun_profile" "60-agents/codex.sb"
+}
+
+@test "[POLICY-ONLY] pipx subcommands other than run map profile selection to pipx itself" {
+  local pipx_bin aider_bin pipx_install_profile pipx_bare_profile
+
+  pipx_bin="$(sft_workspace_path "pipx")"
+  aider_bin="$(sft_workspace_path "aider")"
+
+  sft_make_fake_command "$pipx_bin"
+  sft_make_fake_command "$aider_bin"
+
+  pipx_install_profile="$(safehouse_profile -- "$pipx_bin" install "$aider_bin")"
+  pipx_bare_profile="$(safehouse_profile -- "$pipx_bin" "$aider_bin")"
+
+  sft_assert_omits_source "$pipx_install_profile" "60-agents/aider.sb"
+  sft_assert_omits_source "$pipx_bare_profile" "60-agents/aider.sb"
 }
 
 @test "[POLICY-ONLY] leading command env assignments still map profile selection to the wrapped command" {
