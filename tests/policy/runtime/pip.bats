@@ -489,6 +489,7 @@ sft_pip_assert_config_readonly() {
 # 1. Skip the current test if the requested Python install type is absent.
 # 2. Set SFT_PIP_PYTHON_BIN to that install's python3.
 #
+# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python
 # NOTE: pip is driven as `"$SFT_PIP_PYTHON_BIN" -m pip` so the interpreter
 #       under test is explicit, regardless of which python3 is first on PATH.
 sft_pip_use_python() {
@@ -582,6 +583,8 @@ sft_pip_lock_global_site() {
 #
 # Tests running in parallel targeting the same interpreter would otherwise
 # install, see, and uninstall each other's package.
+#
+# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock
 #
 # Released by sft_pip_release_global_lock in teardown.
 sft_pip_acquire_global_lock() {
