@@ -21,6 +21,9 @@ These are baseline allowances intended to keep common workflows functional:
 - Directory-root reads for `~/.config` and `~/.cache` so tools can discover XDG locations; contents under those trees still need more specific grants.
 - Core system/runtime paths required by **shells, compilers, and package managers**.
 - **Binaries already installed globally** by package managers are read-only and can be run, including those in the XDG binary directory `~/.local/bin`.
+    - However cached runner environments which are global and contain binaries
+      (e.g. for `uvx`, `pipx run`) are NOT read-only.
+      See [Important Limitations](./overview.md#important-limitations) for more information.
 - **Package manager config files** (e.g. `pip.conf`) are readable but not writable so installs from private package indexes work. Put only tokens with read-only scope there.
     - Put tokens with publish (write) scope in your publishing tool's credential file (e.g. `~/.pypirc`) instead, which the sandbox denies by default.
 - **Toolchain profile** access under `profiles/30-toolchains/`.

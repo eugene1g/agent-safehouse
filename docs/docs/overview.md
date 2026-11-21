@@ -54,6 +54,12 @@ Safehouse does **not** fully protect against:
 - Sandbox escapes (it is not a VM/hypervisor boundary).
 - Abuse through already-allowed IPC/credential channels.
 - Leakage of data from explicitly allowed paths.
+- Cache poisoning, which can allow a sandboxed agent to plant a binary in a
+  global cache that later gets executed outside the sandbox.
+    - Package managers like `uvx` and `pipx` generally require their caches to
+      be writable in order to function.
+    - In the future Safehouse may isolate cache writes from inside a sandbox
+      to persist only for the duration of that sandbox's lifetime.
 
 For practical hardening guidance, continue with [Getting Started](./getting-started.md) and [Usage](./usage.md).
 
