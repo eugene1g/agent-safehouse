@@ -49,14 +49,6 @@ SFT_PIPX_TEST_PKG_VERSION="6.1"
 # Tests
 
 setup_file() {
-  # Unset PIPX_* variables from host environment variables
-  # TODO: Remove this after merging general test environment variable
-  #       sanitization in sft_sanitize_env()
-  local var
-  for var in $(compgen -e | grep '^PIPX_' || true); do
-    unset "$var"
-  done
-  
   # 1. Skip tests if pipx not installed.
   # 2. Set SFT_PIPX_BIN to pipx's path.
   export SFT_PIPX_BIN SFT_PIPX_HAS_BACKENDS
