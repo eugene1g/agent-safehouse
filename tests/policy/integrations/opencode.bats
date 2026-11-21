@@ -70,6 +70,66 @@ EOF
   [ -f "${fake_home}/.local/state/opencode/ok" ]
 }
 
+@test "[EXECUTION] opencode profile can bootstrap its XDG paths when the XDG roots already exist" {
+  local fake_home workdir fake_opencode
+
+  fake_home="$(sft_fake_home)" || return 1
+  workdir="${fake_home}/sites/test"
+  fake_opencode="${fake_home}/.local/bin/opencode"
+
+  # Create the XDG roots outside the sandbox, as for a user who has run OpenCode before
+  mkdir -p \
+    "$workdir" \
+    "${fake_home}/.config" \
+    "${fake_home}/.cache" \
+    "${fake_home}/.local/share" \
+    "${fake_home}/.local/state" || return 1
+  make_fake_opencode_bootstrap "$fake_opencode" || return 1
+
+  HOME="$fake_home" safehouse_ok_in_dir "$workdir" -- "$fake_opencode"
+
+  [ -f "${fake_home}/.config/opencode/opencode.json" ]
+  [ -f "${fake_home}/.cache/opencode/ok" ]
+  [ -f "${fake_home}/.local/share/opencode/ok" ]
+  [ -f "${fake_home}/.local/state/opencode/ok" ]
+}
+
+@test "[EXECUTION] opencode profile cannot move or create XDG base directory roots" {
+  local fake_home workdir fake_opencode root
+
+  fake_home="$(sft_fake_home)" || return 1
+  workdir="${fake_home}/sites/test"
+  fake_opencode="${fake_home}/.local/bin/opencode"
+  mkdir -p "$workdir" || return 1
+  make_fake_opencode_exec "$fake_opencode"
+
+  # Ensure cannot move a root out from under other profiles' read-only rules,
+  # where its contents could be modified and then moved back
+  mkdir -p \
+    "${fake_home}/.config" \
+    "${fake_home}/.cache" \
+    "${fake_home}/.local/share" \
+    "${fake_home}/.local/state" || return 1
+  for root in .config .cache .local .local/share .local/state; do
+    HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- \
+      "$fake_opencode" /bin/mv "${fake_home}/${root}" "${workdir}/moved_root"
+    [ -d "${fake_home}/${root}" ]
+  done
+
+  # Ensure cannot create a missing root, which is indistinguishable from
+  # moving a pre-filled one into place
+  rmdir \
+    "${fake_home}/.config" \
+    "${fake_home}/.cache" \
+    "${fake_home}/.local/share" \
+    "${fake_home}/.local/state" || return 1
+  for root in .config .cache .local/share .local/state; do
+    HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- \
+      "$fake_opencode" /bin/mkdir "${fake_home}/${root}"
+    [ ! -e "${fake_home}/${root}" ]
+  done
+}
+
 make_fake_opencode_exec() {
   mkdir -p "$(dirname "$1")"
   printf '#!/bin/sh\nexec "$@"\n' >"$1"

@@ -155,50 +155,25 @@ load ../procargs_utils.bash
   HOME="$fake_home" safehouse_denied -- /bin/cat "$target"
 }
 
-@test "[POLICY-ONLY] default profile grants XDG base directory roots creation, literal-scoped" {
-  local profile xdg_block
-
-  profile="$(safehouse_profile)"
-  xdg_block="$(awk '/#safehouse-test-id:xdg-root-create#/ { capture=1 } capture { print } capture && $0 == ")" { exit }' <<<"$profile")"
-
-  sft_assert_contains "$xdg_block" "(allow file-write-create"
-  sft_assert_contains "$xdg_block" "(home-literal \"/.cache\")"
-  sft_assert_contains "$xdg_block" "(home-literal \"/.config\")"
-  sft_assert_contains "$xdg_block" "(home-literal \"/.local\")"
-  sft_assert_contains "$xdg_block" "(home-literal \"/.local/share\")"
-  sft_assert_contains "$xdg_block" "(home-literal \"/.local/state\")"
-
-  # The roots are bootstrapped as directory entries only; nothing below them is opened here.
-  sft_assert_not_contains "$xdg_block" "home-subpath"
-  sft_assert_not_contains "$xdg_block" "home-prefix"
-}
-
-@test "[EXECUTION] default sandbox can create missing XDG base directory roots" {
+@test "[EXECUTION] default sandbox cannot create missing XDG base directory roots" {
   local fake_home root
 
   fake_home="$(sft_fake_home)" || return 1
 
-  # A fresh macOS home ships none of these, so tools must be able to mkdir them
-  # before their own per-tool grants under each root become reachable.
-  # ~/.local must exist before its own children can be created.
-  for root in .cache .config .local .local/share .local/state; do
-    HOME="$fake_home" safehouse_ok -- /bin/mkdir "${fake_home}/${root}"
-    [ -d "${fake_home}/${root}" ]
+  # Creating a directory is indistinguishable from moving a pre-filled one into
+  # place, which would plant trusted files outside the sandbox, such as
+  # ~/.config/git/config or ~/.local/bin/<tool>.
+  # NOTE: ~/.local is created outside the sandbox first so that its children
+  #       are each denied on their own merits.
+  for root in .cache .config .local; do
+    HOME="$fake_home" safehouse_denied -- /bin/mkdir "${fake_home}/${root}"
+    [ ! -e "${fake_home}/${root}" ]
   done
-}
-
-@test "[EXECUTION] creating an XDG root does not open the tool directories below it" {
-  local fake_home
-
-  fake_home="$(sft_fake_home)" || return 1
-  mkdir -p "${fake_home}/.cache" "${fake_home}/.local/share" "${fake_home}/.local/state"
-
-  # This is the scoping boundary: bootstrapping the roots must not let an
-  # unguarded tool claim its own subdirectory under them. Tools that legitimately
-  # need one carry an explicit subpath grant (e.g. ~/.cache/uv in python.sb).
-  HOME="$fake_home" safehouse_denied -- /bin/mkdir "${fake_home}/.cache/safehouse-unguarded-tool"
-  HOME="$fake_home" safehouse_denied -- /bin/mkdir "${fake_home}/.local/share/safehouse-unguarded-tool"
-  HOME="$fake_home" safehouse_denied -- /bin/mkdir "${fake_home}/.local/state/safehouse-unguarded-tool"
+  mkdir "${fake_home}/.local" || return 1
+  for root in .local/share .local/state; do
+    HOME="$fake_home" safehouse_denied -- /bin/mkdir "${fake_home}/${root}"
+    [ ! -e "${fake_home}/${root}" ]
+  done
 }
 
 @test "[EXECUTION] default sandbox can write to tmp" {

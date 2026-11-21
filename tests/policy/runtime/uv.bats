@@ -19,6 +19,12 @@ SFT_UV_TEST_TOKEN="sft-not-a-real-token"
 # ------------------------------------------------------------------------------
 # Tests
 
+setup() {
+  sft_setup_test_env
+  # Setup the default fake $HOME
+  sft_uv_create_xdg_roots "$HOME"
+}
+
 # 1. Skip tests if uv not installed.
 # 2. Set SFT_UV_BIN to uv's path.
 setup_file() {
@@ -41,7 +47,7 @@ teardown() {
 
 @test "[EXECUTION] uv tool list and uv tool dir work on a fresh home directory, without creating uv's data directories" {
   local fake_home uv_data_dir
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
 
   # Ensure `uv tool list` works, reporting no tools
@@ -62,7 +68,7 @@ teardown() {
 
 @test "[EXECUTION] uvx and uv tool run fail on a fresh home directory, with uv's own error" {
   local fake_home
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
 
   # Ensure fails creating ~/.local/share/uv/tools,
   # with an error that names the directory the user must create
@@ -75,7 +81,7 @@ teardown() {
 
 @test "[EXECUTION] uv's data directories cannot be created inside the sandbox" {
   local fake_home uv_data_dir
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
 
   # NOTE: Creating a directory is indistinguishable from moving a
@@ -283,7 +289,7 @@ EOF
 
 @test "[EXECUTION] uvx and uv tool run can run an ephemeral tool" {
   local fake_home
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
 
   # Ensure `uvx` (an alias for `uv tool run`) can resolve, create .venv
@@ -337,7 +343,7 @@ EOF
 
 @test "[EXECUTION] uv tool install cannot install a global binary" {
   local fake_home
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
 
   # Ensure cannot write payload (under ~/.local/share/uv/tools)
@@ -375,7 +381,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] a uv-installed global binary runs" {
   local fake_home
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
 
   sft_uv_tool_install_outside_sandbox "$fake_home" || return 1
 
@@ -387,7 +393,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] a uv-installed global binary cannot be modified" {
   local fake_home uv_data_dir tools_dir payload_bin bin_link snapshot_before
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
   tools_dir="${uv_data_dir}/tools"
   payload_bin="${tools_dir}/${SFT_UV_TEST_PKG}/bin/${SFT_UV_TEST_PKG}"
@@ -429,7 +435,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] uv venv cannot provision a uv-managed Python interpreter" {
   local fake_home venv_dir python_dir
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   venv_dir="$(sft_workspace_path "uv_managed_venv")" || return 1
   python_dir="${fake_home}/.local/share/uv/python"
 
@@ -449,7 +455,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] uv python install cannot install a shared Python interpreter" {
   local fake_home global_bin python_dir
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   global_bin="${fake_home}/.local/bin"
   python_dir="${fake_home}/.local/share/uv/python"
 
@@ -466,7 +472,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] a uv-managed interpreter installed outside the sandbox is usable by uv venv, uv run --script and uvx" {
   local fake_home python_dir venv_dir script_path snapshot_before
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   python_dir="${fake_home}/.local/share/uv/python"
   venv_dir="$(sft_workspace_path "uv_preinstalled_python_venv")" || return 1
 
@@ -513,7 +519,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] a uv-managed interpreter cannot be modified" {
   local fake_home uv_data_dir python_dir interp_dir minor_link stdlib_dir snapshot_before
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
   python_dir="${uv_data_dir}/python"
 
@@ -566,7 +572,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] a uv-managed interpreter's ~/.local/bin/pythonX.Y link cannot be modified" {
   local fake_home bin_link snapshot_before
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   bin_link="${fake_home}/.local/bin/python${SFT_UV_TEST_PYTHON_VERSION}"
 
   # NOTE: `uv python install` (uv 0.8+) links ~/.local/bin/pythonX.Y
@@ -594,7 +600,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] uv can read user config but not write it" {
   local fake_home config_dir cache_dir
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   config_dir="${fake_home}/.config/uv"
   cache_dir="$(sft_workspace_path "uv_configured_cache")" || return 1
 
@@ -623,7 +629,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] uv cannot read or write stored index credentials" {
   local fake_home creds_file
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   creds_file="${fake_home}/.local/share/uv/credentials/credentials.toml"
 
   sft_uv_auth_login_outside_sandbox "$fake_home" || return 1
@@ -654,7 +660,7 @@ sft_uv_test_system_install_denied() {
 # else be planted there.
 @test "[EXECUTION] uv: the tools/ lock files are writable but the rest of tools/ is not" {
   local fake_home tools_dir
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   tools_dir="${fake_home}/.local/share/uv/tools"
 
   sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
@@ -686,7 +692,7 @@ sft_uv_test_system_install_denied() {
 # NOTE: Test characterizes current behavior. Ideal behavior would disallow tampering.
 @test "[EXECUTION] can tamper with a cached uvx venv to place a binary where it will run outside sandbox" {
   local fake_home cache_dir cached_bins cached_bin fake_bin
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
 
   # Outside sandbox, create a cached venv
   HOME="$fake_home" run "$SFT_UV_BIN" tool run \
@@ -717,7 +723,7 @@ sft_uv_test_system_install_denied() {
 # NOTE: Test characterizes current behavior. Ideal behavior would disallow tampering.
 @test "[EXECUTION] can tamper with a cached uv run --script environment to place a binary where it will run outside sandbox" {
   local fake_home script_path cache_dir env_dirs env_dir fake_python marker
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_uv_fake_home)" || return 1
   script_path="$(sft_workspace_path "uv_cached_script.py")" || return 1
   marker="$(sft_workspace_path "planted_python_ran")" || return 1
   sft_uv_write_inline_deps_script "$script_path" || return 1
@@ -757,6 +763,23 @@ sft_uv_test_system_install_denied() {
 
 # ------------------------------------------------------------------------------
 # Utility
+
+# Creates a new fake home with uv's XDG roots, and prints its path.
+sft_uv_fake_home() {
+  local fake_home
+  fake_home="$(sft_fake_home)" || return 1
+  sft_uv_create_xdg_roots "$fake_home" || return 1
+  printf '%s\n' "$fake_home"
+}
+
+# Creates uv's XDG roots in the given home.
+sft_uv_create_xdg_roots() {
+  local home="$1"
+  # Precreate the XDG roots that uv uses outside the sandbox because doing so
+  # inside the sandbox is denied. On a real machine they would exist for a user
+  # who has run uv outside the sandbox at least once.
+  mkdir -p "${home}/.cache" "${home}/.local/share"
+}
 
 # Runs `uv tool run` once outside the sandbox, as a user would before starting
 # a sandboxed agent, then clears uv's cache so a sandboxed run must build its
