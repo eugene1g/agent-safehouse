@@ -15,8 +15,8 @@
 #  - It must not be an Apple-signed system binary (/bin/sh, perl, ruby): those are
 #    restricted under SIP, so procargs returns their argv but withholds their
 #    environment. python3, already required by these tests, is not restricted.
-export KERN_PROCARGS=38
-export KERN_PROCARGS2=49
+KERN_PROCARGS=38
+KERN_PROCARGS2=49
 sft_procargs_reader_py() {
   cat <<EOF
 import ctypes, sys
