@@ -320,6 +320,12 @@ load ../../test_helper.bash
   case "$aube_bin" in "$SAFEHOUSE_HOST_HOME"/*) sandbox_home="$SAFEHOUSE_HOST_HOME" ;; esac
   case "$node_bin" in "$SAFEHOUSE_HOST_HOME"/*) sandbox_home="$SAFEHOUSE_HOST_HOME" ;; esac
 
+  # Create the XDG roots aube writes under, as a real home would have them,
+  # since the sandbox cannot create an XDG root itself.
+  if [[ "$sandbox_home" != "$SAFEHOUSE_HOST_HOME" ]]; then
+    mkdir -p "${sandbox_home}/.local/share" "${sandbox_home}/.cache" || return 1
+  fi
+
   mkdir -p "${project_dir}/local-dep" || return 1
   printf '%s\n' '{"name":"local-dep","version":"1.0.0","main":"index.js"}' > "${project_dir}/local-dep/package.json"
   printf 'module.exports = "sandboxed-aube-ok";\n' > "${project_dir}/local-dep/index.js"
