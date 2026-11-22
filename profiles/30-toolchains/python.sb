@@ -8,8 +8,6 @@
 ;; - python.org
 ;; - brew install python
 
-;; Covers common Python package/cache/config paths.
-
 (allow file-read* file-write*
     ;; CPython
     (home-literal "/.python_history")          ;; REPL history file touched by Python subprocess sessions.
@@ -87,6 +85,12 @@
     ;; Read-only: they run, but cannot be modified.
     (home-subpath "/Library/Python")           ;; PEP 370 user base: ~/Library/Python/3.X/{lib/python/site-packages,bin}.
 
+    ;; Package Manager: Poetry
+    (home-subpath "/Library/Application Support/pypoetry/venv")         ;; install location of official installer
+    (home-subpath "/Library/Application Support/pypoetry/python")       ;; interpreters installed by `poetry python install`
+    ;; NOTE: Credentials in sibling config auth.toml stay unreadable.
+    (home-literal "/Library/Application Support/pypoetry/config.toml")  ;; user config
+
     ;; Package Manager: uv
     (home-subpath "/.config/uv")               ;; uv config reads during tool resolution.
 )
@@ -104,7 +108,7 @@
 ;; pipx:
 ;; 1. Disallow installs inside sandbox to pipx/venvs.
 ;; 2. Disallow pipx/shared/ because on PATH.
-;; 3. Disallow pipx/py/ because installed tools' venvs use it.
+;; 3. Disallow pipx/py/ because venvs of installed tools use it.
 (deny file-write*
     (home-subpath "/Library/Application Support/pipx/venvs")
     (home-subpath "/Library/Application Support/pipx/shared")
@@ -124,6 +128,11 @@
 (deny file-write*
     (home-literal "/Library/Application Support/pipx")
     (home-literal "/.local/pipx")
+)
+
+;; Poetry: Resolving the path of pypoetry/venv must stat each ancestor.
+(allow file-read-metadata
+    (home-literal "/Library/Application Support/pypoetry")
 )
 
 ;; uv:

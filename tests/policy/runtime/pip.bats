@@ -406,7 +406,7 @@ sft_pip_test_user_binary_immutable() {
     "--user"
 }
 
-# === Config ===
+# === Config & Credentials ===
 
 @test "[EXECUTION] pip can read user config but not write it (python.org)" {
   sft_pip_use_python python.org
@@ -489,7 +489,8 @@ sft_pip_assert_config_readonly() {
 # 1. Skip the current test if the requested Python install type is absent.
 # 2. Set SFT_PIP_PYTHON_BIN to that install's python3.
 #
-# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python
+# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python,
+#       sft_poetry_use_python
 # NOTE: pip is driven as `"$SFT_PIP_PYTHON_BIN" -m pip` so the interpreter
 #       under test is explicit, regardless of which python3 is first on PATH.
 sft_pip_use_python() {
@@ -565,6 +566,8 @@ sft_pip_require_global_install_target() {
 # - An import of the package would resolve to a copy installed in the
 #   global site-packages if present, even if a --user installed copy
 #   was the intended target.
+#
+# NOTE: Duplicate logic in: sft_pip_lock_global_site, sft_poetry_require_global_install_target
 sft_pip_lock_global_site() {
   SFT_PIP_SITE_PACKAGES="$("$SFT_PIP_PYTHON_BIN" -c \
     'import sysconfig; print(sysconfig.get_path("purelib"))')" || return 1
@@ -584,7 +587,8 @@ sft_pip_lock_global_site() {
 # Tests running in parallel targeting the same interpreter would otherwise
 # install, see, and uninstall each other's package.
 #
-# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock
+# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock,
+#       sft_poetry_acquire_global_lock
 #
 # Released by sft_pip_release_global_lock in teardown.
 sft_pip_acquire_global_lock() {

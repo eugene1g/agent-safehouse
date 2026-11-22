@@ -825,7 +825,8 @@ EOF
 #    so that the sandbox, not PEP 668's EXTERNALLY-MANAGED marker,
 #    is what refuses a system install.
 #
-# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python
+# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python,
+#       sft_poetry_use_python
 sft_uv_use_system_python() {
   local install_type="$1" python_bin brew_prefix
 
@@ -875,7 +876,8 @@ sft_uv_require_system_install_target() {
 
 # Serializes tests that use one interpreter's global site-packages.
 #
-# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock
+# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock,
+#       sft_poetry_acquire_global_lock
 #
 # Released by sft_uv_release_system_lock in teardown.
 sft_uv_acquire_system_lock() {

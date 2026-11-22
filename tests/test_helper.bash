@@ -111,13 +111,13 @@ sft_remove_test_root() {
   [[ -z "$path" ]] && return 0
 
   case "$path" in
-    "${BATS_TEST_TMPDIR}"/safehouse-workspace-root.*)
-      rm -rf -- "$path"
-      ;;
-    "${SAFEHOUSE_HOST_HOME}"/.safehouse-bats-home-root.*)
-      rm -rf -- "$path"
-      ;;
+    "${BATS_TEST_TMPDIR}"/safehouse-workspace-root.* | \
+    "${SAFEHOUSE_HOST_HOME}"/.safehouse-bats-home-root.* | \
     "${SAFEHOUSE_HOST_HOME}"/.safehouse-bats-external.*)
+      # Restore write permission first, since some tools leave read-only
+      # directories behind, which rm cannot empty.
+      # e.g. virtualenv's wheel cache, ~/Library/Caches/virtualenv/wheel/
+      [ ! -e "$path" ] || chmod -R u+w "$path" || return 1
       rm -rf -- "$path"
       ;;
     *)
