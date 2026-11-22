@@ -11,7 +11,7 @@
 #              (pip backend only.)
 #   - py/      Standalone interpreters it downloads.     Read-only in sandbox.
 #   - .trash/  Staging for uninstalls.
-# - ~/.local/pipx/                        PIPX_HOME (legacy), used instead of
+# - ~/.local/pipx/                        PIPX_HOME (pipx <1.16), used instead of
 #                                         the default only if it already exists.
 #                                         Same contents as above.
 # - ~/Library/Caches/pipx/                Venvs reused by `pipx run` for 14 days.
@@ -19,9 +19,6 @@
 # - ~/Library/Logs/pipx/                  Per-invocation logs. Writable.
 # - ~/.local/bin/                         Symlinks to installed tools.
 # - ~/.local/share/man/                   Man pages of installed tools.
-#
-# NOTE: pipx before 1.16 kept everything, including its cache and logs,
-#       under ~/.local/pipx.
 #
 # Backends:
 # - pipx 1.12+ manages venvs with either pip or uv, picking uv automatically
@@ -37,7 +34,7 @@
 #   with the pip backend only, to keep the variant count down.
 #
 # NOTE: Every subcommand except --version, list, and environment first mkdirs
-#       venvs/, ~/.local/bin, ~/.local/share/man, the venv cache and py/.
+#       venvs/, ~/.local/bin, ~/.local/share/man, the venv cache, and py/.
 #
 load ../../test_helper.bash
 
@@ -656,6 +653,8 @@ sft_pipx_make_fresh_macos_home() {
 }
 
 # Prints the site-packages directory of the venv at $venv_dir.
+#
+# NOTE: Duplicate logic in: sft_pipx_site_packages, sft_poetry_site_packages
 sft_pipx_site_packages() {
   local venv_dir="$1" site_dir
 
@@ -670,6 +669,8 @@ sft_pipx_site_packages() {
 
 # Prints a digest of the names, modes, inodes and change times of every path
 # under the given paths, without following symlinks.
+#
+# NOTE: Duplicate logic in: sft_pipx_snapshot, sft_poetry_snapshot
 sft_pipx_snapshot() {
   find "$@" -exec /usr/bin/stat -f '%N %Sp %i %z %m' {} + | LC_ALL=C sort | shasum
 }

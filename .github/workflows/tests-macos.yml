@@ -109,6 +109,11 @@ jobs:
           #       freshly-published supply chain compromises.
           npm install --global --no-fund --no-audit --min-release-age=4 \
             agent-browser playwright
+          # NOTE: Uses --cooldown=N to reduce exposure to
+          #       freshly-published supply chain compromises.
+          # NOTE: Duplicated in `pipx install --cooldown=` and `SFT_POETRY_INSTALL_COOLDOWN_DAYS=`
+          pipx install --cooldown=4 poetry
+          pipx environment --value PIPX_BIN_DIR >> "${GITHUB_PATH}"
 
           # Configure temurin
           shopt -s nullglob
@@ -121,6 +126,7 @@ jobs:
           printf 'JAVA_HOME=%s\n' "${temurin_homes[0]}" >> "${GITHUB_ENV}"
           printf '%s\n' "${temurin_homes[0]}/bin" >> "${GITHUB_PATH}"
 
+          # Install browsers (used by agent-browser and playwright)
           agent-browser install
           playwright install chromium-headless-shell
 
