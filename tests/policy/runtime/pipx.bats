@@ -394,16 +394,27 @@ sft_pipx_test_fetched_python_immutable() {
   # An installed tool's venv uses the fetched interpreter as its Python home,
   # so a write to its stdlib (e.g. a sitecustomize.py) would run inside the tool,
   # outside the sandbox.
-  local fake_home py_dir fetch_arg py_version interp_dir stdlib_dir snapshot_before
+  local fake_home py_dir fetch_arg py_version interp_dir stdlib_dir snapshot_before output
   sft_pipx_fetch_missing_python_arg_or_skip fetch_arg
   sft_pipx_missing_python_version_or_skip py_version
 
   # Outside sandbox, install a tool with a fetched interpreter
+  # NOTE: Prints pipx's output and logs on failure
   fake_home="$(sft_pipx_fake_home)" || return 1
-  HOME="$fake_home" "$SFT_PIPX_BIN" install \
-    ${SFT_PIPX_BACKEND_ARGS[@]+"${SFT_PIPX_BACKEND_ARGS[@]}"} \
-    "$fetch_arg" --python "$py_version" \
-    "${SFT_PIPX_TEST_PKG}==${SFT_PIPX_TEST_PKG_VERSION}" >/dev/null || return 1
+  if ! output="$(HOME="$fake_home" "$SFT_PIPX_BIN" install \
+      ${SFT_PIPX_BACKEND_ARGS[@]+"${SFT_PIPX_BACKEND_ARGS[@]}"} \
+      "$fetch_arg" --python "$py_version" \
+      "${SFT_PIPX_TEST_PKG}==${SFT_PIPX_TEST_PKG_VERSION}" 2>&1)"; then
+    local log_dir log_file
+    printf 'pipx install with a fetched Python %s failed:\n%s\n' "$py_version" "$output" >&2
+    log_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_LOG_DIR)" || return 1
+    for log_file in "$log_dir"/*.log; do
+      [ -f "$log_file" ] || continue
+      printf '\n=== pipx log: %s\n' "$log_file" >&2
+      cat "$log_file" >&2
+    done
+    return 1
+  fi
   py_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_STANDALONE_PYTHON_CACHEDIR)" || return 1
   interp_dir="${py_dir}/${py_version}"
   stdlib_dir="${interp_dir}/lib/python${py_version}"
