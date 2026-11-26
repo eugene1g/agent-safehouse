@@ -30,6 +30,7 @@
 # - (official installer) install.python-poetry.org, into the data dir's venv/.
 #
 load ../../test_helper.bash
+load python_helper.bash
 
 # Skip install of any Poetry dependency released in the last N days,
 # to reduce exposure to freshly-published supply chain compromises
@@ -375,14 +376,14 @@ teardown() {
 
 @test "[EXECUTION] poetry install with virtualenvs.create=false cannot install a package into the interpreter's global site-packages or bin directory (python.org)" {
   # Targets: /Library/Frameworks/Python.framework/Versions/3.X/{lib/python3.X/site-packages,bin}
-  sft_poetry_use_python python.org
+  sft_py_use_python python.org
   sft_poetry_test_no_venv_install_denied
 }
 @test "[EXECUTION] poetry install with virtualenvs.create=false cannot install a package into the interpreter's global site-packages or bin directory (Homebrew)" {
   # Targets: $(brew --prefix)/lib/python3.X/site-packages, $(brew --prefix)/bin
   # NOTE: Poetry ignores PEP 668's EXTERNALLY-MANAGED marker, which Homebrew's
   #       interpreter has, so the sandbox is what refuses the install.
-  sft_poetry_use_python homebrew
+  sft_py_use_python homebrew
   sft_poetry_test_no_venv_install_denied
 }
 sft_poetry_test_no_venv_install_denied() {
@@ -391,17 +392,17 @@ sft_poetry_test_no_venv_install_denied() {
   project_dir="$(sft_workspace_path "poetry_no_venv")" || return 1
 
   # Precondition: site-packages is writable unsandboxed
-  sft_poetry_require_global_install_target || return 1
+  sft_py_require_global_install_target "$SFT_POETRY_TEST_PKG" || return 1
 
   # Install a copy of Poetry that runs on the interpreter under test
   # NOTE: With virtualenvs.create=false and no active venv, Poetry installs
   #       into the base interpreter of the Python that Poetry itself runs on,
   #       regardless of PATH.
   poetry_root="${BATS_TEST_TMPDIR}/pipx"
-  sft_poetry_pipx_install_into "$poetry_root" --python "$SFT_POETRY_PYTHON_BIN" || return 1
+  sft_poetry_pipx_install_into "$poetry_root" --python "$SFT_PY_PYTHON_BIN" || return 1
   poetry_bin="${poetry_root}/bin/poetry"
   [ "$("${poetry_root}/home/venvs/poetry/bin/python" -c 'import sys; print(sys.base_prefix)')" = \
-    "$("$SFT_POETRY_PYTHON_BIN" -c 'import sys; print(sys.prefix)')" ]
+    "$("$SFT_PY_PYTHON_BIN" -c 'import sys; print(sys.prefix)')" ]
 
   # Configure the project to install without a venv
   sft_poetry_write_project "$project_dir" "sft-poetry-no-venv-probe" \
@@ -412,8 +413,8 @@ sft_poetry_test_no_venv_install_denied() {
   SFT_POETRY_GLOBAL_DIRTY=1
   HOME="$fake_home" safehouse_denied -- "$poetry_bin" -C "$project_dir" install --no-root --no-interaction
   sft_assert_contains "$output" "Operation not permitted"
-  sft_assert_path_absent "${SFT_POETRY_SITE_PACKAGES}/${SFT_POETRY_TEST_PKG}"
-  sft_assert_path_absent "${SFT_POETRY_SCRIPTS_DIR}/${SFT_POETRY_TEST_PKG}"
+  sft_assert_path_absent "${SFT_PY_SITE_PACKAGES}/${SFT_POETRY_TEST_PKG}"
+  sft_assert_path_absent "${SFT_PY_SCRIPTS_DIR}/${SFT_POETRY_TEST_PKG}"
 }
 
 @test "[EXECUTION] poetry self add cannot install a plugin into Poetry's own environment (pipx)" {
@@ -430,7 +431,7 @@ sft_poetry_test_self_add_denied() {
   sft_poetry_install_outside_sandbox "$install_type" "$fake_home" || return 1
   venv_dir="$SFT_POETRY_VENV_DIR"
   poetry_bin="${fake_home}/.local/bin/poetry"
-  site_dir="$(sft_poetry_site_packages "$venv_dir")" || return 1
+  site_dir="$(sft_py_venv_site_packages "$venv_dir")" || return 1
   snapshot_before="$(sft_tree_snapshot "$venv_dir" "$poetry_bin")" || return 1
 
   # Precondition: the pre-installed Poetry runs inside the sandbox,
@@ -541,7 +542,7 @@ sft_poetry_test_preinstalled_immutable() {
   venv_dir="$SFT_POETRY_VENV_DIR"
   root_dir="$SFT_POETRY_ROOT_DIR"
   poetry_bin="${fake_home}/.local/bin/poetry"
-  site_dir="$(sft_poetry_site_packages "$venv_dir")" || return 1
+  site_dir="$(sft_py_venv_site_packages "$venv_dir")" || return 1
   pkg_dir="${site_dir}/poetry"
   sft_assert_file_exists "${pkg_dir}/__version__.py"
   snapshot_before="$(sft_tree_snapshot "$venv_dir" "$poetry_bin")" || return 1
@@ -1221,81 +1222,12 @@ sft_poetry_assert_test_pkg_installed() {
   [ "$output" = "$SFT_POETRY_TEST_PKG_VERSION" ]
 }
 
-# 1. Skip the current test if the requested Python install type is absent.
-# 2. Set SFT_POETRY_PYTHON_BIN to that install's python3.
-#
-# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python,
-#       sft_poetry_use_python
-sft_poetry_use_python() {
-  local install_type="$1" python_bin brew_prefix
-
-  case "$install_type" in
-    python.org)
-      python_bin="/Library/Frameworks/Python.framework/Versions/Current/bin/python3"
-      ;;
-    homebrew)
-      brew_prefix="$(brew --prefix 2>/dev/null || true)"
-      [ -n "$brew_prefix" ] || skip "Homebrew is not installed"
-      python_bin="${brew_prefix}/bin/python3"
-      ;;
-    *)
-      echo "unknown Python install type: $install_type" >&2
-      return 1
-      ;;
-  esac
-  [ -x "$python_bin" ] || skip "${install_type} Python is not installed"
-
-  export SFT_POETRY_PYTHON_BIN="$python_bin"
-}
-
-# 1. Set SFT_POETRY_SITE_PACKAGES and SFT_POETRY_SCRIPTS_DIR to where a global
-#    (non-venv) install into SFT_POETRY_PYTHON_BIN lands.
-# 2. Hold that interpreter's global-site lock until teardown.
-# Skips the test when it cannot be exercised faithfully, since a sandbox
-# denial proves nothing there: when the test package was already installed
-# globally, or when site-packages is not writable unsandboxed.
-#
-# NOTE: Duplicate logic in: sft_pip_lock_global_site, sft_poetry_require_global_install_target
-sft_poetry_require_global_install_target() {
-  SFT_POETRY_SITE_PACKAGES="$("$SFT_POETRY_PYTHON_BIN" -c \
-    'import sysconfig; print(sysconfig.get_path("purelib"))')" || return 1
-  SFT_POETRY_SCRIPTS_DIR="$("$SFT_POETRY_PYTHON_BIN" -c \
-    'import sysconfig; print(sysconfig.get_path("scripts"))')" || return 1
-
-  # Serialize tests that use this interpreter's global site-packages, across
-  # pip.bats, uv.bats and poetry.bats. Parallel tests would otherwise install,
-  # see, and uninstall each other's package.
-  sft_acquire_run_lock "pip-global-$(printf '%s' "$SFT_POETRY_SITE_PACKAGES" | cksum | cut -d' ' -f1)" || return 1
-
-  # Skip if package appears to have been installed before test run started,
-  # so that we do NOT adopt it and do NOT uninstall it later.
-  [ ! -e "${SFT_POETRY_SITE_PACKAGES}/${SFT_POETRY_TEST_PKG}" ] \
-    || skip "${SFT_POETRY_TEST_PKG} is already installed globally"
-
-  [ -w "$SFT_POETRY_SITE_PACKAGES" ] && [ -w "$SFT_POETRY_SCRIPTS_DIR" ] \
-    || skip "global site-packages/bin not writable by this user (${SFT_POETRY_SITE_PACKAGES})"
-}
-
 # Uninstalls the test package from the global site-packages, in case a test
 # that set SFT_POETRY_GLOBAL_DIRTY=1 installed it there despite the sandbox.
 sft_poetry_cleanup_global_install() {
   [ "${SFT_POETRY_GLOBAL_DIRTY:-}" = 1 ] || return 0
-  "$SFT_POETRY_PYTHON_BIN" -m pip uninstall -y --break-system-packages \
+  # shellcheck disable=SC2086
+  "$SFT_PY_PYTHON_BIN" -m pip uninstall -y $SFT_PY_PEP668_FLAG \
     "$SFT_POETRY_TEST_PKG" >/dev/null 2>&1 || true
   SFT_POETRY_GLOBAL_DIRTY=0
-}
-
-# Prints the site-packages directory of the venv at $venv_dir.
-#
-# NOTE: Duplicate logic in: sft_pipx_site_packages, sft_poetry_site_packages
-sft_poetry_site_packages() {
-  local venv_dir="$1" site_dir
-
-  for site_dir in "$venv_dir"/lib/python*/site-packages; do
-    [ -d "$site_dir" ] || continue
-    printf '%s\n' "$site_dir"
-    return 0
-  done
-  echo "no site-packages under ${venv_dir}" >&2
-  return 1
 }
