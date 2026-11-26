@@ -19,7 +19,6 @@ SFT_PIP_TEST_PKG_VERSION="6.1"
 
 teardown() {
   sft_pip_cleanup_global_install
-  sft_pip_release_global_lock
   sft_teardown_test_env
 }
 
@@ -574,50 +573,15 @@ sft_pip_lock_global_site() {
   SFT_PIP_SCRIPTS_DIR="$("$SFT_PIP_PYTHON_BIN" -c \
     'import sysconfig; print(sysconfig.get_path("scripts"))')" || return 1
 
-  sft_pip_acquire_global_lock || return 1
+  # Serialize tests that use this interpreter's global site-packages, across
+  # pip.bats, uv.bats and poetry.bats. Parallel tests would otherwise install,
+  # see, and uninstall each other's package.
+  sft_acquire_run_lock "pip-global-$(printf '%s' "$SFT_PIP_SITE_PACKAGES" | cksum | cut -d' ' -f1)" || return 1
 
   # Skip if package appears to have been installed before test run started,
   # so that we do NOT adopt it and do NOT uninstall it later.
   [ ! -e "${SFT_PIP_SITE_PACKAGES}/${SFT_PIP_TEST_PKG}" ] \
     || skip "${SFT_PIP_TEST_PKG} is already installed globally"
-}
-
-# Serializes tests that use one interpreter's global site-packages.
-#
-# Tests running in parallel targeting the same interpreter would otherwise
-# install, see, and uninstall each other's package.
-#
-# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock,
-#       sft_poetry_acquire_global_lock
-#
-# Released by sft_pip_release_global_lock in teardown.
-sft_pip_acquire_global_lock() {
-  local timeout=600
-
-  local key lock_dir
-  key="$(printf '%s' "$SFT_PIP_SITE_PACKAGES" | cksum | cut -d' ' -f1)"
-  lock_dir="${BATS_RUN_TMPDIR}/sft-pip-global-${key}.lock"
-
-  # Wait for directory-based lock inside BATS_RUN_TMPDIR (until timeout),
-  # which is shared by all parallel workers of the same bats run and which is
-  # discarded with the run.
-  local waited=0
-  until mkdir "$lock_dir" 2>/dev/null; do
-    if [ "$waited" -ge "$timeout" ]; then
-      echo "timed out after ${timeout}s waiting for ${lock_dir}" >&2
-      return 1
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-
-  SFT_PIP_GLOBAL_LOCK="$lock_dir"
-}
-
-sft_pip_release_global_lock() {
-  [ -n "${SFT_PIP_GLOBAL_LOCK:-}" ] || return 0
-  rmdir "$SFT_PIP_GLOBAL_LOCK" 2>/dev/null || true
-  SFT_PIP_GLOBAL_LOCK=""
 }
 
 # Installs the test package into the interpreter's global site-packages and

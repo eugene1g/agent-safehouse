@@ -73,8 +73,7 @@ setup_file() {
 
 @test "[EXECUTION] pipx list works on a fresh home directory" {
   local fake_home
-  fake_home="$(sft_fake_home)" || return 1
-  sft_pipx_make_fresh_macos_home "$fake_home" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
 
   # NOTE: pipx 1.16+ skips setup()'s mkdirs for `pipx list`.
   sft_pipx_test_list_works "$fake_home"
@@ -82,8 +81,7 @@ setup_file() {
 
 @test "[EXECUTION] pipx list works when ~/.local/bin and ~/.local/share/man already exist" {
   local fake_home
-  fake_home="$(sft_fake_home)" || return 1
-  sft_pipx_make_fresh_macos_home "$fake_home" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   mkdir -p "${fake_home}/.local/bin" "${fake_home}/.local/share/man" || return 1
 
   # NOTE: Models a typical user's machine, where other tools have
@@ -93,8 +91,7 @@ setup_file() {
 
 @test "[EXECUTION] pipx list works (legacy ~/.local/pipx home)" {
   local fake_home pipx_home
-  fake_home="$(sft_fake_home)" || return 1
-  sft_pipx_make_fresh_macos_home "$fake_home" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
 
   # Outside sandbox, create a legacy home populated as a user's would be
   mkdir -p "${fake_home}/.local/pipx" || return 1
@@ -117,8 +114,7 @@ sft_pipx_test_list_works() {
 
 @test "[EXECUTION] pipx subcommands that create pipx's directories fail on a fresh home directory, with pipx's own error" {
   local fake_home
-  fake_home="$(sft_fake_home)" || return 1
-  sft_pipx_make_fresh_macos_home "$fake_home" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   mkdir -p "${fake_home}/.local/bin" "${fake_home}/.local/share/man" || return 1
 
   HOME="$fake_home" safehouse_denied -- "$SFT_PIPX_BIN" interpreter list
@@ -153,8 +149,8 @@ sft_pipx_test_run_ephemeral_tool() {
   sft_assert_contains "$output" "$SFT_PIPX_TEST_PKG_VERSION"
 
   # Ensure installed nothing persistent to PATH
-  sft_pipx_assert_absent "${venvs_dir}/${SFT_PIPX_TEST_PKG}"
-  sft_pipx_assert_absent "${fake_home}/.local/bin/${SFT_PIPX_TEST_PKG}"
+  sft_assert_path_absent "${venvs_dir}/${SFT_PIPX_TEST_PKG}"
+  sft_assert_path_absent "${fake_home}/.local/bin/${SFT_PIPX_TEST_PKG}"
 }
 
 @test "[EXECUTION] pipx run can run a script with inline dependencies (pip backend)" {
@@ -215,8 +211,8 @@ sft_pipx_test_install_denied() {
     "${SFT_PIPX_TEST_PKG}==${SFT_PIPX_TEST_PKG_VERSION}"
 
   # Ensure no payload under venvs/ and no symlink in ~/.local/bin
-  sft_pipx_assert_absent "${venvs_dir}/${SFT_PIPX_TEST_PKG}"
-  sft_pipx_assert_absent "${fake_home}/.local/bin/${SFT_PIPX_TEST_PKG}"
+  sft_assert_path_absent "${venvs_dir}/${SFT_PIPX_TEST_PKG}"
+  sft_assert_path_absent "${fake_home}/.local/bin/${SFT_PIPX_TEST_PKG}"
 }
 
 # === Pre-Installed Global Tools: Usable, Immutable ===
@@ -275,7 +271,7 @@ sft_pipx_test_installed_binary_immutable() {
   # Remove the package's __pycache__, as if the tool had never run
   # NOTE: The uv backend does not precompile, so it has none to begin with.
   rm -rf "${pkg_dir}/__pycache__" || return 1
-  snapshot_before="$(sft_pipx_snapshot "$venvs_dir" "$bin_link")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$venvs_dir" "$bin_link")" || return 1
 
   # Ensure cannot modify the tool with pipx subcommands
   HOME="$fake_home" safehouse_denied -- "$SFT_PIPX_BIN" reinstall "$SFT_PIPX_TEST_PKG"
@@ -305,11 +301,11 @@ sft_pipx_test_installed_binary_immutable() {
   HOME="$fake_home" safehouse_run -- "$bin_link" --version
   [ "$status" -eq 0 ]
   sft_assert_contains "$output" "$SFT_PIPX_TEST_PKG_VERSION"
-  sft_pipx_assert_absent "${pkg_dir}/__pycache__"
+  sft_assert_path_absent "${pkg_dir}/__pycache__"
 
   # Ensure nothing changed
   [ -d "$pipx_home" ]
-  [ "$(sft_pipx_snapshot "$venvs_dir" "$bin_link")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$venvs_dir" "$bin_link")" = "$snapshot_before" ]
 }
 
 # Only the pip backend has shared libraries.
@@ -334,7 +330,7 @@ sft_pipx_test_shared_libs_immutable() {
   shared_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_SHARED_LIBS)" || return 1
   site_dir="$(sft_pipx_site_packages "$shared_dir")" || return 1
   sft_assert_file_exists "${site_dir}/pip/__init__.py"
-  snapshot_before="$(sft_pipx_snapshot "$shared_dir")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$shared_dir")" || return 1
 
   # Ensure cannot modify pipx/shared/ with pipx subcommands
   # NOTE: May succeed without writing anything if pip is already at the latest version.
@@ -348,8 +344,8 @@ sft_pipx_test_shared_libs_immutable() {
   HOME="$fake_home" safehouse_denied -- /bin/ln "${site_dir}/pip/__init__.py" "$(sft_workspace_path "linked_pip_init")"
 
   # Ensure nothing changed
-  sft_pipx_assert_absent "${site_dir}/sitecustomize.py"
-  [ "$(sft_pipx_snapshot "$shared_dir")" = "$snapshot_before" ]
+  sft_assert_path_absent "${site_dir}/sitecustomize.py"
+  [ "$(sft_tree_snapshot "$shared_dir")" = "$snapshot_before" ]
 }
 
 # === Interpreters ===
@@ -377,7 +373,7 @@ sft_pipx_test_fetch_missing_python_denied() {
     ${SFT_PIPX_BACKEND_ARGS[@]+"${SFT_PIPX_BACKEND_ARGS[@]}"} \
     "$fetch_arg" --python "$py_version" \
     "${SFT_PIPX_TEST_PKG}==${SFT_PIPX_TEST_PKG_VERSION}" --version
-  sft_pipx_assert_absent "${py_dir}/${py_version}"
+  sft_assert_path_absent "${py_dir}/${py_version}"
 
   # Ensure nothing is put on global PATH
   [ -z "$(ls -A "${fake_home}/.local/bin")" ]
@@ -411,7 +407,7 @@ sft_pipx_test_fetched_python_immutable() {
   interp_dir="${py_dir}/${py_version}"
   stdlib_dir="${interp_dir}/lib/python${py_version}"
   sft_assert_file_exists "${stdlib_dir}/site.py"
-  snapshot_before="$(sft_pipx_snapshot "$py_dir")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$py_dir")" || return 1
 
   # Ensure cannot write to the interpreter directly
   HOME="$fake_home" safehouse_denied -- /usr/bin/touch "${stdlib_dir}/sitecustomize.py"
@@ -429,8 +425,8 @@ sft_pipx_test_fetched_python_immutable() {
   sft_assert_contains "$output" "$SFT_PIPX_TEST_PKG_VERSION"
 
   # Ensure nothing changed
-  sft_pipx_assert_absent "${stdlib_dir}/sitecustomize.py"
-  [ "$(sft_pipx_snapshot "$py_dir")" = "$snapshot_before" ]
+  sft_assert_path_absent "${stdlib_dir}/sitecustomize.py"
+  [ "$(sft_tree_snapshot "$py_dir")" = "$snapshot_before" ]
 }
 
 # === Cache Poisoning: Accepted Risk ===
@@ -531,12 +527,12 @@ sft_pipx_use_home() {
 }
 
 # Creates a fake home with the ~/Library directories macOS creates for every
-# new user. For a legacy SFT_PIPX_HOME_KIND, also creates ~/.local/pipx and
-# ensures pipx will use it. Prints the fake home's path.
+# new user, where pipx puts its default home, cache and logs. For a legacy
+# SFT_PIPX_HOME_KIND, also creates ~/.local/pipx and ensures pipx will use it.
+# Prints the fake home's path.
 sft_pipx_fake_home() {
   local fake_home pipx_home expected_pipx_home
-  fake_home="$(sft_fake_home)" || return 1
-  sft_pipx_make_fresh_macos_home "$fake_home" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
 
   if [ "${SFT_PIPX_HOME_KIND:-default}" = "legacy" ]; then
     mkdir -p "${fake_home}/.local/pipx" || return 1
@@ -641,17 +637,6 @@ sft_pipx_missing_python_version_or_skip() {
   skip "every candidate Python version is already on PATH"
 }
 
-# Creates the ~/Library directories that macOS creates for every new user,
-# under which pipx puts its default home, cache and logs.
-sft_pipx_make_fresh_macos_home() {
-  local fake_home="$1"
-
-  mkdir -p \
-    "${fake_home}/Library/Application Support" \
-    "${fake_home}/Library/Caches" \
-    "${fake_home}/Library/Logs"
-}
-
 # Prints the site-packages directory of the venv at $venv_dir.
 #
 # NOTE: Duplicate logic in: sft_pipx_site_packages, sft_poetry_site_packages
@@ -664,23 +649,6 @@ sft_pipx_site_packages() {
     return 0
   done
   echo "no site-packages under ${venv_dir}" >&2
-  return 1
-}
-
-# Prints a digest of the names, modes, inodes and change times of every path
-# under the given paths, without following symlinks.
-#
-# NOTE: Duplicate logic in: sft_pipx_snapshot, sft_poetry_snapshot
-sft_pipx_snapshot() {
-  find "$@" -exec /usr/bin/stat -f '%N %Sp %i %z %m' {} + | LC_ALL=C sort | shasum
-}
-
-# Fails if $path exists, including as a dangling symlink.
-sft_pipx_assert_absent() {
-  local path="$1"
-
-  [ ! -e "$path" ] && [ ! -L "$path" ] && return 0
-  echo "expected path to be absent: ${path}" >&2
   return 1
 }
 

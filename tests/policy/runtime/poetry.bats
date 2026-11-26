@@ -108,7 +108,6 @@ setup_file() {
 
 teardown() {
   sft_poetry_cleanup_global_install
-  sft_poetry_release_global_lock
   sft_teardown_test_env
 }
 
@@ -122,7 +121,7 @@ teardown() {
 
 @test "[EXECUTION] poetry about, cache list, and python list work on a fresh home directory, without creating Poetry's config and data directory" {
   local fake_home poetry_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
 
   # Ensure `poetry about` works
@@ -147,7 +146,7 @@ teardown() {
 
 @test "[EXECUTION] poetry config and poetry self fail on a fresh home directory" {
   local fake_home poetry_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
 
   # Ensure each fails creating Poetry's config directory,
@@ -167,7 +166,7 @@ teardown() {
 
 @test "[EXECUTION] Poetry's config and data directory cannot be created inside the sandbox" {
   local fake_home poetry_dir name
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
 
   # NOTE: Creating a directory is indistinguishable from moving a
@@ -201,7 +200,7 @@ teardown() {
 
 @test "[EXECUTION] poetry new can create a project in the workspace" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "sft-poetry-new-probe")" || return 1
 
   # Ensure `poetry new` works
@@ -216,7 +215,7 @@ teardown() {
 
 @test "[EXECUTION] poetry install can install project dependencies into an in-project .venv" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_in_project")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-in-project-probe" \
     "${SFT_POETRY_TEST_PKG}==${SFT_POETRY_TEST_PKG_VERSION}" || return 1
@@ -243,7 +242,7 @@ teardown() {
 
 @test "[EXECUTION] poetry install can install project dependencies into a venv in Poetry's virtualenvs cache" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_cache_venv")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-cache-venv-probe" \
     "${SFT_POETRY_TEST_PKG}==${SFT_POETRY_TEST_PKG_VERSION}" || return 1
@@ -267,7 +266,7 @@ teardown() {
 
 @test "[EXECUTION] poetry install can install the root project in editable mode" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_editable")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-editable-probe" || return 1
   printf '[virtualenvs]\nin-project = true\n' > "${project_dir}/poetry.toml" || return 1
@@ -297,7 +296,7 @@ teardown() {
 
 @test "[EXECUTION] poetry add can add a dependency to a project and lock it" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_add")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-add-probe" || return 1
   printf '[virtualenvs]\nin-project = true\n' > "${project_dir}/poetry.toml" || return 1
@@ -314,7 +313,7 @@ teardown() {
 
 @test "[EXECUTION] poetry remove can remove a dependency from a project and its venv" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_remove")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-remove-probe" \
     "${SFT_POETRY_TEST_PKG}==${SFT_POETRY_TEST_PKG_VERSION}" || return 1
@@ -336,7 +335,7 @@ teardown() {
 
 @test "[EXECUTION] poetry run can execute a project command" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_run")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-run-probe" \
     "${SFT_POETRY_TEST_PKG}==${SFT_POETRY_TEST_PKG_VERSION}" || return 1
@@ -357,7 +356,7 @@ teardown() {
 
 @test "[EXECUTION] poetry build can build a wheel and sdist into the workspace" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_build")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-build-probe" || return 1
   mkdir -p "${project_dir}/src/sft_poetry_build_probe" || return 1
@@ -384,7 +383,7 @@ teardown() {
 }
 sft_poetry_test_no_venv_install_denied() {
   local fake_home project_dir poetry_root poetry_bin
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_no_venv")" || return 1
 
   # Precondition: site-packages is writable unsandboxed
@@ -423,12 +422,12 @@ sft_poetry_test_self_add_denied() {
   local install_type="$1"
 
   local fake_home venv_dir poetry_bin site_dir config_dir snapshot_before
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   sft_poetry_install_outside_sandbox "$install_type" "$fake_home" || return 1
   venv_dir="$SFT_POETRY_VENV_DIR"
   poetry_bin="${fake_home}/.local/bin/poetry"
   site_dir="$(sft_poetry_site_packages "$venv_dir")" || return 1
-  snapshot_before="$(sft_poetry_snapshot "$venv_dir" "$poetry_bin")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$venv_dir" "$poetry_bin")" || return 1
 
   # Precondition: the pre-installed Poetry runs inside the sandbox,
   # so that the denials below are not just a failure to start
@@ -460,12 +459,12 @@ sft_poetry_test_self_add_denied() {
   # Ensure nothing changed
   sft_assert_path_absent "${site_dir}/${SFT_POETRY_TEST_PKG}"
   sft_assert_path_absent "${venv_dir}/bin/${SFT_POETRY_TEST_PKG}"
-  [ "$(sft_poetry_snapshot "$venv_dir" "$poetry_bin")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$venv_dir" "$poetry_bin")" = "$snapshot_before" ]
 }
 
 @test "[EXECUTION] the official Poetry installer cannot install Poetry globally" {
   local fake_home installer poetry_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   installer="$(sft_poetry_official_installer)" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
 
@@ -504,7 +503,7 @@ sft_poetry_test_preinstalled_runs() {
   local install_type="$1"
 
   local fake_home poetry_bin
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   sft_poetry_install_outside_sandbox "$install_type" "$fake_home" || return 1
   poetry_bin="${fake_home}/.local/bin/poetry"
 
@@ -533,7 +532,7 @@ sft_poetry_test_preinstalled_immutable() {
   local install_type="$1"
 
   local fake_home venv_dir root_dir poetry_bin site_dir pkg_dir snapshot_before
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   sft_poetry_install_outside_sandbox "$install_type" "$fake_home" || return 1
   venv_dir="$SFT_POETRY_VENV_DIR"
   root_dir="$SFT_POETRY_ROOT_DIR"
@@ -541,7 +540,7 @@ sft_poetry_test_preinstalled_immutable() {
   site_dir="$(sft_poetry_site_packages "$venv_dir")" || return 1
   pkg_dir="${site_dir}/poetry"
   sft_assert_file_exists "${pkg_dir}/__version__.py"
-  snapshot_before="$(sft_poetry_snapshot "$venv_dir" "$poetry_bin")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$venv_dir" "$poetry_bin")" || return 1
 
   # Ensure cannot modify Poetry with `poetry self` subcommands, with Poetry's
   # config dir moved into the workspace, so that they get as far as Poetry's
@@ -586,7 +585,7 @@ sft_poetry_test_preinstalled_immutable() {
   # Ensure nothing changed
   sft_assert_path_absent "${site_dir}/sitecustomize.py"
   [ -d "$root_dir" ]
-  [ "$(sft_poetry_snapshot "$venv_dir" "$poetry_bin")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$venv_dir" "$poetry_bin")" = "$snapshot_before" ]
 }
 
 @test "[EXECUTION] a Poetry plugin installed outside the sandbox is usable (pipx)" {
@@ -599,7 +598,7 @@ sft_poetry_test_plugin_usable() {
   local install_type="$1"
 
   local fake_home poetry_bin project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   sft_poetry_install_outside_sandbox "$install_type" "$fake_home" || return 1
   poetry_bin="${fake_home}/.local/bin/poetry"
   project_dir="$(sft_workspace_path "poetry_plugin")" || return 1
@@ -626,7 +625,7 @@ sft_poetry_test_plugin_usable() {
   # NOTE: Models an agent started in a project the user already ran
   #       `poetry install` in.
   local fake_home project_dir venvs_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_preinstalled_venv")" || return 1
   venvs_dir="${fake_home}/Library/Caches/pypoetry/virtualenvs"
   sft_poetry_write_project "$project_dir" "sft-poetry-preinstalled-venv-probe" \
@@ -662,7 +661,7 @@ sft_poetry_test_plugin_usable() {
 
 @test "[EXECUTION] poetry python install cannot install a shared Python interpreter" {
   local fake_home poetry_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
 
   # Ensure cannot install, with no Poetry config and data directory yet
@@ -682,7 +681,7 @@ sft_poetry_test_plugin_usable() {
 
 @test "[EXECUTION] a Poetry-managed interpreter installed outside the sandbox is usable by poetry env use and poetry install" {
   local fake_home python_dir python_bin
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   sft_poetry_python_install_outside_sandbox "$fake_home" || return 1
   python_dir="$SFT_POETRY_MANAGED_PYTHON_DIR"
   python_bin="$SFT_POETRY_MANAGED_PYTHON_BIN"
@@ -716,14 +715,14 @@ sft_poetry_test_plugin_usable() {
   #       (e.g. a sitecustomize.py in its stdlib) would run inside all of them.
 
   local fake_home poetry_dir python_dir python_bin stdlib_dir snapshot_before
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   sft_poetry_python_install_outside_sandbox "$fake_home" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
   python_dir="$SFT_POETRY_MANAGED_PYTHON_DIR"
   python_bin="$SFT_POETRY_MANAGED_PYTHON_BIN"
   stdlib_dir="${python_dir}/lib/python${SFT_POETRY_TEST_PYTHON_VERSION}"
   sft_assert_file_exists "${stdlib_dir}/os.py"
-  snapshot_before="$(sft_poetry_snapshot "$python_dir")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$python_dir")" || return 1
 
   # Ensure cannot modify the interpreter with `poetry python` subcommands
   HOME="$fake_home" safehouse_denied -- "$SFT_POETRY_BIN" python install --no-interaction \
@@ -759,7 +758,7 @@ sft_poetry_test_plugin_usable() {
 
   # Ensure nothing changed
   sft_assert_path_absent "${stdlib_dir}/sitecustomize.py"
-  [ "$(sft_poetry_snapshot "$python_dir")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$python_dir")" = "$snapshot_before" ]
 }
 
 # === Config & Credentials ===
@@ -769,7 +768,7 @@ sft_poetry_test_plugin_usable() {
   #       where Poetry fetches from.
 
   local fake_home poetry_dir config_file
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
   config_file="${poetry_dir}/config.toml"
 
@@ -813,7 +812,7 @@ sft_poetry_test_plugin_usable() {
 
 @test "[EXECUTION] poetry config --local can write project config in the workspace" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_local_config")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-local-config-probe" || return 1
 
@@ -843,7 +842,7 @@ sft_poetry_test_plugin_usable() {
   #       auth.toml. So this test exercises auth.toml.
 
   local fake_home poetry_dir auth_file auth_before
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   poetry_dir="${fake_home}/Library/Application Support/pypoetry"
   auth_file="${poetry_dir}/auth.toml"
 
@@ -879,7 +878,7 @@ sft_poetry_test_plugin_usable() {
 # NOTE: Test characterizes current behavior. Ideal behavior would disallow tampering.
 @test "[EXECUTION] can tamper with a project venv in Poetry's virtualenvs cache to place a binary where it will run outside sandbox" {
   local fake_home project_dir
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_tampered_venv")" || return 1
   sft_poetry_write_project "$project_dir" "sft-poetry-tampered-venv-probe" \
     "${SFT_POETRY_TEST_PKG}==${SFT_POETRY_TEST_PKG_VERSION}" || return 1
@@ -916,7 +915,7 @@ sft_poetry_test_plugin_usable() {
 
 @test "[EXECUTION] a tampered wheel in Poetry's artifacts cache is rejected by a later poetry install outside sandbox" {
   local fake_home project_dir venvs_dir cached_wheels cached_wheel tampered_wheel marker output
-  fake_home="$(sft_poetry_fake_home)" || return 1
+  fake_home="$(sft_fake_home --macos-dirs)" || return 1
   project_dir="$(sft_workspace_path "poetry_tampered_wheel")" || return 1
   venvs_dir="${fake_home}/Library/Caches/pypoetry/virtualenvs"
   marker="$(sft_workspace_path "planted_pth_ran")" || return 1
@@ -969,16 +968,6 @@ with zipfile.ZipFile(sys.argv[1], "a") as whl:
 
 # ------------------------------------------------------------------------------
 # Utility
-
-# Prints a new fake home, laid out as on a fresh macOS user account.
-sft_poetry_fake_home() {
-  local fake_home
-  fake_home="$(sft_fake_home)" || return 1
-  mkdir -p \
-    "${fake_home}/Library/Application Support" \
-    "${fake_home}/Library/Caches" || return 1
-  printf '%s\n' "$fake_home"
-}
 
 # Installs a copy of the Poetry on PATH, at the same version, with pipx,
 # into the pipx home, bin dir and man dir under $1.
@@ -1267,7 +1256,10 @@ sft_poetry_require_global_install_target() {
   SFT_POETRY_SCRIPTS_DIR="$("$SFT_POETRY_PYTHON_BIN" -c \
     'import sysconfig; print(sysconfig.get_path("scripts"))')" || return 1
 
-  sft_poetry_acquire_global_lock || return 1
+  # Serialize tests that use this interpreter's global site-packages, across
+  # pip.bats, uv.bats and poetry.bats. Parallel tests would otherwise install,
+  # see, and uninstall each other's package.
+  sft_acquire_run_lock "pip-global-$(printf '%s' "$SFT_POETRY_SITE_PACKAGES" | cksum | cut -d' ' -f1)" || return 1
 
   # Skip if package appears to have been installed before test run started,
   # so that we do NOT adopt it and do NOT uninstall it later.
@@ -1276,36 +1268,6 @@ sft_poetry_require_global_install_target() {
 
   [ -w "$SFT_POETRY_SITE_PACKAGES" ] && [ -w "$SFT_POETRY_SCRIPTS_DIR" ] \
     || skip "global site-packages/bin not writable by this user (${SFT_POETRY_SITE_PACKAGES})"
-}
-
-# Serializes tests that use one interpreter's global site-packages,
-# across pip.bats, uv.bats and poetry.bats in the same bats run.
-#
-# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock,
-#       sft_poetry_acquire_global_lock
-#
-# Released by sft_poetry_release_global_lock in teardown.
-sft_poetry_acquire_global_lock() {
-  local timeout=600 key lock_dir waited=0
-  key="$(printf '%s' "$SFT_POETRY_SITE_PACKAGES" | cksum | cut -d' ' -f1)"
-  lock_dir="${BATS_RUN_TMPDIR}/sft-pip-global-${key}.lock"
-
-  until mkdir "$lock_dir" 2>/dev/null; do
-    if [ "$waited" -ge "$timeout" ]; then
-      echo "timed out after ${timeout}s waiting for ${lock_dir}" >&2
-      return 1
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-
-  SFT_POETRY_GLOBAL_LOCK="$lock_dir"
-}
-
-sft_poetry_release_global_lock() {
-  [ -n "${SFT_POETRY_GLOBAL_LOCK:-}" ] || return 0
-  rmdir "$SFT_POETRY_GLOBAL_LOCK" 2>/dev/null || true
-  SFT_POETRY_GLOBAL_LOCK=""
 }
 
 # Uninstalls the test package from the global site-packages, in case a test
@@ -1330,12 +1292,4 @@ sft_poetry_site_packages() {
   done
   echo "no site-packages under ${venv_dir}" >&2
   return 1
-}
-
-# Prints a digest of the names, modes, inodes and change times of every path
-# under the given paths, without following symlinks.
-#
-# NOTE: Duplicate logic in: sft_pipx_snapshot, sft_poetry_snapshot
-sft_poetry_snapshot() {
-  find "$@" -exec /usr/bin/stat -f '%N %Sp %i %z %m' {} + | LC_ALL=C sort | shasum
 }

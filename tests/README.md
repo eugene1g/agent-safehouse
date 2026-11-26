@@ -276,7 +276,8 @@ The split is intentional: the default Safehouse profile already allows broad acc
 - **`sft_assert_file_content <path> <expected>`** — asserts that a file exists and has the expected full content.
 - **`sft_assert_file_includes_source <path> <profile-path>`** — file-backed variant of `sft_assert_includes_source`.
 - **`sft_assert_file_omits_source <path> <profile-path>`** — file-backed variant of `sft_assert_omits_source`.
-- **`sft_assert_path_absent <path>`** — asserts that a path does not exist.
+- **`sft_assert_path_absent <path>`** — asserts that a path does not exist, including as a dangling symlink.
+- **`sft_tree_snapshot <path>...`** — prints a digest of every path under the given paths. Compare digests from before and after an action to assert it left them unchanged.
 - **`sft_require_cmd_or_skip <cmd>`** — skips the test if the host dependency is not installed.
 - **`sft_require_env_or_skip <VAR>`** — skips the test if the named environment variable is unset or empty.
 - **`sft_command_path_or_skip <var> <cmd>`** — assigns the resolved command path to `<var>`, or skips if the command is unavailable.
@@ -287,6 +288,14 @@ The split is intentional: the default Safehouse profile already allows broad acc
 - **`sft_external_dir <label>`** — creates and returns a directory under `SAFEHOUSE_EXTERNAL_ROOT` (outside the sandbox workdir — access depends on profile grants).
 - **`sft_external_path <label> <name>`** — creates an external directory and returns a path inside it.
 - **`sft_fake_home`** — creates and returns a second fake home under `SAFEHOUSE_FAKE_HOME_ROOT` when one test needs more than the default fake `HOME`.
+  - `--macos-dirs` adds the `~/Library` dirs every macOS account has.
+  - `--xdg-dirs` adds `~/.cache` and `~/.local/share`.
+  - `sft_create_macos_home_dirs <home>` and `sft_create_xdg_home_dirs <home>`
+    add the corresponding dirs to an existing home.
+
+### Concurrency helpers
+
+- **`sft_acquire_run_lock <name>`** — holds a lock shared by all tests, to serialize tests that use a global resource outside the fake home. Released automatically in `sft_teardown_test_env`.
 
 ## Examples
 
