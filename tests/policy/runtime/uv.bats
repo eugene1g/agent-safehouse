@@ -4,6 +4,7 @@
 # uv toolchain tests.
 #
 load ../../test_helper.bash
+load python_helper.bash
 
 # Minimal test package to install
 SFT_UV_TEST_PKG="cowsay"
@@ -354,26 +355,26 @@ EOF
 
 @test "[EXECUTION] uv pip install --system cannot install a package into the interpreter's global site-packages or bin directory (python.org)" {
   # Targets: /Library/Frameworks/Python.framework/Versions/3.X/{lib/python3.X/site-packages,bin}
-  sft_uv_use_system_python python.org
+  sft_py_use_python python.org
   sft_uv_test_system_install_denied
 }
 @test "[EXECUTION] uv pip install --system cannot install a package into the interpreter's global site-packages or bin directory (Homebrew)" {
   # Targets: $(brew --prefix)/lib/python3.X/site-packages, $(brew --prefix)/bin
-  sft_uv_use_system_python homebrew
+  sft_py_use_python homebrew
   sft_uv_test_system_install_denied
 }
 sft_uv_test_system_install_denied() {
   # Precondition: site-packages is writable unsandboxed
-  sft_uv_require_system_install_target || return 1
+  sft_py_require_global_install_target "$SFT_UV_TEST_PKG" || return 1
 
   # Ensure cannot install global package
   SFT_UV_SYSTEM_DIRTY=1
   # shellcheck disable=SC2086  # intentionally unquoted: empty or one flag
   safehouse_denied -- "$SFT_UV_BIN" pip install --system \
-    --python "$SFT_UV_SYSTEM_PYTHON_BIN" $SFT_UV_PEP668_FLAG \
+    --python "$SFT_PY_PYTHON_BIN" $SFT_PY_PEP668_FLAG \
     "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}"
-  [ ! -e "${SFT_UV_SITE_PACKAGES}/${SFT_UV_TEST_PKG}" ]
-  [ ! -e "${SFT_UV_SCRIPTS_DIR}/${SFT_UV_TEST_PKG}" ]
+  [ ! -e "${SFT_PY_SITE_PACKAGES}/${SFT_UV_TEST_PKG}" ]
+  [ ! -e "${SFT_PY_SCRIPTS_DIR}/${SFT_UV_TEST_PKG}" ]
 }
 
 # === Pre-Installed Global Tools: Usable, Immutable ===
@@ -801,71 +802,13 @@ print("${SFT_UV_TEST_PKG}", importlib.metadata.version("${SFT_UV_TEST_PKG}"), sy
 EOF
 }
 
-# 1. Skip the current test if the requested Python install type is absent.
-# 2. Set SFT_UV_SYSTEM_PYTHON_BIN to that install's python3.
-# 3. Set SFT_UV_PEP668_FLAG to --break-system-packages for Homebrew,
-#    so that the sandbox, not PEP 668's EXTERNALLY-MANAGED marker,
-#    is what refuses a system install.
-#
-# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python,
-#       sft_poetry_use_python
-sft_uv_use_system_python() {
-  local install_type="$1" python_bin brew_prefix
-
-  case "$install_type" in
-    python.org)
-      python_bin="/Library/Frameworks/Python.framework/Versions/Current/bin/python3"
-      ;;
-    homebrew)
-      brew_prefix="$(brew --prefix 2>/dev/null || true)"
-      [ -n "$brew_prefix" ] || skip "Homebrew is not installed"
-      python_bin="${brew_prefix}/bin/python3"
-      ;;
-    *)
-      echo "unknown Python install type: $install_type" >&2
-      return 1
-      ;;
-  esac
-  [ -x "$python_bin" ] || skip "${install_type} Python is not installed"
-
-  export SFT_UV_SYSTEM_PYTHON_BIN="$python_bin"
-  export SFT_UV_PEP668_FLAG=""
-  [ "$install_type" != "homebrew" ] || SFT_UV_PEP668_FLAG="--break-system-packages"
-}
-
-# 1. Set SFT_UV_SITE_PACKAGES and SFT_UV_SCRIPTS_DIR to where a system
-#    (non-venv, non-user) install lands.
-# 2. Hold the interpreter's global-site lock until teardown.
-# 3. Skip the test when it cannot be exercised faithfully, since a sandbox
-#    denial proves nothing there: when the test package is already installed
-#    globally, or when site-packages is not writable by this user.
-sft_uv_require_system_install_target() {
-  SFT_UV_SITE_PACKAGES="$("$SFT_UV_SYSTEM_PYTHON_BIN" -c \
-    'import sysconfig; print(sysconfig.get_path("purelib"))')" || return 1
-  SFT_UV_SCRIPTS_DIR="$("$SFT_UV_SYSTEM_PYTHON_BIN" -c \
-    'import sysconfig; print(sysconfig.get_path("scripts"))')" || return 1
-
-  # Serialize tests that use this interpreter's global site-packages, across
-  # pip.bats, uv.bats and poetry.bats. Parallel tests would otherwise install,
-  # see, and uninstall each other's package.
-  sft_acquire_run_lock "pip-global-$(printf '%s' "$SFT_UV_SITE_PACKAGES" | cksum | cut -d' ' -f1)" || return 1
-
-  # Skip if package appears to have been installed before test run started,
-  # so that we do NOT adopt it and do NOT uninstall it later.
-  [ ! -e "${SFT_UV_SITE_PACKAGES}/${SFT_UV_TEST_PKG}" ] \
-    || skip "${SFT_UV_TEST_PKG} is already installed globally"
-
-  [ -w "$SFT_UV_SITE_PACKAGES" ] && [ -w "$SFT_UV_SCRIPTS_DIR" ] \
-    || skip "global site-packages/bin not writable by this user (${SFT_UV_SITE_PACKAGES})"
-}
-
 # Uninstalls the test package from the interpreter's global site-packages,
 # in case a sandbox failure let a system install through.
 sft_uv_cleanup_system_install() {
   [ "${SFT_UV_SYSTEM_DIRTY:-}" = 1 ] || return 0
   # shellcheck disable=SC2086
-  "$SFT_UV_BIN" pip uninstall --system --python "$SFT_UV_SYSTEM_PYTHON_BIN" \
-    $SFT_UV_PEP668_FLAG "$SFT_UV_TEST_PKG" >/dev/null 2>&1 || true
+  "$SFT_UV_BIN" pip uninstall --system --python "$SFT_PY_PYTHON_BIN" \
+    $SFT_PY_PEP668_FLAG "$SFT_UV_TEST_PKG" >/dev/null 2>&1 || true
   SFT_UV_SYSTEM_DIRTY=0
 }
 

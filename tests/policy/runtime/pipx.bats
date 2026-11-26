@@ -37,6 +37,7 @@
 #       venvs/, ~/.local/bin, ~/.local/share/man, the venv cache, and py/.
 #
 load ../../test_helper.bash
+load python_helper.bash
 
 # Minimal test package to install
 SFT_PIPX_TEST_PKG="cowsay"
@@ -264,7 +265,7 @@ sft_pipx_test_installed_binary_immutable() {
   pipx_home="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_HOME)" || return 1
   venvs_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_LOCAL_VENVS)" || return 1
   venv_dir="${venvs_dir}/${SFT_PIPX_TEST_PKG}"
-  pkg_dir="$(sft_pipx_site_packages "$venv_dir")/${SFT_PIPX_TEST_PKG}" || return 1
+  pkg_dir="$(sft_py_venv_site_packages "$venv_dir")/${SFT_PIPX_TEST_PKG}" || return 1
   bin_link="${fake_home}/.local/bin/${SFT_PIPX_TEST_PKG}"
   sft_assert_file_exists "${pkg_dir}/__init__.py"
 
@@ -328,7 +329,7 @@ sft_pipx_test_shared_libs_immutable() {
   sft_pipx_install_outside_sandbox "$fake_home" || return 1
 
   shared_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_SHARED_LIBS)" || return 1
-  site_dir="$(sft_pipx_site_packages "$shared_dir")" || return 1
+  site_dir="$(sft_py_venv_site_packages "$shared_dir")" || return 1
   sft_assert_file_exists "${site_dir}/pip/__init__.py"
   snapshot_before="$(sft_tree_snapshot "$shared_dir")" || return 1
 
@@ -635,21 +636,6 @@ sft_pipx_missing_python_version_or_skip() {
     return 0
   done
   skip "every candidate Python version is already on PATH"
-}
-
-# Prints the site-packages directory of the venv at $venv_dir.
-#
-# NOTE: Duplicate logic in: sft_pipx_site_packages, sft_poetry_site_packages
-sft_pipx_site_packages() {
-  local venv_dir="$1" site_dir
-
-  for site_dir in "$venv_dir"/lib/python*/site-packages; do
-    [ -d "$site_dir" ] || continue
-    printf '%s\n' "$site_dir"
-    return 0
-  done
-  echo "no site-packages under ${venv_dir}" >&2
-  return 1
 }
 
 # Prints the value of a `pipx environment` variable for $fake_home.
