@@ -351,19 +351,18 @@ sft_pipx_test_shared_libs_immutable() {
 
 # === Interpreters ===
 
-@test "[EXECUTION] pipx run --fetch-missing-python cannot provision a standalone interpreter (pip backend)" {
+@test "[EXECUTION] pipx run --fetch-python cannot provision a standalone interpreter (pip backend)" {
   sft_pipx_use_backend pip
-  sft_pipx_test_fetch_missing_python_denied
+  sft_pipx_test_fetch_python_denied
 }
-@test "[EXECUTION] pipx run --fetch-missing-python cannot provision a standalone interpreter (uv backend)" {
+@test "[EXECUTION] pipx run --fetch-python cannot provision a standalone interpreter (uv backend)" {
   # NOTE: pipx downloads the interpreter itself, into py/, under either backend.
   sft_pipx_use_backend uv
-  sft_pipx_test_fetch_missing_python_denied
+  sft_pipx_test_fetch_python_denied
 }
-sft_pipx_test_fetch_missing_python_denied() {
+sft_pipx_test_fetch_python_denied() {
   local fake_home py_dir fetch_arg py_version
-  sft_pipx_fetch_missing_python_arg_or_skip fetch_arg
-  sft_pipx_missing_python_version_or_skip py_version
+  sft_pipx_fetch_python_args_or_skip fetch_arg py_version
 
   fake_home="$(sft_pipx_fake_home)" || return 1
   sft_pipx_prepare_home_outside_sandbox "$fake_home" || return 1
@@ -395,8 +394,7 @@ sft_pipx_test_fetched_python_immutable() {
   # so a write to its stdlib (e.g. a sitecustomize.py) would run inside the tool,
   # outside the sandbox.
   local fake_home py_dir fetch_arg py_version interp_dir stdlib_dir snapshot_before output
-  sft_pipx_fetch_missing_python_arg_or_skip fetch_arg
-  sft_pipx_missing_python_version_or_skip py_version
+  sft_pipx_fetch_python_args_or_skip fetch_arg py_version
 
   # Outside sandbox, install a tool with a fetched interpreter
   # NOTE: Prints pipx's output and logs on failure
@@ -618,35 +616,34 @@ sft_pipx_prepare_home_outside_sandbox() {
   fi
 }
 
-# Sets the variable named $1 to the `pipx run` option that downloads a
-# standalone interpreter only when the requested version is missing.
-# Skips the current test if pipx cannot download interpreters.
-sft_pipx_fetch_missing_python_arg_or_skip() {
-  local out_var="$1" run_help
+# Sets the variable named $1 to the pipx option that downloads a standalone
+# interpreter, and the variable named $2 to a Python version to download.
+#
+# Skips the current test if pipx cannot download interpreters, or if it can
+# download only missing versions and every candidate is already on PATH.
+sft_pipx_fetch_python_args_or_skip() {
+  local arg_var="$1" version_var="$2" run_help version
+
   run_help="$("$SFT_PIPX_BIN" run --help 2>/dev/null)"
-
   if [[ "$run_help" == *"--fetch-python"* ]]; then
-    # pipx 1.18+ deprecates --fetch-missing-python in favor of this
-    printf -v "$out_var" '%s' "--fetch-python=missing"
-  elif [[ "$run_help" == *"--fetch-missing-python"* ]]; then
-    printf -v "$out_var" '%s' "--fetch-missing-python"
-  else
-    skip "pipx cannot download standalone interpreters"
-  fi
-}
-
-# Sets the variable named $1 to a Python version that python-build-standalone
-# provides but that is not on PATH, so pipx must download it.
-# Skips the current test if every candidate is already on PATH.
-sft_pipx_missing_python_version_or_skip() {
-  local out_var="$1" version
-
-  for version in 3.13 3.12 3.11 3.14; do
-    command -v "python${version}" >/dev/null 2>&1 && continue
-    printf -v "$out_var" '%s' "$version"
+    # Prepare to install a fixed Python version,
+    # regardless of any Python versions on PATH
+    printf -v "$arg_var" '%s' "--fetch-python=always"
+    printf -v "$version_var" '%s' "3.13"
     return 0
-  done
-  skip "every candidate Python version is already on PATH"
+  fi
+  if [[ "$run_help" == *"--fetch-missing-python"* ]]; then
+    # Prepare to install a Python version that is not on PATH.
+    # NOTE: Each candidate must be one that python-build-standalone provides.
+    for version in 3.13 3.12 3.11 3.14; do
+      command -v "python${version}" >/dev/null 2>&1 && continue
+      printf -v "$arg_var" '%s' "--fetch-missing-python"
+      printf -v "$version_var" '%s' "$version"
+      return 0
+    done
+    skip "every candidate Python version is already on PATH"
+  fi
+  skip "pipx cannot download standalone interpreters"
 }
 
 # Prints the value of a `pipx environment` variable for $fake_home.
