@@ -58,6 +58,14 @@ setup_file() {
   if "$SFT_PIPX_BIN" run --help 2>/dev/null | grep -q -- '--backend'; then
     SFT_PIPX_HAS_BACKENDS=1
   fi
+
+  # Fetch python-build-standalone's release index once, for the tests that
+  # download a standalone interpreter. See sft_pipx_load_python_index.
+  export SFT_PIPX_PYTHON_INDEX="${BATS_FILE_TMPDIR}/pipx-python-index.json"
+  if "$SFT_PIPX_BIN" run --help 2>/dev/null | grep -q -- '--fetch-'; then
+    sft_pipx_fetch_python_index "$SFT_PIPX_PYTHON_INDEX" \
+      || echo "# WARNING: could not fetch the python-build-standalone index" >&3
+  fi
 }
 
 # === Basics ===
@@ -366,6 +374,7 @@ sft_pipx_test_fetch_python_denied() {
 
   fake_home="$(sft_pipx_fake_home)" || return 1
   sft_pipx_prepare_home_outside_sandbox "$fake_home" || return 1
+  sft_pipx_load_python_index "$fake_home" || return 1
   py_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_STANDALONE_PYTHON_CACHEDIR)" || return 1
 
   # Ensure cannot download a standalone interpreter into py/
@@ -399,6 +408,7 @@ sft_pipx_test_fetched_python_immutable() {
   # Outside sandbox, install a tool with a fetched interpreter
   # NOTE: Prints pipx's output and logs on failure
   fake_home="$(sft_pipx_fake_home)" || return 1
+  sft_pipx_load_python_index "$fake_home" || return 1
   if ! output="$(HOME="$fake_home" "$SFT_PIPX_BIN" install \
       ${SFT_PIPX_BACKEND_ARGS[@]+"${SFT_PIPX_BACKEND_ARGS[@]}"} \
       "$fetch_arg" --python "$py_version" \
@@ -614,6 +624,46 @@ sft_pipx_prepare_home_outside_sandbox() {
     
     return
   fi
+}
+
+# Writes python-build-standalone's latest release index to $1, in the format
+# of the index that pipx caches.
+#
+# Authenticates with GH_TOKEN if set. Unauthenticated, the GitHub API has a
+# lower rate limit.
+sft_pipx_fetch_python_index() {
+  local index_file="$1" release_file="${1}.release" auth_file="${1}.auth"
+
+  # NOTE: Passes the token in a file, not argv, so that ps cannot see it.
+  ( umask 077; : > "$auth_file" ) || return 1
+  [ -z "${GH_TOKEN:-}" ] \
+    || printf 'Authorization: Bearer %s\n' "$GH_TOKEN" > "$auth_file" || return 1
+  curl -fsSL --retry 3 -o "$release_file" \
+    -H "@${auth_file}" -H 'Accept: application/vnd.github+json' \
+    https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest
+  local rc=$?
+  rm -f "$auth_file"
+  [ "$rc" -eq 0 ] || return 1
+
+  # NOTE: macOS 15+ is known to ship jq
+  jq -c '{fetched: now, releases: [.assets[] | [.browser_download_url, .digest]]}' \
+    "$release_file" > "$index_file" || return 1
+  rm -f "$release_file"
+}
+
+# Copies the index from sft_pipx_fetch_python_index into the fake home at $1,
+# so that pipx does not fetch the index itself when it downloads an interpreter.
+# pipx trusts a cached index for 30 days (pipx 1.18).
+sft_pipx_load_python_index() {
+  local fake_home="$1" py_dir
+
+  [ -s "$SFT_PIPX_PYTHON_INDEX" ] || {
+    echo "python-build-standalone index missing: setup_file could not fetch it" >&2
+    return 1
+  }
+  py_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_STANDALONE_PYTHON_CACHEDIR)" || return 1
+  mkdir -p "$py_dir" || return 1
+  cp "$SFT_PIPX_PYTHON_INDEX" "${py_dir}/index.json"
 }
 
 # Sets the variable named $1 to the pipx option that downloads a standalone
