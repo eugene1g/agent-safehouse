@@ -495,11 +495,13 @@ sft_pipx_test_fetched_python_immutable() {
 # 2. Set SFT_PIPX_BACKEND to its name.
 # 3. Set SFT_PIPX_BACKEND_ARGS to the args that select it,
 #    to pass to pipx subcommands that accept --backend.
+# 4. For the uv backend, make uv findable by pipx inside the sandbox
+#    for the rest of the test.
 #
 # NOTE: Selects the backend with --backend rather than PIPX_DEFAULT_BACKEND
 #       because the sandbox does not pass that env var through by default.
 sft_pipx_use_backend() {
-  local backend="$1" uv_bin
+  local backend="$1" uv_bin uv_dir
 
   case "$backend" in
     pip)
@@ -511,12 +513,13 @@ sft_pipx_use_backend() {
     uv)
       [ "$SFT_PIPX_HAS_BACKENDS" = "1" ] || skip "pipx does not support --backend"
       sft_command_path_or_skip uv_bin uv
-      # pipx finds uv on PATH. A PATH entry under the host HOME is dropped
-      # from the sandbox's PATH because each test runs with a fake HOME,
-      # so a real user's ~/.local/bin/uv would be found but this one not.
+      # If uv is installed under the host HOME, put its directory back on PATH
+      # granted read-only so that sandbox calls in the test can see it
       case "$uv_bin" in
         "$SAFEHOUSE_HOST_HOME"/*)
-          skip "uv is installed under the host HOME (${uv_bin}), which the sandbox cannot see under a fake HOME. Suggest install uv via brew instead."
+          uv_dir="$(dirname "$uv_bin")"
+          export PATH="${uv_dir}:${PATH}"
+          export SAFEHOUSE_ADD_DIRS_RO="${SAFEHOUSE_ADD_DIRS_RO:+${SAFEHOUSE_ADD_DIRS_RO}:}${uv_dir}"
           ;;
       esac
       SFT_PIPX_BACKEND=uv
