@@ -1140,7 +1140,7 @@ sft_poetry_python_install_outside_sandbox() {
   # Try to install Poetry-managed interpreter outside the sandbox,
   # up to 3 times, to reduce flakiness from Poetry's hard-coded 5s timeout
   # per network operation with no internal retries.
-  local attempt, output
+  local attempt output
   local pythons_dir="${fake_home}/Library/Application Support/pypoetry/python"
   for attempt in 1 2 3; do
     if output="$(HOME="$fake_home" "$SFT_POETRY_BIN" python install --no-interaction \
