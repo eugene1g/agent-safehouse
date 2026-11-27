@@ -57,7 +57,7 @@ SFT_POETRY_TEST_PYTHON_VERSION="3.14"
 
 setup_file() {
   # Skip tests if poetry or pipx not installed.
-  local poetry_bin pipx_root
+  local poetry_bin pipx_root uv_bin
   poetry_bin="$(command -v poetry || true)"
   [ -n "$poetry_bin" ] || skip "poetry is not installed"
   export SFT_PIPX_BIN
@@ -75,12 +75,16 @@ setup_file() {
   #       pip reads it inverted, as with PIP_NO_CACHE_DIR.
   export SFT_POETRY_PIP_COMPILE=0
 
-  # Pick pipx's backend for per-test installs of Poetry outside the sandbox
+  # Pick uv backend for per-test installs of Poetry outside the sandbox
   # when possible, else fallback to pip. Share one uv cache across tests.
-  export SFT_POETRY_PIPX_BACKEND=pip SFT_POETRY_UV_CACHE_DIR="${BATS_FILE_TMPDIR}/uv-cache"
-  if command -v uv >/dev/null 2>&1 \
+  # NOTE: Calls to pipx that need uv put SFT_POETRY_UV_DIR back on PATH.
+  export SFT_POETRY_PIPX_BACKEND=pip \
+    SFT_POETRY_UV_DIR="" \
+    SFT_POETRY_UV_CACHE_DIR="${BATS_FILE_TMPDIR}/uv-cache"
+  if uv_bin="$(command -v uv)" \
       && "$SFT_PIPX_BIN" install --help 2>/dev/null | grep -q -- '--backend'; then
     SFT_POETRY_PIPX_BACKEND=uv
+    SFT_POETRY_UV_DIR="$(dirname "$uv_bin")"
   fi
 
   # 1. Install a copy of the Poetry on PATH, at the same version,
@@ -1030,6 +1034,7 @@ sft_poetry_pipx_install_outside_sandbox() {
   if [ "$SFT_POETRY_PIPX_BACKEND" = uv ]; then
     backend_args=(--backend uv --python "$SFT_POETRY_BASE_PYTHON")
   fi
+  PATH="${SFT_POETRY_UV_DIR:+${SFT_POETRY_UV_DIR}:}${PATH}" \
   PIP_COMPILE="$SFT_POETRY_PIP_COMPILE" \
   UV_CACHE_DIR="$SFT_POETRY_UV_CACHE_DIR" \
   HOME="$fake_home" \
@@ -1101,6 +1106,7 @@ sft_poetry_plugin_install_outside_sandbox() {
   case "$install_type" in
     pipx)
       output="$(
+        PATH="${SFT_POETRY_UV_DIR:+${SFT_POETRY_UV_DIR}:}${PATH}" \
         HOME="$fake_home" \
         PIPX_HOME="${fake_home}/Library/Application Support/pipx" \
         PIPX_BIN_DIR="${fake_home}/.local/bin" \
