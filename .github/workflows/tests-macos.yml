@@ -141,6 +141,9 @@ jobs:
 
       - name: Run test suite
         if: ${{ inputs.bats_files == '' }}
+        env:
+          # Raises the GitHub API rate limit for tests that query it, such as pipx.bats
+          GH_TOKEN: ${{ github.token }}
         run: |
           ./tests/run.sh
 
@@ -148,6 +151,8 @@ jobs:
         if: ${{ inputs.bats_files != '' }}
         env:
           BATS_FILES: ${{ inputs.bats_files }}
+          # Raises the GitHub API rate limit for tests that query it, such as pipx.bats
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           bats --print-output-on-failure --show-output-of-passing-tests $BATS_FILES
