@@ -4,6 +4,7 @@
 # uv toolchain tests.
 #
 load ../../test_helper.bash
+load python_helper.bash
 
 # Minimal test package to install
 SFT_UV_TEST_PKG="cowsay"
@@ -22,7 +23,7 @@ SFT_UV_TEST_TOKEN="sft-not-a-real-token"
 setup() {
   sft_setup_test_env
   # Setup the default fake $HOME
-  sft_uv_create_xdg_roots "$HOME"
+  sft_create_xdg_home_dirs "$HOME"
 }
 
 # 1. Skip tests if uv not installed.
@@ -35,7 +36,6 @@ setup_file() {
 
 teardown() {
   sft_uv_cleanup_system_install
-  sft_uv_release_system_lock
   sft_teardown_test_env
 }
 
@@ -47,7 +47,7 @@ teardown() {
 
 @test "[EXECUTION] uv tool list and uv tool dir work on a fresh home directory, without creating uv's data directories" {
   local fake_home uv_data_dir
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
 
   # Ensure `uv tool list` works, reporting no tools
@@ -68,7 +68,7 @@ teardown() {
 
 @test "[EXECUTION] uvx and uv tool run fail on a fresh home directory, with uv's own error" {
   local fake_home
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
 
   # Ensure fails creating ~/.local/share/uv/tools,
   # with an error that names the directory the user must create
@@ -81,7 +81,7 @@ teardown() {
 
 @test "[EXECUTION] uv's data directories cannot be created inside the sandbox" {
   local fake_home uv_data_dir
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
 
   # NOTE: Creating a directory is indistinguishable from moving a
@@ -289,7 +289,7 @@ EOF
 
 @test "[EXECUTION] uvx and uv tool run can run an ephemeral tool" {
   local fake_home
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
 
   # Ensure `uvx` (an alias for `uv tool run`) can resolve, create .venv
@@ -343,7 +343,7 @@ EOF
 
 @test "[EXECUTION] uv tool install cannot install a global binary" {
   local fake_home
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
 
   # Ensure cannot write payload (under ~/.local/share/uv/tools)
@@ -355,33 +355,33 @@ EOF
 
 @test "[EXECUTION] uv pip install --system cannot install a package into the interpreter's global site-packages or bin directory (python.org)" {
   # Targets: /Library/Frameworks/Python.framework/Versions/3.X/{lib/python3.X/site-packages,bin}
-  sft_uv_use_system_python python.org
+  sft_py_use_python python.org
   sft_uv_test_system_install_denied
 }
 @test "[EXECUTION] uv pip install --system cannot install a package into the interpreter's global site-packages or bin directory (Homebrew)" {
   # Targets: $(brew --prefix)/lib/python3.X/site-packages, $(brew --prefix)/bin
-  sft_uv_use_system_python homebrew
+  sft_py_use_python homebrew
   sft_uv_test_system_install_denied
 }
 sft_uv_test_system_install_denied() {
   # Precondition: site-packages is writable unsandboxed
-  sft_uv_require_system_install_target || return 1
+  sft_py_require_global_install_target "$SFT_UV_TEST_PKG" || return 1
 
   # Ensure cannot install global package
   SFT_UV_SYSTEM_DIRTY=1
   # shellcheck disable=SC2086  # intentionally unquoted: empty or one flag
   safehouse_denied -- "$SFT_UV_BIN" pip install --system \
-    --python "$SFT_UV_SYSTEM_PYTHON_BIN" $SFT_UV_PEP668_FLAG \
+    --python "$SFT_PY_PYTHON_BIN" $SFT_PY_PEP668_FLAG \
     "${SFT_UV_TEST_PKG}==${SFT_UV_TEST_PKG_VERSION}"
-  [ ! -e "${SFT_UV_SITE_PACKAGES}/${SFT_UV_TEST_PKG}" ]
-  [ ! -e "${SFT_UV_SCRIPTS_DIR}/${SFT_UV_TEST_PKG}" ]
+  [ ! -e "${SFT_PY_SITE_PACKAGES}/${SFT_UV_TEST_PKG}" ]
+  [ ! -e "${SFT_PY_SCRIPTS_DIR}/${SFT_UV_TEST_PKG}" ]
 }
 
 # === Pre-Installed Global Tools: Usable, Immutable ===
 
 @test "[EXECUTION] a uv-installed global binary runs" {
   local fake_home
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
 
   sft_uv_tool_install_outside_sandbox "$fake_home" || return 1
 
@@ -393,7 +393,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] a uv-installed global binary cannot be modified" {
   local fake_home uv_data_dir tools_dir payload_bin bin_link snapshot_before
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
   tools_dir="${uv_data_dir}/tools"
   payload_bin="${tools_dir}/${SFT_UV_TEST_PKG}/bin/${SFT_UV_TEST_PKG}"
@@ -401,7 +401,7 @@ sft_uv_test_system_install_denied() {
 
   sft_uv_tool_install_outside_sandbox "$fake_home" || return 1
   sft_assert_file_exists "$payload_bin"
-  snapshot_before="$(sft_uv_snapshot "$tools_dir" "$bin_link")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$tools_dir" "$bin_link")" || return 1
 
   # Ensure cannot reinstall/upgrade/uninstall binary
   # NOTE: These subcommands try to rewrite the payload in place
@@ -428,14 +428,14 @@ sft_uv_test_system_install_denied() {
   HOME="$fake_home" safehouse_denied -- /bin/ln "$payload_bin" "$(sft_workspace_path "linked_bin")"
 
   # Ensure nothing changed
-  [ "$(sft_uv_snapshot "$tools_dir" "$bin_link")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$tools_dir" "$bin_link")" = "$snapshot_before" ]
 }
 
 # === Interpreters ===
 
 @test "[EXECUTION] uv venv cannot provision a uv-managed Python interpreter" {
   local fake_home venv_dir python_dir
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   venv_dir="$(sft_workspace_path "uv_managed_venv")" || return 1
   python_dir="${fake_home}/.local/share/uv/python"
 
@@ -455,7 +455,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] uv python install cannot install a shared Python interpreter" {
   local fake_home global_bin python_dir
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   global_bin="${fake_home}/.local/bin"
   python_dir="${fake_home}/.local/share/uv/python"
 
@@ -472,13 +472,13 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] a uv-managed interpreter installed outside the sandbox is usable by uv venv, uv run --script and uvx" {
   local fake_home python_dir venv_dir script_path snapshot_before
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   python_dir="${fake_home}/.local/share/uv/python"
   venv_dir="$(sft_workspace_path "uv_preinstalled_python_venv")" || return 1
 
   sft_uv_python_install_outside_sandbox "$fake_home" || return 1
   sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
-  snapshot_before="$(sft_uv_snapshot "$python_dir")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$python_dir")" || return 1
 
   # NOTE: `only-managed` stops uv adopting a system interpreter,
   #       so each command below must use the preinstalled one.
@@ -514,12 +514,12 @@ sft_uv_test_system_install_denied() {
   sft_assert_contains "$output" "$SFT_UV_TEST_PKG_VERSION"
 
   # Ensure nothing changed
-  [ "$(sft_uv_snapshot "$python_dir")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$python_dir")" = "$snapshot_before" ]
 }
 
 @test "[EXECUTION] a uv-managed interpreter cannot be modified" {
   local fake_home uv_data_dir python_dir interp_dir minor_link stdlib_dir snapshot_before
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   uv_data_dir="${fake_home}/.local/share/uv"
   python_dir="${uv_data_dir}/python"
 
@@ -533,7 +533,7 @@ sft_uv_test_system_install_denied() {
   # and venvs use the link as their Python home
   minor_link="$(find "$python_dir" -maxdepth 1 -type l \
     -name "cpython-${SFT_UV_TEST_PYTHON_VERSION}-*" -print -quit)"
-  snapshot_before="$(sft_uv_snapshot "$python_dir")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$python_dir")" || return 1
 
   # Ensure cannot modify the interpreter with uv subcommands
   HOME="$fake_home" safehouse_denied -- "$SFT_UV_BIN" python install \
@@ -567,19 +567,19 @@ sft_uv_test_system_install_denied() {
 
   # Ensure nothing changed
   [ ! -e "${stdlib_dir}/sitecustomize.py" ]
-  [ "$(sft_uv_snapshot "$python_dir")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$python_dir")" = "$snapshot_before" ]
 }
 
 @test "[EXECUTION] a uv-managed interpreter's ~/.local/bin/pythonX.Y link cannot be modified" {
   local fake_home bin_link snapshot_before
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   bin_link="${fake_home}/.local/bin/python${SFT_UV_TEST_PYTHON_VERSION}"
 
   # NOTE: `uv python install` (uv 0.8+) links ~/.local/bin/pythonX.Y
   #       to the interpreter, putting it on the user's PATH.
   sft_uv_python_install_outside_sandbox "$fake_home" || return 1
   [ -L "$bin_link" ]
-  snapshot_before="$(sft_uv_snapshot "$bin_link")" || return 1
+  snapshot_before="$(sft_tree_snapshot "$bin_link")" || return 1
 
   # Ensure the link runs the interpreter inside the sandbox
   HOME="$fake_home" safehouse_run -- "$bin_link" --version
@@ -593,14 +593,14 @@ sft_uv_test_system_install_denied() {
   HOME="$fake_home" safehouse_denied -- /bin/mv "$bin_link" "$(sft_workspace_path "moved_link")"
 
   # Ensure nothing changed
-  [ "$(sft_uv_snapshot "$bin_link")" = "$snapshot_before" ]
+  [ "$(sft_tree_snapshot "$bin_link")" = "$snapshot_before" ]
 }
 
 # === Config ===
 
 @test "[EXECUTION] uv can read user config but not write it" {
   local fake_home config_dir cache_dir
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   config_dir="${fake_home}/.config/uv"
   cache_dir="$(sft_workspace_path "uv_configured_cache")" || return 1
 
@@ -629,7 +629,7 @@ sft_uv_test_system_install_denied() {
 
 @test "[EXECUTION] uv cannot read or write stored index credentials" {
   local fake_home creds_file
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   creds_file="${fake_home}/.local/share/uv/credentials/credentials.toml"
 
   sft_uv_auth_login_outside_sandbox "$fake_home" || return 1
@@ -660,7 +660,7 @@ sft_uv_test_system_install_denied() {
 # else be planted there.
 @test "[EXECUTION] uv: the tools/ lock files are writable but the rest of tools/ is not" {
   local fake_home tools_dir
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   tools_dir="${fake_home}/.local/share/uv/tools"
 
   sft_uv_prepare_home_outside_sandbox "$fake_home" || return 1
@@ -692,7 +692,7 @@ sft_uv_test_system_install_denied() {
 # NOTE: Test characterizes current behavior. Ideal behavior would disallow tampering.
 @test "[EXECUTION] can tamper with a cached uvx venv to place a binary where it will run outside sandbox" {
   local fake_home cache_dir cached_bins cached_bin fake_bin
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
 
   # Outside sandbox, create a cached venv
   HOME="$fake_home" run "$SFT_UV_BIN" tool run \
@@ -723,7 +723,7 @@ sft_uv_test_system_install_denied() {
 # NOTE: Test characterizes current behavior. Ideal behavior would disallow tampering.
 @test "[EXECUTION] can tamper with a cached uv run --script environment to place a binary where it will run outside sandbox" {
   local fake_home script_path cache_dir env_dirs env_dir fake_python marker
-  fake_home="$(sft_uv_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   script_path="$(sft_workspace_path "uv_cached_script.py")" || return 1
   marker="$(sft_workspace_path "planted_python_ran")" || return 1
   sft_uv_write_inline_deps_script "$script_path" || return 1
@@ -764,23 +764,6 @@ sft_uv_test_system_install_denied() {
 # ------------------------------------------------------------------------------
 # Utility
 
-# Creates a new fake home with uv's XDG roots, and prints its path.
-sft_uv_fake_home() {
-  local fake_home
-  fake_home="$(sft_fake_home)" || return 1
-  sft_uv_create_xdg_roots "$fake_home" || return 1
-  printf '%s\n' "$fake_home"
-}
-
-# Creates uv's XDG roots in the given home.
-sft_uv_create_xdg_roots() {
-  local home="$1"
-  # Precreate the XDG roots that uv uses outside the sandbox because doing so
-  # inside the sandbox is denied. On a real machine they would exist for a user
-  # who has run uv outside the sandbox at least once.
-  mkdir -p "${home}/.cache" "${home}/.local/share"
-}
-
 # Runs `uv tool run` once outside the sandbox, as a user would before starting
 # a sandboxed agent, then clears uv's cache so a sandboxed run must build its
 # own venv.
@@ -819,105 +802,14 @@ print("${SFT_UV_TEST_PKG}", importlib.metadata.version("${SFT_UV_TEST_PKG}"), sy
 EOF
 }
 
-# 1. Skip the current test if the requested Python install type is absent.
-# 2. Set SFT_UV_SYSTEM_PYTHON_BIN to that install's python3.
-# 3. Set SFT_UV_PEP668_FLAG to --break-system-packages for Homebrew,
-#    so that the sandbox, not PEP 668's EXTERNALLY-MANAGED marker,
-#    is what refuses a system install.
-#
-# NOTE: Duplicate logic in: sft_pip_use_python, sft_uv_use_system_python
-sft_uv_use_system_python() {
-  local install_type="$1" python_bin brew_prefix
-
-  case "$install_type" in
-    python.org)
-      python_bin="/Library/Frameworks/Python.framework/Versions/Current/bin/python3"
-      ;;
-    homebrew)
-      brew_prefix="$(brew --prefix 2>/dev/null || true)"
-      [ -n "$brew_prefix" ] || skip "Homebrew is not installed"
-      python_bin="${brew_prefix}/bin/python3"
-      ;;
-    *)
-      echo "unknown Python install type: $install_type" >&2
-      return 1
-      ;;
-  esac
-  [ -x "$python_bin" ] || skip "${install_type} Python is not installed"
-
-  export SFT_UV_SYSTEM_PYTHON_BIN="$python_bin"
-  export SFT_UV_PEP668_FLAG=""
-  [ "$install_type" != "homebrew" ] || SFT_UV_PEP668_FLAG="--break-system-packages"
-}
-
-# 1. Set SFT_UV_SITE_PACKAGES and SFT_UV_SCRIPTS_DIR to where a system
-#    (non-venv, non-user) install lands.
-# 2. Hold the interpreter's global-site lock until teardown.
-# 3. Skip the test when it cannot be exercised faithfully, since a sandbox
-#    denial proves nothing there: when the test package is already installed
-#    globally, or when site-packages is not writable by this user.
-sft_uv_require_system_install_target() {
-  SFT_UV_SITE_PACKAGES="$("$SFT_UV_SYSTEM_PYTHON_BIN" -c \
-    'import sysconfig; print(sysconfig.get_path("purelib"))')" || return 1
-  SFT_UV_SCRIPTS_DIR="$("$SFT_UV_SYSTEM_PYTHON_BIN" -c \
-    'import sysconfig; print(sysconfig.get_path("scripts"))')" || return 1
-
-  sft_uv_acquire_system_lock || return 1
-
-  # Skip if package appears to have been installed before test run started,
-  # so that we do NOT adopt it and do NOT uninstall it later.
-  [ ! -e "${SFT_UV_SITE_PACKAGES}/${SFT_UV_TEST_PKG}" ] \
-    || skip "${SFT_UV_TEST_PKG} is already installed globally"
-
-  [ -w "$SFT_UV_SITE_PACKAGES" ] && [ -w "$SFT_UV_SCRIPTS_DIR" ] \
-    || skip "global site-packages/bin not writable by this user (${SFT_UV_SITE_PACKAGES})"
-}
-
-# Serializes tests that use one interpreter's global site-packages.
-#
-# NOTE: Same lock path used by: sft_pip_acquire_global_lock, sft_uv_acquire_system_lock
-#
-# Released by sft_uv_release_system_lock in teardown.
-sft_uv_acquire_system_lock() {
-  local timeout=600
-
-  local key lock_dir
-  key="$(printf '%s' "$SFT_UV_SITE_PACKAGES" | cksum | cut -d' ' -f1)"
-  lock_dir="${BATS_RUN_TMPDIR}/sft-pip-global-${key}.lock"
-
-  local waited=0
-  until mkdir "$lock_dir" 2>/dev/null; do
-    if [ "$waited" -ge "$timeout" ]; then
-      echo "timed out after ${timeout}s waiting for ${lock_dir}" >&2
-      return 1
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-
-  SFT_UV_SYSTEM_LOCK="$lock_dir"
-}
-
-sft_uv_release_system_lock() {
-  [ -n "${SFT_UV_SYSTEM_LOCK:-}" ] || return 0
-  rmdir "$SFT_UV_SYSTEM_LOCK" 2>/dev/null || true
-  SFT_UV_SYSTEM_LOCK=""
-}
-
 # Uninstalls the test package from the interpreter's global site-packages,
 # in case a sandbox failure let a system install through.
 sft_uv_cleanup_system_install() {
   [ "${SFT_UV_SYSTEM_DIRTY:-}" = 1 ] || return 0
   # shellcheck disable=SC2086
-  "$SFT_UV_BIN" pip uninstall --system --python "$SFT_UV_SYSTEM_PYTHON_BIN" \
-    $SFT_UV_PEP668_FLAG "$SFT_UV_TEST_PKG" >/dev/null 2>&1 || true
+  "$SFT_UV_BIN" pip uninstall --system --python "$SFT_PY_PYTHON_BIN" \
+    $SFT_PY_PEP668_FLAG "$SFT_UV_TEST_PKG" >/dev/null 2>&1 || true
   SFT_UV_SYSTEM_DIRTY=0
-}
-
-# Prints a digest of the names, modes, inodes and change times of every path
-# under the given paths, without following symlinks.
-sft_uv_snapshot() {
-  find "$@" -exec /usr/bin/stat -f '%N %Sp %i %z %m' {} + | LC_ALL=C sort | shasum
 }
 
 # Installs the test package globally,

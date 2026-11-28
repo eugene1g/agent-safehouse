@@ -88,10 +88,13 @@ sft_isolate_path_from_host_home() {
 }
 
 sft_teardown_test_env() {
+  sft_release_run_locks
+
   cd "${BATS_TEST_DIRNAME:-/}" || return 1
   sft_remove_test_root "${SAFEHOUSE_FAKE_HOME_ROOT:-}" || return 1
   sft_remove_test_root "${SAFEHOUSE_EXTERNAL_ROOT:-}" || return 1
   sft_remove_test_root "${SAFEHOUSE_WORKSPACE_ROOT:-}" || return 1
+
   if [ "${SFT_TEST_OWNS_SUITE:-}" = 1 ]; then
     sft_teardown_suite || return 1
   fi
@@ -111,13 +114,13 @@ sft_remove_test_root() {
   [[ -z "$path" ]] && return 0
 
   case "$path" in
-    "${BATS_TEST_TMPDIR}"/safehouse-workspace-root.*)
-      rm -rf -- "$path"
-      ;;
-    "${SAFEHOUSE_HOST_HOME}"/.safehouse-bats-home-root.*)
-      rm -rf -- "$path"
-      ;;
+    "${BATS_TEST_TMPDIR}"/safehouse-workspace-root.* | \
+    "${SAFEHOUSE_HOST_HOME}"/.safehouse-bats-home-root.* | \
     "${SAFEHOUSE_HOST_HOME}"/.safehouse-bats-external.*)
+      # Restore write permission first, since some tools leave read-only
+      # directories behind, which rm cannot empty.
+      # e.g. virtualenv's wheel cache, ~/Library/Caches/virtualenv/wheel/
+      [ ! -e "$path" ] || chmod -R u+w "$path" || return 1
       rm -rf -- "$path"
       ;;
     *)
@@ -353,10 +356,11 @@ sft_assert_file_omits_source() {
   sft_assert_file_not_contains "$path" "$(sft_source_marker "$source_path")"
 }
 
+# Fails if $path exists, including as a dangling symlink.
 sft_assert_path_absent() {
   local path="$1"
 
-  [ ! -e "$path" ] && return 0
+  [ ! -e "$path" ] && [ ! -L "$path" ] && return 0
 
   printf 'expected path to be absent: %s\n' "$path" >&2
   return 1
@@ -369,8 +373,79 @@ sft_external_dir() {
   mktemp -d "${SAFEHOUSE_EXTERNAL_ROOT}/${label}.XXXXXX"
 }
 
+# Creates a new fake home and prints its path. Options add standard dirs that
+# a real home would already have, and that a sandboxed tool may be unable to
+# create itself:
+# --macos-dirs: See sft_create_macos_home_dirs.
+# --xdg-dirs:   See sft_create_xdg_home_dirs.
 sft_fake_home() {
-  mktemp -d "${SAFEHOUSE_FAKE_HOME_ROOT}/home.XXXXXX"
+  local fake_home opt
+  fake_home="$(mktemp -d "${SAFEHOUSE_FAKE_HOME_ROOT}/home.XXXXXX")" || return 1
+  for opt in "$@"; do
+    case "$opt" in
+      --macos-dirs) sft_create_macos_home_dirs "$fake_home" || return 1 ;;
+      --xdg-dirs)   sft_create_xdg_home_dirs "$fake_home" || return 1 ;;
+      *) printf 'sft_fake_home: unknown option: %s\n' "$opt" >&2; return 1 ;;
+    esac
+  done
+  printf '%s\n' "$fake_home"
+}
+
+# Creates the ~/Library directories that macOS creates for every new user,
+# where many tools put their default config, data, cache and logs.
+sft_create_macos_home_dirs() {
+  local home="$1"
+  mkdir -p \
+    "${home}/Library/Application Support" \
+    "${home}/Library/Caches" \
+    "${home}/Library/Logs"
+}
+
+# Creates the default XDG roots, which XDG-style tools write under. A real home
+# has them once any such tool has run outside the sandbox.
+sft_create_xdg_home_dirs() {
+  local home="$1"
+  mkdir -p \
+    "${home}/.cache" \
+    "${home}/.local/share"
+}
+
+# Prints a digest of the names, modes, inodes and change times of every path
+# under the given paths, without following symlinks. Compare digests taken
+# before and after an action to assert that it left those trees unchanged.
+sft_tree_snapshot() {
+  find "$@" -exec /usr/bin/stat -f '%N %Sp %i %z %m' {} + | LC_ALL=C sort | shasum
+}
+
+# Holds a lock named $1, shared by all tests in the bats run, until
+# sft_release_run_locks. Waits up to 600s for another test to release it.
+# Serializes tests that use one shared resource outside the fake home,
+# such as an interpreter's global site-packages.
+sft_acquire_run_lock() {
+  local name="$1" timeout=600 lock_dir waited=0
+  # BATS_RUN_TMPDIR is shared by all parallel workers of the same bats run,
+  # and is discarded with the run.
+  lock_dir="${BATS_RUN_TMPDIR}/sft-${name}.lock"
+
+  until mkdir "$lock_dir" 2>/dev/null; do
+    if [ "$waited" -ge "$timeout" ]; then
+      echo "timed out after ${timeout}s waiting for ${lock_dir}" >&2
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+
+  SFT_RUN_LOCKS+=("$lock_dir")
+}
+
+# Releases every lock this test holds. Called by sft_teardown_test_env.
+sft_release_run_locks() {
+  local lock_dir
+  for lock_dir in ${SFT_RUN_LOCKS[@]+"${SFT_RUN_LOCKS[@]}"}; do
+    rmdir "$lock_dir" 2>/dev/null || true
+  done
+  SFT_RUN_LOCKS=()
 }
 
 sft_workspace_path() {
