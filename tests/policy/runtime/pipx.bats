@@ -58,6 +58,14 @@ setup_file() {
   if "$SFT_PIPX_BIN" run --help 2>/dev/null | grep -q -- '--backend'; then
     SFT_PIPX_HAS_BACKENDS=1
   fi
+
+  # Fetch python-build-standalone's release index once, for the tests that
+  # download a standalone interpreter. See sft_pipx_load_python_index.
+  export SFT_PIPX_PYTHON_INDEX="${BATS_FILE_TMPDIR}/pipx-python-index.json"
+  if "$SFT_PIPX_BIN" run --help 2>/dev/null | grep -q -- '--fetch-'; then
+    sft_pipx_fetch_python_index "$SFT_PIPX_PYTHON_INDEX" \
+      || echo "# WARNING: could not fetch the python-build-standalone index" >&3
+  fi
 }
 
 # === Basics ===
@@ -351,22 +359,22 @@ sft_pipx_test_shared_libs_immutable() {
 
 # === Interpreters ===
 
-@test "[EXECUTION] pipx run --fetch-missing-python cannot provision a standalone interpreter (pip backend)" {
+@test "[EXECUTION] pipx run --fetch-python cannot provision a standalone interpreter (pip backend)" {
   sft_pipx_use_backend pip
-  sft_pipx_test_fetch_missing_python_denied
+  sft_pipx_test_fetch_python_denied
 }
-@test "[EXECUTION] pipx run --fetch-missing-python cannot provision a standalone interpreter (uv backend)" {
+@test "[EXECUTION] pipx run --fetch-python cannot provision a standalone interpreter (uv backend)" {
   # NOTE: pipx downloads the interpreter itself, into py/, under either backend.
   sft_pipx_use_backend uv
-  sft_pipx_test_fetch_missing_python_denied
+  sft_pipx_test_fetch_python_denied
 }
-sft_pipx_test_fetch_missing_python_denied() {
+sft_pipx_test_fetch_python_denied() {
   local fake_home py_dir fetch_arg py_version
-  sft_pipx_fetch_missing_python_arg_or_skip fetch_arg
-  sft_pipx_missing_python_version_or_skip py_version
+  sft_pipx_fetch_python_args_or_skip fetch_arg py_version
 
   fake_home="$(sft_pipx_fake_home)" || return 1
   sft_pipx_prepare_home_outside_sandbox "$fake_home" || return 1
+  sft_pipx_load_python_index "$fake_home" || return 1
   py_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_STANDALONE_PYTHON_CACHEDIR)" || return 1
 
   # Ensure cannot download a standalone interpreter into py/
@@ -394,16 +402,27 @@ sft_pipx_test_fetched_python_immutable() {
   # An installed tool's venv uses the fetched interpreter as its Python home,
   # so a write to its stdlib (e.g. a sitecustomize.py) would run inside the tool,
   # outside the sandbox.
-  local fake_home py_dir fetch_arg py_version interp_dir stdlib_dir snapshot_before
-  sft_pipx_fetch_missing_python_arg_or_skip fetch_arg
-  sft_pipx_missing_python_version_or_skip py_version
+  local fake_home py_dir fetch_arg py_version interp_dir stdlib_dir snapshot_before output
+  sft_pipx_fetch_python_args_or_skip fetch_arg py_version
 
   # Outside sandbox, install a tool with a fetched interpreter
+  # NOTE: Prints pipx's output and logs on failure
   fake_home="$(sft_pipx_fake_home)" || return 1
-  HOME="$fake_home" "$SFT_PIPX_BIN" install \
-    ${SFT_PIPX_BACKEND_ARGS[@]+"${SFT_PIPX_BACKEND_ARGS[@]}"} \
-    "$fetch_arg" --python "$py_version" \
-    "${SFT_PIPX_TEST_PKG}==${SFT_PIPX_TEST_PKG_VERSION}" >/dev/null || return 1
+  sft_pipx_load_python_index "$fake_home" || return 1
+  if ! output="$(HOME="$fake_home" "$SFT_PIPX_BIN" install \
+      ${SFT_PIPX_BACKEND_ARGS[@]+"${SFT_PIPX_BACKEND_ARGS[@]}"} \
+      "$fetch_arg" --python "$py_version" \
+      "${SFT_PIPX_TEST_PKG}==${SFT_PIPX_TEST_PKG_VERSION}" 2>&1)"; then
+    local log_dir log_file
+    printf 'pipx install with a fetched Python %s failed:\n%s\n' "$py_version" "$output" >&2
+    log_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_LOG_DIR)" || return 1
+    for log_file in "$log_dir"/*.log; do
+      [ -f "$log_file" ] || continue
+      printf '\n=== pipx log: %s\n' "$log_file" >&2
+      cat "$log_file" >&2
+    done
+    return 1
+  fi
   py_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_STANDALONE_PYTHON_CACHEDIR)" || return 1
   interp_dir="${py_dir}/${py_version}"
   stdlib_dir="${interp_dir}/lib/python${py_version}"
@@ -476,11 +495,13 @@ sft_pipx_test_fetched_python_immutable() {
 # 2. Set SFT_PIPX_BACKEND to its name.
 # 3. Set SFT_PIPX_BACKEND_ARGS to the args that select it,
 #    to pass to pipx subcommands that accept --backend.
+# 4. For the uv backend, make uv findable by pipx inside the sandbox
+#    for the rest of the test.
 #
 # NOTE: Selects the backend with --backend rather than PIPX_DEFAULT_BACKEND
 #       because the sandbox does not pass that env var through by default.
 sft_pipx_use_backend() {
-  local backend="$1" uv_bin
+  local backend="$1" uv_bin uv_dir
 
   case "$backend" in
     pip)
@@ -492,12 +513,13 @@ sft_pipx_use_backend() {
     uv)
       [ "$SFT_PIPX_HAS_BACKENDS" = "1" ] || skip "pipx does not support --backend"
       sft_command_path_or_skip uv_bin uv
-      # pipx finds uv on PATH. A PATH entry under the host HOME is dropped
-      # from the sandbox's PATH because each test runs with a fake HOME,
-      # so a real user's ~/.local/bin/uv would be found but this one not.
+      # If uv is installed under the host HOME, put its directory back on PATH
+      # granted read-only so that sandbox calls in the test can see it
       case "$uv_bin" in
         "$SAFEHOUSE_HOST_HOME"/*)
-          skip "uv is installed under the host HOME (${uv_bin}), which the sandbox cannot see under a fake HOME. Suggest install uv via brew instead."
+          uv_dir="$(dirname "$uv_bin")"
+          export PATH="${uv_dir}:${PATH}"
+          export SAFEHOUSE_ADD_DIRS_RO="${SAFEHOUSE_ADD_DIRS_RO:+${SAFEHOUSE_ADD_DIRS_RO}:}${uv_dir}"
           ;;
       esac
       SFT_PIPX_BACKEND=uv
@@ -607,35 +629,74 @@ sft_pipx_prepare_home_outside_sandbox() {
   fi
 }
 
-# Sets the variable named $1 to the `pipx run` option that downloads a
-# standalone interpreter only when the requested version is missing.
-# Skips the current test if pipx cannot download interpreters.
-sft_pipx_fetch_missing_python_arg_or_skip() {
-  local out_var="$1" run_help
-  run_help="$("$SFT_PIPX_BIN" run --help 2>/dev/null)"
+# Writes python-build-standalone's latest release index to $1, in the format
+# of the index that pipx caches.
+#
+# Authenticates with GH_TOKEN if set. Unauthenticated, the GitHub API has a
+# lower rate limit.
+sft_pipx_fetch_python_index() {
+  local index_file="$1" release_file="${1}.release" auth_file="${1}.auth"
 
-  if [[ "$run_help" == *"--fetch-python"* ]]; then
-    # pipx 1.18+ deprecates --fetch-missing-python in favor of this
-    printf -v "$out_var" '%s' "--fetch-python=missing"
-  elif [[ "$run_help" == *"--fetch-missing-python"* ]]; then
-    printf -v "$out_var" '%s' "--fetch-missing-python"
-  else
-    skip "pipx cannot download standalone interpreters"
-  fi
+  # NOTE: Passes the token in a file, not argv, so that ps cannot see it.
+  ( umask 077; : > "$auth_file" ) || return 1
+  [ -z "${GH_TOKEN:-}" ] \
+    || printf 'Authorization: Bearer %s\n' "$GH_TOKEN" > "$auth_file" || return 1
+  curl -fsSL --retry 3 -o "$release_file" \
+    -H "@${auth_file}" -H 'Accept: application/vnd.github+json' \
+    https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest
+  local rc=$?
+  rm -f "$auth_file"
+  [ "$rc" -eq 0 ] || return 1
+
+  # NOTE: macOS 15+ is known to ship jq
+  jq -c '{fetched: now, releases: [.assets[] | [.browser_download_url, .digest]]}' \
+    "$release_file" > "$index_file" || return 1
+  rm -f "$release_file"
 }
 
-# Sets the variable named $1 to a Python version that python-build-standalone
-# provides but that is not on PATH, so pipx must download it.
-# Skips the current test if every candidate is already on PATH.
-sft_pipx_missing_python_version_or_skip() {
-  local out_var="$1" version
+# Copies the index from sft_pipx_fetch_python_index into the fake home at $1,
+# so that pipx does not fetch the index itself when it downloads an interpreter.
+# pipx trusts a cached index for 30 days (pipx 1.18).
+sft_pipx_load_python_index() {
+  local fake_home="$1" py_dir
 
-  for version in 3.13 3.12 3.11 3.14; do
-    command -v "python${version}" >/dev/null 2>&1 && continue
-    printf -v "$out_var" '%s' "$version"
+  [ -s "$SFT_PIPX_PYTHON_INDEX" ] || {
+    echo "python-build-standalone index missing: setup_file could not fetch it" >&2
+    return 1
+  }
+  py_dir="$(sft_pipx_env_value_outside_sandbox "$fake_home" PIPX_STANDALONE_PYTHON_CACHEDIR)" || return 1
+  mkdir -p "$py_dir" || return 1
+  cp "$SFT_PIPX_PYTHON_INDEX" "${py_dir}/index.json"
+}
+
+# Sets the variable named $1 to the pipx option that downloads a standalone
+# interpreter, and the variable named $2 to a Python version to download.
+#
+# Skips the current test if pipx cannot download interpreters, or if it can
+# download only missing versions and every candidate is already on PATH.
+sft_pipx_fetch_python_args_or_skip() {
+  local arg_var="$1" version_var="$2" run_help version
+
+  run_help="$("$SFT_PIPX_BIN" run --help 2>/dev/null)"
+  if [[ "$run_help" == *"--fetch-python"* ]]; then
+    # Prepare to install a fixed Python version,
+    # regardless of any Python versions on PATH
+    printf -v "$arg_var" '%s' "--fetch-python=always"
+    printf -v "$version_var" '%s' "3.13"
     return 0
-  done
-  skip "every candidate Python version is already on PATH"
+  fi
+  if [[ "$run_help" == *"--fetch-missing-python"* ]]; then
+    # Prepare to install a Python version that is not on PATH.
+    # NOTE: Each candidate must be one that python-build-standalone provides.
+    for version in 3.13 3.12 3.11 3.14; do
+      command -v "python${version}" >/dev/null 2>&1 && continue
+      printf -v "$arg_var" '%s' "--fetch-missing-python"
+      printf -v "$version_var" '%s' "$version"
+      return 0
+    done
+    skip "every candidate Python version is already on PATH"
+  fi
+  skip "pipx cannot download standalone interpreters"
 }
 
 # Prints the value of a `pipx environment` variable for $fake_home.

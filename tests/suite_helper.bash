@@ -53,6 +53,7 @@ SFT_ENV_ALLOWED_NAMES=(
   SSH_AUTH_SOCK  # ssh.bats: launchd listener socket
   SDKROOT
   JAVA_HOME      # toolchains.bats: java test (set on GitHub runners)
+  GH_TOKEN       # pipx.bats: authenticates its GitHub API fetch (set on GitHub runners)
   # E2E agent configuration
   SAFEHOUSE_OPENCODE_V2_BIN
   # E2E agent credentials
