@@ -401,13 +401,15 @@ sft_create_macos_home_dirs() {
     "${home}/Library/Logs"
 }
 
-# Creates the default XDG roots, which XDG-style tools write under. A real home
-# has them once any such tool has run outside the sandbox.
+# Creates the default XDG base directories, which XDG-style tools write under.
+# A real home has them once any such tool has run outside the sandbox.
 sft_create_xdg_home_dirs() {
   local home="$1"
   mkdir -p \
+    "${home}/.config" \
     "${home}/.cache" \
-    "${home}/.local/share"
+    "${home}/.local/share" \
+    "${home}/.local/state"
 }
 
 # Prints a digest of the names, modes, inodes and change times of every path

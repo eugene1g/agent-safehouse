@@ -289,7 +289,8 @@ The split is intentional: the default Safehouse profile already allows broad acc
 - **`sft_external_path <label> <name>`** — creates an external directory and returns a path inside it.
 - **`sft_fake_home`** — creates and returns a second fake home under `SAFEHOUSE_FAKE_HOME_ROOT` when one test needs more than the default fake `HOME`.
   - `--macos-dirs` adds the `~/Library` dirs every macOS account has.
-  - `--xdg-dirs` adds `~/.cache` and `~/.local/share`.
+  - `--xdg-dirs` adds the default XDG base directories: `~/.config`, `~/.cache`,
+    `~/.local/share` and `~/.local/state`.
   - `sft_create_macos_home_dirs <home>` and `sft_create_xdg_home_dirs <home>`
     add the corresponding dirs to an existing home.
 

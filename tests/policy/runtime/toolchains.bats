@@ -323,7 +323,7 @@ load ../../test_helper.bash
   # Create the XDG roots aube writes under, as a real home would have them,
   # since the sandbox cannot create an XDG root itself.
   if [[ "$sandbox_home" != "$SAFEHOUSE_HOST_HOME" ]]; then
-    mkdir -p "${sandbox_home}/.local/share" "${sandbox_home}/.cache" || return 1
+    sft_create_xdg_home_dirs "$sandbox_home" || return 1
   fi
 
   mkdir -p "${project_dir}/local-dep" || return 1

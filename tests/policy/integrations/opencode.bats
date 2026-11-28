@@ -46,19 +46,12 @@ EOF
 @test "[EXECUTION] opencode profile can bootstrap XDG paths when config dir is symlinked" {
   local fake_home workdir fake_opencode target_dir
 
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   workdir="${fake_home}/sites/test"
   fake_opencode="${fake_home}/.local/bin/opencode"
   target_dir="${fake_home}/.dotfiles/.config/opencode"
 
-  mkdir -p \
-    "$workdir" \
-    "${fake_home}/.config" \
-    "${fake_home}/.cache" \
-    "${fake_home}/.local" \
-    "${fake_home}/.local/share" \
-    "${fake_home}/.local/state" \
-    "$target_dir" || return 1
+  mkdir -p "$workdir" "$target_dir" || return 1
   /bin/ln -sf ../.dotfiles/.config/opencode "${fake_home}/.config/opencode"
   make_fake_opencode_bootstrap "$fake_opencode" || return 1
 
@@ -73,17 +66,11 @@ EOF
 @test "[EXECUTION] opencode profile can bootstrap its XDG paths when the XDG roots already exist" {
   local fake_home workdir fake_opencode
 
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   workdir="${fake_home}/sites/test"
   fake_opencode="${fake_home}/.local/bin/opencode"
 
-  # Create the XDG roots outside the sandbox, as for a user who has run OpenCode before
-  mkdir -p \
-    "$workdir" \
-    "${fake_home}/.config" \
-    "${fake_home}/.cache" \
-    "${fake_home}/.local/share" \
-    "${fake_home}/.local/state" || return 1
+  mkdir -p "$workdir" || return 1
   make_fake_opencode_bootstrap "$fake_opencode" || return 1
 
   HOME="$fake_home" safehouse_ok_in_dir "$workdir" -- "$fake_opencode"
@@ -97,7 +84,7 @@ EOF
 @test "[EXECUTION] opencode profile cannot move or create XDG base directory roots" {
   local fake_home workdir fake_opencode root
 
-  fake_home="$(sft_fake_home)" || return 1
+  fake_home="$(sft_fake_home --xdg-dirs)" || return 1
   workdir="${fake_home}/sites/test"
   fake_opencode="${fake_home}/.local/bin/opencode"
   mkdir -p "$workdir" || return 1
@@ -105,11 +92,6 @@ EOF
 
   # Ensure cannot move a root out from under other profiles' read-only rules,
   # where its contents could be modified and then moved back
-  mkdir -p \
-    "${fake_home}/.config" \
-    "${fake_home}/.cache" \
-    "${fake_home}/.local/share" \
-    "${fake_home}/.local/state" || return 1
   for root in .config .cache .local .local/share .local/state; do
     HOME="$fake_home" safehouse_denied_in_dir "$workdir" -- \
       "$fake_opencode" /bin/mv "${fake_home}/${root}" "${workdir}/moved_root"

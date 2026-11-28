@@ -16,19 +16,19 @@ prepare_opencode_v2() {
   fi
   OPENCODE_V2_BIN="$(sft_agent_tui_resolve_command_path "$OPENCODE_V2_BIN")"
 
-  # Keep HOME and ancestor configs outside /tmp and the workdir grant: otherwise
-  # broad temporary-directory access masks the config discovery regression (#198).
-  OPENCODE_V2_HOME="$(sft_fake_home)"
+  # Create the XDG roots, which OpenCode cannot create inside the sandbox,
+  # as they exist for a user who has run OpenCode before
+  # NOTE: Keep HOME and ancestor configs outside /tmp and the workdir grant:
+  #       otherwise broad temporary-directory access masks the config discovery
+  #       regression (#198).
+  OPENCODE_V2_HOME="$(sft_fake_home --xdg-dirs)"
   export HOME="$OPENCODE_V2_HOME"
   export XDG_CONFIG_HOME="${HOME}/.config"
   export XDG_CACHE_HOME="${HOME}/.cache"
   export XDG_DATA_HOME="${HOME}/.local/share"
   export XDG_STATE_HOME="${HOME}/.local/state"
   AGENT_TUI_WORKDIR="${HOME}/projects/repo"
-  # Create the XDG roots, which OpenCode cannot create inside the sandbox,
-  # as they exist for a user who has run OpenCode before
-  mkdir -p "$AGENT_TUI_WORKDIR" "${HOME}/.claude" "${XDG_CONFIG_HOME}/opencode" \
-    "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
+  mkdir -p "$AGENT_TUI_WORKDIR" "${HOME}/.claude" "${XDG_CONFIG_HOME}/opencode"
   printf '{}\n' >"${HOME}/projects/opencode.json"
   printf '{"model":"anthropic/claude-sonnet-5"}\n' >"${XDG_CONFIG_HOME}/opencode/opencode.json"
 
